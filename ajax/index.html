@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet"
+    href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css"/>
+  <style>
+    body {
+      margin: 1em;
+    }
+    #table1 {
+      width:100%;
+      padding-top: 1em;
+    }
+    #table1_filter {
+      float: left;
+    }
+    #table1_length {
+      float: right;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+      float: left;
+    }
+    table.dataTable thead th {
+      font-size: 0.8em;
+    }
+    tfoot {
+      display: table-header-group;
+    }
+    tfoot input {
+      width: 100%;
+      padding: 3px;
+      box-sizing: border-box;
+    }
+    table.dataTable tfoot tr th p {
+      margin: 1px;
+    }
+    table.dataTable tfoot th, table.dataTable tfoot td {
+      padding: 1px;
+    }
+  </style>
+</head>
+<body>
+  <p>To perform a regex search, start search with <code>^</code></p>
+  <table id="table1" class="display" style="width:100%"></table>
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js">
+  </script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js">
+  </script>
+  <script>
+    $(document).ready(function () {
+
+      init();
+
+      // Could do this before document.ready
+      async function getHeader() {
+        let resp = await fetch("/header");
+        const header = await resp.json();
+        return header;
+      }
+
+      async function getConfig(header) {
+
+        //let resp = await fetch("/config");
+        //const cfgo = await resp.json();
+
+        columnDefs = [];
+        searchCols = [];
+        for (let i = 0; i < header.length; i++) {
+          columnDefs.push({ "name": header[i], "targets": i, "visible": true });
+          searchCols.push(null);
+        }
+
+        let cfg = {
+          "processing": true,
+          "serverSide": true,
+          "deferRender": true,
+          "lengthMenu": [ [10, 50, 100, 500, 1000, -1], [10, 50, 100, 500, 1000, "All"] ],
+          "lengthChange": true,
+          "fixedHeader": {"footer": true},          
+          "search": {
+            "regex": true,
+            "smart": false,
+            "return": true // If true, must hit return key to invoke search
+          },
+          "columnDefs": columnDefs,
+          "searchCols": searchCols,
+        };
+        return cfg;
+        }
+
+      async function init() {
+        const header = await getHeader();
+        const config = await getConfig(header);
+        //init(header, config);
+
+        $('#table1').append('<thead><tr></tr></thead>');
+        $('#table1').append('<tfoot><tr></tr></tfoot>');
+        let thead = $('#table1 > thead > tr');
+        let tfoot = $('#table1 > tfoot > tr');
+        for (let i = 0; i < header.length; i++) {
+          thead.append(`<th>${header[i]}</th>`);
+          tfoot.append(`<th>${header[i]}</th>`);
+        } 
+        $('#table1').append('<tbody></tbody>');
+
+        $('#table1 > tfoot > tr > th').each(function () {
+          let title = $(this).text();
+          $(this).html('<p><input type="text" placeholder="Search col."/></p>');
+        });
+
+        // https://datatables.net/reference/option/
+        let dataTableOptions = 
+          {
+            ...config,
+            "ajax": {
+              "url": "data/",
+              "type": "get",
+              "data": function(dtp) {
+                let names = [];
+                for (let c = 0; c < dtp.columns.length; c++) {
+                  names.push(dtp.columns[c].name);
+                  let searchValue = dtp.columns[c].search.value;
+                  if (searchValue) {
+                    dtp[name] = searchValue;
+                  }
+                }
+                dtp.search = dtp.search.value;
+                dtp.orderby = names[dtp.order[0]['column']];
+                dtp.orderdir = dtp.order[0]['column']['dir'] == 'asc' ? 'asc' : 'desc';
+                dtp.globalsearch = dtp.search;
+                delete dtp.search;
+                delete dtp.columns;
+                delete dtp.order;
+                return dtp;
+              }
+            },
+            "initComplete": function () {
+              // Column search initialization
+              this.api().columns().every( function () {
+                let that = this;
+                let event = config["search"]["return"] ? 'keypress' : 'keyup change clear';  
+                $('input', this.footer())
+                  .on(event, function () {
+                    if (that.search() !== this.value) {
+                      that.search(this.value).draw();
+                    }
+                });
+              });
+            }
+          };
+        console.log(dataTableOptions);
+
+        $('#table1').DataTable(dataTableOptions);
+      }
+    });
+  </script>
+</body>
