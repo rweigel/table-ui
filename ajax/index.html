@@ -71,13 +71,15 @@
           searchCols.push(null);
         }
 
+        // https://datatables.net/reference/option/
         let cfg = {
           "processing": true,
-          "serverSide": true,
+          "serverSide": false,
           "deferRender": true,
+          "stateSave": true,
           "lengthMenu": [ [10, 50, 100, 500, 1000, -1], [10, 50, 100, 500, 1000, "All"] ],
           "lengthChange": true,
-          "fixedHeader": {"footer": true},          
+          "fixedHeader": {"footer": true},
           "search": {
             "regex": true,
             "smart": false,
@@ -86,13 +88,40 @@
           "columnDefs": columnDefs,
           "searchCols": searchCols,
         };
-        return cfg;
+
+        if (cfg['severSearch']) {
+          cfg['ajax'] = {
+            "url": "data/",
+            "type": "get",
+            "data": function(dtp) {
+              let names = [];
+              for (let c = 0; c < dtp.columns.length; c++) {
+                names.push(dtp.columns[c].name);
+                let searchValue = dtp.columns[c].search.value;
+                if (searchValue) {
+                  dtp[name] = searchValue;
+                }
+              }
+              dtp.search = dtp.search.value;
+              dtp.orderby = names[dtp.order[0]['column']];
+              dtp.orderdir = dtp.order[0]['column']['dir'] == 'asc' ? 'asc' : 'desc';
+              dtp.globalsearch = dtp.search;
+              delete dtp.search;
+              delete dtp.columns;
+              delete dtp.order;
+              return dtp;
+            }
+          };
+        } else {
+          cfg['ajax'] = "data/";
         }
+
+        return cfg;
+      }
 
       async function init() {
         const header = await getHeader();
         const config = await getConfig(header);
-        //init(header, config);
 
         $('#table1').append('<thead><tr></tr></thead>');
         $('#table1').append('<tfoot><tr></tr></tfoot>');
@@ -100,55 +129,47 @@
         let tfoot = $('#table1 > tfoot > tr');
         for (let i = 0; i < header.length; i++) {
           thead.append(`<th>${header[i]}</th>`);
-          tfoot.append(`<th>${header[i]}</th>`);
-        } 
+          tfoot.append(`<td>${header[i]}</td>`);
+        }
         $('#table1').append('<tbody></tbody>');
 
-        $('#table1 > tfoot > tr > th').each(function () {
-          let title = $(this).text();
-          $(this).html('<p><input type="text" placeholder="Search col."/></p>');
-        });
+        $("#table1").on( 'length.dt', function () {
+          console.log( 'Redraw occurred at: '+new Date().getTime() );
+      } );
 
-        // https://datatables.net/reference/option/
-        let dataTableOptions = 
+      // https://datatables.net/reference/option/
+        let dataTableOptions =
           {
             ...config,
-            "ajax": {
-              "url": "data/",
-              "type": "get",
-              "data": function(dtp) {
-                let names = [];
-                for (let c = 0; c < dtp.columns.length; c++) {
-                  names.push(dtp.columns[c].name);
-                  let searchValue = dtp.columns[c].search.value;
-                  if (searchValue) {
-                    dtp[name] = searchValue;
-                  }
-                }
-                dtp.search = dtp.search.value;
-                dtp.orderby = names[dtp.order[0]['column']];
-                dtp.orderdir = dtp.order[0]['column']['dir'] == 'asc' ? 'asc' : 'desc';
-                dtp.globalsearch = dtp.search;
-                delete dtp.search;
-                delete dtp.columns;
-                delete dtp.order;
-                return dtp;
-              }
-            },
             "initComplete": function () {
-              // Column search initialization
+
+              let input = $('#table1_filter input').attr('placeholder','Global search')
+              $('#table1_filter label').replaceWith(input[0]);
+              $('#table1_info').insertBefore('#table1');
+              $('#table1_paginate').insertBefore('#table1');
+
               this.api().columns().every( function () {
-                let that = this;
-                let event = config["search"]["return"] ? 'keypress' : 'keyup change clear';  
-                $('input', this.footer())
-                  .on(event, function () {
-                    if (that.search() !== this.value) {
-                      that.search(this.value).draw();
-                    }
+              var that = this;
+
+              // Create the `select` element
+              $("tfoot tr > td").eq(this.index()).html('');
+              var input = $('<input type="text" placeholder="Search col."/>')
+                .appendTo($("tfoot tr > td").eq(this.index()))
+                .on("keyup", function() {
+                  that.search($(this).val()).draw();
                 });
+
+              // Restore state saved values
+              var state = this.state.loaded();
+              if (state) {
+                var val = state.columns[this.index()];
+                input.val(val.search.search);
+              }
+
               });
             }
           };
+
         console.log(dataTableOptions);
 
         $('#table1').DataTable(dataTableOptions);
