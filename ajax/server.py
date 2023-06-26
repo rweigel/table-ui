@@ -51,6 +51,18 @@ else:
   with open(args['file_head']) as f:
     HEAD = json.load(f)
 
+def ids2colnums(cids):
+  scols = []
+  for cid in cids:
+    for hidx, hid in enumerate(HEAD):
+      if hid == cid:
+        scols.append(hidx)
+  return scols
+
+def process(parameters):
+  print(ids2colnums(parameters["orders"]))
+  return len(DATA), len(DATA)
+
 def cors_headers(response: Response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "*"
@@ -77,21 +89,20 @@ def data(request: Request):
 
   parameters = dict(request.query_params)
 
-  recordsTotal = len(DATA)
-
   if not "start" in parameters:
     # No server-side processing. Serve entire file.
     return JSONResponse(content={"data": DATA})
 
   start = int(parameters["start"])
   end = int(parameters["start"]) + int(parameters["length"])
-  data = DATA[start:end]
+
+  recordsTotal, recordsFiltered = process(parameters)
 
   content = {
               "draw": parameters["draw"],
               "recordsTotal": recordsTotal,
-              "recordsFiltered": recordsTotal,
-              "data": data
+              "recordsFiltered": recordsFiltered,
+              "data": DATA[start:end]
             }
 
   return JSONResponse(content=content)

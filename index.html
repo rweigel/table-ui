@@ -99,14 +99,13 @@
           "deferRender": true,
           "stateSave": true,
           "lengthMenu": [ [10, 50, 100, 500, 1000, -1], [10, 50, 100, 500, 1000, "All"] ],
-          "processing": true,
           "lengthChange": true,
+          "processing": true, // Show "processing" indicator
           "scrollX": true,
           "scrollY": true,
           "autoWidth": true,
           //"fixedHeader": {"footer": true},
           "fixedHeader": true,
-          "fixedColumns": true,
           "search": {
             "regex": true,
             "smart": false,
@@ -179,7 +178,7 @@
         //console.log(dataTableOptions);
 
         let table = $('#table1').DataTable(dataTableOptions);
-        //new $.fn.dataTable.FixedColumns( table );
+        new $.fn.dataTable.FixedColumns( table );
 
         function adjustDOM() {
 
@@ -217,7 +216,7 @@
           // on initial scroll.
           //$('.dataTables_scroll thead th').css('z-index',-1);
         }
-
+  
         function dtInitComplete() {
 
           adjustDOM();
