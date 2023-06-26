@@ -108,7 +108,7 @@
           "search": {
             "regex": true,
             "smart": false,
-            "return": false // If true, must hit return key to invoke search
+            "return": true // If true, must hit return key to invoke search
           },
           "columnDefs": columnDefs,
           "searchCols": searchCols,
@@ -213,8 +213,15 @@
             $("thead tr:eq(0) > th").eq(this.index()).html('');
             var input = $('<input type="text" placeholder="Search col."/>')
               .appendTo($("thead tr:eq(0) > th").eq(this.index()))
-              .on("keyup", function() {
-                that.search($(this).val()).draw();
+              .on("keydown", function() {
+                if (!config["search"]["return"]) {
+                  that.search($(this).val()).draw();
+                } else {
+                  var keycode = (event.keyCode ? event.keyCode : event.which);
+                  if(keycode == '13'){
+                    that.search($(this).val()).draw();
+                  }
+                }
               });
             //$("thead tr:eq(0)").before($("thead tr:eq(1)"));
             // Restore state saved values
