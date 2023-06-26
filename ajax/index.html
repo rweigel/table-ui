@@ -2,8 +2,8 @@
 <html>
 <head>
   <meta charset="UTF-8">
-    <link href="https://cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.css" rel="stylesheet"/>
-    <script src="https://cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.js"></script>
+    <link href="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.css" rel="stylesheet"/>
+    <script src="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.js"></script>
     <script src="//cdn.datatables.net/plug-ins/1.13.4/dataRender/ellipsis.js"></script>
   <style>
     body {
@@ -100,6 +100,7 @@
           "stateSave": true,
           "lengthMenu": [ [10, 50, 100, 500, 1000, -1], [10, 50, 100, 500, 1000, "All"] ],
           "lengthChange": true,
+          "processing": true, // Show "processing" indicator
           "scrollX": true,
           "scrollY": true,
           "autoWidth": true,
@@ -179,32 +180,46 @@
         let table = $('#table1').DataTable(dataTableOptions);
         new $.fn.dataTable.FixedColumns( table );
 
-        function dtInitComplete() {
+        function adjustDOM() {
 
-          if ($("#table1").dataTable().api().page.info().pages == 1) {
-            // Hide paging if only one page
-            $("#table1_paginate").hide();
-          }
-
+          $("#table1")
+            .on('draw.dt', function () {
+              // Hide paging if only one page on draw event.
+              if ($("#table1").dataTable().api().page.info().pages == 1) {
+                $("#table1_paginate").hide();
+              } else {
+                $("#table1_paginate").show();
+              }
+            })
+            .trigger('draw.dt');
+            // trigger() above needed for initial load for b/c draw.dt not triggered.
+  
           let input = $('#table1_filter input').attr('placeholder','Global search')
           $('#table1_filter label').replaceWith(input[0]);
           $('#table1_info').insertAfter('#table1_filter');
           $('#table1_paginate').insertAfter('#table1_filter');
           $('#dataTables_length').append('<br>');
-
+  
           // A resize triggers left column header width
           // to match the width of the body columns.
           setTimeout(function() {$(window).resize()}, 0);
-
+  
           // Make the added header search row fixed b/c the fixedColumns
           // plugin does not seem to "see" the added row.
           $("thead tr:eq(0) > th:eq(0)")
             .css('position', 'sticky')
             .css('left', '0px')
             .css('z-index', '1000000')
-            .css('background-color', 'white')
+            .css('background-color', 'white');
+  
+          // Prevent double header on first column showing when
+          // on initial scroll.
+          //$('.dataTables_scroll thead th').css('z-index',-1);
+        }
+  
+        function dtInitComplete() {
 
-          //$('.dataTables_scrollHeadInner thead tr:eq(1)').hide();
+          adjustDOM();
 
           this.api().columns().every( function () {
             var that = this;
