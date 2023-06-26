@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 
 def cli():
+
   port = sys.argv[1]
   host = "0.0.0.0"
   file_head = "data/hapi.table.head.json"
@@ -24,6 +25,7 @@ def cli():
     file_head = sys.argv[2]
   if len(sys.argv) > 2:
     file_body = sys.argv[3]
+
   return {
           'port': int(port),
           'host': host,
