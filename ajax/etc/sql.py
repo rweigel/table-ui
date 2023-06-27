@@ -47,7 +47,9 @@ def read_and_prep(header_file, matrix_file):
   print(end - start)
   return header, matrix
 
-def createdb(table, file="table.db", name="table", header=None):
+def createdb(table, file="table.db", name="table1", header=None):
+
+  header[2] = "_" + header[2]
 
   column_names = f"({', '.join(header)})"
   column_spec  = f"({', '.join(header)} TEXT)"
@@ -56,21 +58,23 @@ def createdb(table, file="table.db", name="table", header=None):
   create  = f'CREATE TABLE {name} {column_spec}'
   execute = f'INSERT INTO {name} {column_names} VALUES {column_vals}'
 
-  #print(create)
-  #print(execute)
+  print(create)
+  print(execute)
 
   conn = sqlite3.connect(file)
   #conn = sqlite3.connect(":memory:")
   cursor = conn.cursor()
   cursor.execute(create)
-  cursor.execute("CREATE INDEX idx_datasetID ON matrix (datasetID)")
+  if header is not None:
+    #cursor.execute(f"CREATE INDEX idx_{header[0]} ON matrix (datasetID)")
+    print(f"CREATE INDEX idx_{header[0]} ON matrix (datasetID)")
   cursor.executemany(execute, table)
   conn.commit()
   #print(list(cursor.execute('SELECT * FROM matrix')))
   #conn.close()
   #return conn
 
-def querydb(conn, name, orders=None, offset=1, limit=18446744073709551615):
+def querydb(conn, name, query="", orders=None, offset=1, limit=18446744073709551615):
 
   # 18446744073709551615 is the maximum value for a 64-bit unsigned integer
   # See https://stackoverflow.com/a/271650 for why used.
@@ -91,14 +95,14 @@ def querydb(conn, name, orders=None, offset=1, limit=18446744073709551615):
   if offset != 1:
     subset = f'LIMIT {limit} OFFSET {offset}'
 
-  query = f"SELECT * FROM {name} WHERE datasetID LIKE 'AC_H0_MFI' {orderby} {subset}"
+  query = f"SELECT * FROM {name} {query} {orderby} {subset}"
   print(query)
   cursor.execute(query)
   return cursor.fetchall()
 
 regen = True
 name = "matrix"
-file = "matrix.db"
+file = sys.argv[2] + ".sql"
 #file = ":memory:"
 
 if regen or not os.path.exists(file):
@@ -120,13 +124,15 @@ import time
 start = time.time()
 print("Querying database.")
 #smatrix = querydb(conn, name, orders=orders)
-smatrix = querydb(conn, name, offset=1, limit=10)
+query = f"WHERE {header[0]} LIKE 'AC_H0_MFI'"
+smatrix = querydb(conn, name, query=query, offset=1, limit=10)
 print(len(smatrix))
 end = time.time()
 print(end - start)
 print("Done.")
 
-#for row in smatrix: print(row)
+import json
+print(json.dumps(smatrix))
 print("Closing connection.")
 conn.close()
 print("Done.")

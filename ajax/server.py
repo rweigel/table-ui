@@ -39,19 +39,37 @@ root_dir = os.path.dirname(__file__)
 
 app = FastAPI()
 
-if not os.path.exists(args['file_body']):
-  print("ERROR: File not found: " + args['file_body'])
-  exit(1)
-with open(args['file_body']) as f:
-  DATA = json.load(f)
-DATA_mtime_last = os.path.getmtime(args['file_body'])
+def querydb(conn, name, query="", orders=None, offset=1, limit=18446744073709551615):
 
-if not os.path.exists(args['file_head']):
-  print("WARNING: File not found: " + args['file_head'])
-  HEAD = {}
-else:
-  with open(args['file_head']) as f:
-    HEAD = json.load(f)
+  # 18446744073709551615 is the maximum value for a 64-bit unsigned integer
+  # See https://stackoverflow.com/a/271650 for why used.
+
+  cursor = conn.cursor()
+
+  orderby = ""
+  if orders is not None:
+    orderby = "ORDER BY "
+    for order in orders:
+      if order.startswith("-"):
+        orderby += f"{order[1:]} DESC, "
+      else:
+        orderby += f"{order} ASC, "
+    orderby = orderby[:-2]
+
+  subset = ""
+  if offset != 1:
+    subset = f'LIMIT {limit} OFFSET {offset}'
+
+  query = f"SELECT * FROM {name} {query} {orderby} {subset}"
+  print(query)
+  cursor.execute(query)
+  return cursor.fetchall()
+
+def query(start=None, end=None):
+  if start is None:
+    return DATA, len(DATA), len(DATA)
+
+  return DATA[start:end], len(DATA), len(DATA)
 
 def ids2colnums(cids):
   scols = []
@@ -60,10 +78,6 @@ def ids2colnums(cids):
       if hid == cid:
         scols.append(hidx)
   return scols
-
-def process(parameters):
-  print(ids2colnums(parameters["orders"]))
-  return len(DATA), len(DATA)
 
 def cors_headers(response: Response):
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -93,24 +107,47 @@ def data(request: Request):
 
   if not "start" in parameters:
     # No server-side processing. Serve entire file.
-    return JSONResponse(content={"data": DATA})
+    data, recordsTotal, recordsFiltered = query()
+    return JSONResponse(content={"data": data})
 
   start = int(parameters["start"])
   end = int(parameters["start"]) + int(parameters["length"])
-
-  recordsTotal, recordsFiltered = process(parameters)
+  data, recordsTotal, recordsFiltered = query(start=start, end=end)
 
   content = {
               "draw": parameters["draw"],
               "recordsTotal": recordsTotal,
               "recordsFiltered": recordsFiltered,
-              "data": DATA[start:end]
+              "data": data
             }
 
   return JSONResponse(content=content)
 
 # Serve static files
 app.mount("/", StaticFiles(directory=root_dir), name="root")
+
+if not os.path.exists(args['file_head']):
+  print("WARNING: File not found: " + args['file_head'])
+  HEAD = {}
+else:
+  with open(args['file_head']) as f:
+    HEAD = json.load(f)
+
+if not os.path.exists(args['file_body']):
+  print("ERROR: File not found: " + args['file_body'])
+  exit(1)
+
+if args['file_body'].endswith(".json"):
+  with open(args['file_body']) as f:
+    print("Reading: " + args['file_body'])
+    DATA = json.load(f)
+    DATA_mtime_last = os.path.getmtime(args['file_body'])
+else:
+  import sqlite3
+  print("Connecting to database file " + args['file_body'])
+  conn = sqlite3.connect(args['file_body'])
+  print("Querying database.")
+  DATA = querydb(conn, "matrix")
 
 if __name__ == "__main__":
   ukwargs = {

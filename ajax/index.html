@@ -59,6 +59,26 @@
     table.dataTable tfoot th, table.dataTable tfoot td {
       padding: 1px;
     }
+
+    /* https://simurai.com/blog/2011/07/26/webkit-scrollbar */
+    .dataTables_scrollBody::-webkit-scrollbar {
+      -webkit-appearance: none;
+      width: 1px;
+    }
+    .dataTables_scrollBody::-webkit-scrollbar-thumb {
+      border-radius: 1px;
+      background-color: rgba(0,0,0,.5);
+      box-shadow: 0 0 1px rgba(255,255,255,.5);
+    }
+
+    /* https://stackoverflow.com/a/63507769 */
+    #table1 {
+      transform: rotateX(180deg);
+      overflow-x: auto;
+    } 
+    .dataTables_scrollBody {
+      transform: rotateX(180deg);
+    }
   </style>
 </head>
 <body>
@@ -104,7 +124,6 @@
           "scrollX": true,
           "scrollY": true,
           "autoWidth": true,
-          //"fixedHeader": {"footer": true},
           "fixedHeader": true,
           "fixedColumns": true,
           "search": {
@@ -116,7 +135,7 @@
           "searchCols": searchCols,
         };
 
-        if (cfg['severSearch']) {
+        if (cfg['serverSide']) {
           cfg['ajax'] = {
             "url": "data/",
             "type": "get",
@@ -147,6 +166,7 @@
       }
 
       async function init() {
+
         const header = await getHeader();
         const config = await getConfig(header);
 
@@ -223,11 +243,13 @@
           adjustDOM();
 
           this.api().columns().every( function () {
+
             var that = this;
 
             // Create the `select` element
             $("thead tr:eq(0) > th").eq(this.index()).html('');
-            var input = $('<input type="text" placeholder="Search col."/>')
+            let input = $(`<input type="text" placeholder="Search col." style="max-width:5em"/>`);
+            input
               .appendTo($("thead tr:eq(0) > th").eq(this.index()))
               .on("keydown", function() {
                 if (!config["search"]["return"]) {
@@ -239,7 +261,6 @@
                   }
                 }
               });
-            //$("thead tr:eq(0)").before($("thead tr:eq(1)"));
             // Restore state saved values
             var state = this.state.loaded();
             if (state) {
