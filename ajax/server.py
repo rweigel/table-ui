@@ -60,7 +60,7 @@ def querydb(conn, name, query="", orders=None, offset=1, limit=18446744073709551
   if offset != 1:
     subset = f'LIMIT {limit} OFFSET {offset}'
 
-  query = f"SELECT * FROM {name} {query} {orderby} {subset}"
+  query = f"SELECT * FROM `{name}` {query} {orderby} {subset}"
   print(query)
   cursor.execute(query)
   return cursor.fetchall()
@@ -87,12 +87,12 @@ def cors_headers(response: Response):
 
 @app.route("/", methods=["GET", "HEAD"])
 def config(request: Request):
-  return FileResponse('index.html')
+  return FileResponse(os.path.join(os.path.dirname(__file__),'index.html'))
 
 @app.route("/config", methods=["GET", "HEAD"])
 def config(request: Request):
-  if os.path.exists(args['file_conf']):
-    return FileResponse(args['file_conf'])
+  if args['file_body'].endswith(".sql"):
+    return JSONResponse(content={"serverSide": True})
   else:
     return JSONResponse(content={})
 
@@ -144,10 +144,17 @@ if args['file_body'].endswith(".json"):
     DATA_mtime_last = os.path.getmtime(args['file_body'])
 else:
   import sqlite3
+
   print("Connecting to database file " + args['file_body'])
   conn = sqlite3.connect(args['file_body'])
+
   print("Querying database.")
-  DATA = querydb(conn, "matrix")
+  if len(sys.argv) == 4:
+    name = os.path.basename(args['file_body'].replace(".sql", ""))
+  else:
+    name = os.path.basename(sys.argv[4])
+
+  DATA = querydb(conn, name)
 
 if __name__ == "__main__":
   ukwargs = {

@@ -98,8 +98,8 @@
 
       async function getConfig(header) {
 
-        //let resp = await fetch("/config");
-        //const cfgo = await resp.json();
+        let resp = await fetch("/config");
+        const cfgo = await resp.json();
 
         columnDefs = [];
         searchCols = [];
@@ -118,7 +118,7 @@
           "serverSide": false,
           "deferRender": true,
           "stateSave": true,
-          "lengthMenu": [ [10, 50, 100, 500, 1000, -1], [10, 50, 100, 500, 1000, "All"] ],
+          "lengthMenu": [ [50, 100, 500, 1000, -1], [50, 100, 500, 1000, "All"] ],
           "processing": true,
           "lengthChange": true,
           "scrollX": true,
@@ -134,6 +134,7 @@
           "columnDefs": columnDefs,
           "searchCols": searchCols,
         };
+        cfg = {...cfg, ...cfgo};
 
         if (cfg['serverSide']) {
           cfg['ajax'] = {
@@ -161,7 +162,6 @@
         } else {
           cfg['ajax'] = "data/";
         }
-
         return cfg;
       }
 
