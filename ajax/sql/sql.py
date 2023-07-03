@@ -13,11 +13,11 @@ def read_and_prep(header_file, matrix_file):
       indices = [i for i, x in enumerate(headerlc) if x == val.lower()]
       if len(indices) > 1:
         dups = [header[i] for i in indices]
-        print("ERROR: Duplicate column names: " + str(dups))
+        print("ERROR: Duplicate column names when cast to lower case: " + str(dups))
         for r, idx in enumerate(indices):
           if r > 0:
             newname = header[idx] + "_$" + str(r) + "$"
-            print("Renaming " + header[idx] + " to " + newname)
+            #print("Renaming " + header[idx] + " to " + newname)
             headeru[idx] = newname
     return headeru
 

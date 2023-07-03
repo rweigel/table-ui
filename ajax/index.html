@@ -141,21 +141,27 @@
             "url": "data/",
             "type": "get",
             "data": function(dtp) {
-              let names = [];
               for (let c = 0; c < dtp.columns.length; c++) {
-                names.push(dtp.columns[c].name);
+                let name = dtp.columns[c]['name'];
                 let searchValue = dtp.columns[c].search.value;
                 if (searchValue) {
                   dtp[name] = searchValue;
                 }
               }
-              dtp.search = dtp.search.value;
-              dtp.orderby = names[dtp.order[0]['column']];
-              dtp.orderdir = dtp.order[0]['column']['dir'] == 'asc' ? 'asc' : 'desc';
-              dtp.globalsearch = dtp.search;
-              delete dtp.search;
+              orders = [];
+              for (let i = 0; i < dtp.order.length; i++) {
+                let  c = dtp.order[i].column;
+                let name = dtp.columns[c]['name'];
+                orders.push(dtp.order[i]['dir'] == 'asc' ? name : '-' + name);
+              }
+              //dtp.orderby = names[dtp.order[0]['column']];
+              dtp.orders = orders.join(",");
+              if (dtp.search.value)
+                dtp.globalsearch = dtp.search.value;
               delete dtp.columns;
+              delete dtp.search;
               delete dtp.order;
+              console.log(dtp)
               return dtp;
             }
           };
@@ -201,7 +207,7 @@
         let table = $('#table1').DataTable(dataTableOptions);
         //new $.fn.dataTable.FixedColumns( table );
 
-        function adjustDOM() {
+        function adjustDOM(table) {
 
           $("#table1")
             .on('draw.dt', function () {
@@ -211,20 +217,28 @@
               } else {
                 $("#table1_paginate").show();
               }
+              if (0) {
+                // Too slow
+                table.api().columns({page: 'current'}).every( function (index) {
+                  if (this.data().join('') === '') {
+                    table.api().columns(index).visible(false);
+                  }
+                });
+              }
             })
             .trigger('draw.dt');
             // trigger() above needed for initial load for b/c draw.dt not triggered.
-  
+
           let input = $('#table1_filter input').attr('placeholder','Global search')
           $('#table1_filter label').replaceWith(input[0]);
           $('#table1_info').insertAfter('#table1_filter');
           $('#table1_paginate').insertAfter('#table1_filter');
           $('#dataTables_length').append('<br>');
-  
+
           // A resize triggers left column header width
           // to match the width of the body columns.
           setTimeout(function() {$(window).resize()}, 0);
-  
+
           // Make the added header search row fixed b/c the fixedColumns
           // plugin does not seem to "see" the added row.
           $("thead tr:eq(0) > th:eq(0)")
@@ -232,7 +246,7 @@
             .css('left', '0px')
             .css('z-index', '1000000')
             .css('background-color', 'white');
-  
+
           // Prevent double header on first column showing when
           // on initial scroll.
           //$('.dataTables_scroll thead th').css('z-index',-1);
@@ -240,7 +254,7 @@
 
         function dtInitComplete() {
 
-          adjustDOM();
+          adjustDOM(this);
 
           this.api().columns().every( function () {
 

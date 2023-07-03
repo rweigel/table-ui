@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import json
 
 try:
@@ -13,7 +14,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 
-
 def cli():
 
   port = sys.argv[1]
@@ -21,140 +21,205 @@ def cli():
   file_head = "data/hapi.table.head.json"
   file_body = "data/hapi.table.body.json"
   file_conf = "data/hapi.table.conf.json"
-  if len(sys.argv) > 1:
-    file_head = sys.argv[2]
+
   if len(sys.argv) > 2:
+    file_head = sys.argv[2]
+  if not os.path.exists(file_head):
+    print("WARNING: File not found: " + file_head)
+
+  if len(sys.argv) > 3:
     file_body = sys.argv[3]
+  if not os.path.exists(file_body):
+    print("ERROR: File not found: " + file_body)
+    exit(1)
+
+  if len(sys.argv) > 4:
+    table = os.path.basename(sys.argv[4])
+  elif file_body.endswith(".sql"):
+      table = os.path.basename(file_body.replace(".sql", ""))
+  else:
+    table = None
+  if table is not None:
+    # TODO: Check if table exists in database
+    pass
 
   return {
           'port': int(port),
           'host': host,
           'file_head': file_head,
           'file_body': file_body,
-          'file_conf': file_conf
+          'file_conf': file_conf,
+          'table': table,
+          'root_dir': os.path.dirname(__file__)
+
         }
 
-args = cli()
-root_dir = os.path.dirname(__file__)
 
-app = FastAPI()
+def column_names(args):
+  if not os.path.exists(args['file_head']):
+    #print("WARNING: File not found: " + args['file_head'])
+    return {}
+  with open(args['file_head']) as f:
+    return json.load(f)
 
-def querydb(conn, name, query="", orders=None, offset=1, limit=18446744073709551615):
 
-  # 18446744073709551615 is the maximum value for a 64-bit unsigned integer
-  # See https://stackoverflow.com/a/271650 for why used.
+def querydb(conn, table, query="", orders=None, searches=None, offset=1, limit=None):
 
   cursor = conn.cursor()
 
-  orderby = ""
-  if orders is not None:
-    orderby = "ORDER BY "
+  def execute(query):
+    start = time.time()
+    print(query)
+    result = cursor.execute(query)
+    data = result.fetchall()
+    dt = "{:.4f} [s]".format(time.time() - start)
+    print(f"Took {dt} to query and fetch for {query}")
+    return data
+
+  def ntotal():
+    # Could cache this result
+    query = f"SELECT COUNT(*) FROM `{table}`"
+    return execute(query)[0]
+
+  def nfiltered(clause):
+    query = f"SELECT COUNT(*) FROM `{table}` {clause}"
+    return execute(query)[0]
+
+  def orderby(orders):
+    if orders is None:
+      return ""
+    orderstr = "ORDER BY "
     for order in orders:
       if order.startswith("-"):
-        orderby += f"{order[1:]} DESC, "
+        orderstr += f"`{order[1:]}` DESC, "
       else:
-        orderby += f"{order} ASC, "
-    orderby = orderby[:-2]
+        orderstr += f"`{order}` ASC, "
+    orderstr = orderstr[:-2]
+    return orderstr
 
-  subset = ""
-  if offset != 1:
-    subset = f'LIMIT {limit} OFFSET {offset}'
+  def clause(searches):
+    if searches is None:
+      return ""
+    keys = list(searches.keys())
+    where = []
+    for key in keys:
+      where.append(f"`{key}` LIKE '%{searches[key]}%'")
+    return "WHERE" + " AND ".join(where)
 
-  query = f"SELECT * FROM `{name}` {query} {orderby} {subset}"
-  print(query)
-  cursor.execute(query)
-  return cursor.fetchall()
+  print(clause(searches))
+  query = f"SELECT * FROM `{table}` {query} {clause(searches)} {orderby(orders)}"
 
-def query(start=None, end=None):
-  if start is None:
-    return DATA, len(DATA), len(DATA)
+  if offset == 1 and limit == None:
+    data = execute(query)
+    total = len(data)
+    filtered = total
+    if searches is not None:
+      total = ntotal()
+      filtered = nfiltered(clause(searches))
+    return data, total, filtered
 
-  return DATA[start:end], len(DATA), len(DATA)
+  total = ntotal()
+  filtered = total
+  if searches is not None:
+    filtered = nfiltered(clause(searches))
 
-def ids2colnums(cids):
-  scols = []
-  for cid in cids:
-    for hidx, hid in enumerate(HEAD):
-      if hid == cid:
-        scols.append(hidx)
-  return scols
+  if limit is None:
+    limit = total
 
-def cors_headers(response: Response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
-    return response 
+  query = f"{query} LIMIT {limit} OFFSET {offset}"
+  data = execute(query)
 
-@app.route("/", methods=["GET", "HEAD"])
-def config(request: Request):
-  return FileResponse(os.path.join(os.path.dirname(__file__),'index.html'))
+  return data, total, filtered
 
-@app.route("/config", methods=["GET", "HEAD"])
-def config(request: Request):
-  if args['file_body'].endswith(".sql"):
-    return JSONResponse(content={"serverSide": True})
+
+def query(args, query_params=None):
+
+  start = None
+  if query_params is not None and "start" in query_params:
+    start = int(query_params["start"])
+    end = int(query_params["start"]) + int(query_params["length"])
+
+  if args['table'] is None:
+    with open(args['file_body']) as f:
+      # TODO: Stream
+      print("Reading: " + args['file_body'])
+      DATA = json.load(f)
+      if start is None:
+        return DATA, len(DATA), len(DATA)
+      else:
+        return DATA[start:end], len(DATA), len(DATA)
   else:
-    return JSONResponse(content={})
+    import sqlite3
 
-@app.route("/header", methods=["GET", "HEAD"])
-def header(request: Request):
-  return JSONResponse(content=HEAD)
+    orders = None
+    if "orders" in query_params:
+      orders = query_params["orders"].split(",")
 
-@app.route("/data/", methods=["GET", "HEAD"])
-def data(request: Request):
+    searches = None
+    for key, value in query_params.items():
+      if key in column_names(args):
+        if searches is None: searches = {}
+        searches[key] = query_params[key]
 
-  parameters = dict(request.query_params)
+    print(searches)
+    print("Connecting to database file " + args['file_body'])
+    conn = sqlite3.connect(args['file_body'])
+    DATA, ntotal, nfiltered = querydb(conn, args['table'], orders=orders, searches=searches, offset=start+1, limit=end-start)
+    conn.close()
+    return DATA, ntotal, nfiltered
 
-  if not "start" in parameters:
-    # No server-side processing. Serve entire file.
-    data, recordsTotal, recordsFiltered = query()
-    return JSONResponse(content={"data": data})
 
-  start = int(parameters["start"])
-  end = int(parameters["start"]) + int(parameters["length"])
-  data, recordsTotal, recordsFiltered = query(start=start, end=end)
+def api_init(app, args):
 
-  content = {
-              "draw": parameters["draw"],
-              "recordsTotal": recordsTotal,
-              "recordsFiltered": recordsFiltered,
-              "data": data
-            }
+  def cors_headers(response: Response):
+      response.headers["Access-Control-Allow-Origin"] = "*"
+      response.headers["Access-Control-Allow-Headers"] = "*"
+      response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+      return response 
 
-  return JSONResponse(content=content)
+  @app.route("/", methods=["GET", "HEAD"])
+  def config(request: Request):
+    return FileResponse(os.path.join(os.path.dirname(__file__),'index.html'))
 
-# Serve static files
-app.mount("/", StaticFiles(directory=root_dir), name="root")
+  @app.route("/config", methods=["GET", "HEAD"])
+  def config(request: Request):
+    if args['file_body'].endswith(".sql"):
+      return JSONResponse(content={"serverSide": True})
+    else:
+      return JSONResponse(content={})
 
-if not os.path.exists(args['file_head']):
-  print("WARNING: File not found: " + args['file_head'])
-  HEAD = {}
-else:
-  with open(args['file_head']) as f:
-    HEAD = json.load(f)
+  @app.route("/header", methods=["GET", "HEAD"])
+  def header(request: Request):
+    return JSONResponse(content=column_names(args))
 
-if not os.path.exists(args['file_body']):
-  print("ERROR: File not found: " + args['file_body'])
-  exit(1)
+  @app.route("/data/", methods=["GET", "HEAD"])
+  def data(request: Request):
 
-if args['file_body'].endswith(".json"):
-  with open(args['file_body']) as f:
-    print("Reading: " + args['file_body'])
-    DATA = json.load(f)
-    DATA_mtime_last = os.path.getmtime(args['file_body'])
-else:
-  import sqlite3
+    query_params = dict(request.query_params)
 
-  print("Connecting to database file " + args['file_body'])
-  conn = sqlite3.connect(args['file_body'])
+    if not "start" in query_params:
+      # No server-side processing. Serve entire file or table.
+      data, ntotal, nfiltered = query(args)
+      return JSONResponse(content={"data": data})
 
-  print("Querying database.")
-  if len(sys.argv) == 4:
-    name = os.path.basename(args['file_body'].replace(".sql", ""))
-  else:
-    name = os.path.basename(sys.argv[4])
+    data, ntotal, nfiltered = query(args, query_params=query_params)
 
-  DATA = querydb(conn, name)
+    content = {
+                "draw": query_params["draw"],
+                "recordsTotal": ntotal,
+                "recordsFiltered": nfiltered,
+                "data": data
+              }
+
+    return JSONResponse(content=content)
+
+  # Serve static files
+  app.mount("/", StaticFiles(directory=args['root_dir']), name="root")
+
+
+args = cli()
+app = FastAPI()
+api_init(app, args)
 
 if __name__ == "__main__":
   ukwargs = {
