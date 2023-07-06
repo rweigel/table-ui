@@ -82,7 +82,7 @@
   </style>
 </head>
 <body>
-  <p>To execute any search, press enter key</p>
+  <p>To execute any search, press enter key. Shift+click to sort on multiple columns.</p>
   <table id="table1" class="display" style="width:100%"></table>
   <script>
     $(document).ready(function () {
@@ -145,7 +145,7 @@
                 let name = dtp.columns[c]['name'];
                 let searchValue = dtp.columns[c].search.value;
                 if (searchValue) {
-                  dtp[name] = searchValue;
+                  dtp["_" + name] = searchValue;
                 }
               }
               orders = [];

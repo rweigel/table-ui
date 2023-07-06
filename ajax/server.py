@@ -63,7 +63,7 @@ def column_names(args):
     return json.load(f)
 
 
-def querydb(conn, table, query="", orders=None, searches=None, offset=1, limit=None):
+def querydb(conn, table, query="", orders=None, searches=None, offset=0, limit=None):
 
   cursor = conn.cursor()
 
@@ -73,7 +73,7 @@ def querydb(conn, table, query="", orders=None, searches=None, offset=1, limit=N
     result = cursor.execute(query)
     data = result.fetchall()
     dt = "{:.4f} [s]".format(time.time() - start)
-    print(f"Took {dt} to query and fetch for {query}")
+    print(f"Took {dt} to query and fetch")
     return data
 
   def ntotal():
@@ -98,18 +98,21 @@ def querydb(conn, table, query="", orders=None, searches=None, offset=1, limit=N
     return orderstr
 
   def clause(searches):
+    print("----")
+    print(searches)
     if searches is None:
       return ""
     keys = list(searches.keys())
     where = []
     for key in keys:
-      where.append(f"`{key}` LIKE '%{searches[key]}%'")
+      where.append(f" `{key}` LIKE '%{searches[key]}%'")
+    if len(where) == 0:
+      return ""
     return "WHERE" + " AND ".join(where)
 
-  print(clause(searches))
   query = f"SELECT * FROM `{table}` {query} {clause(searches)} {orderby(orders)}"
 
-  if offset == 1 and limit == None:
+  if offset == 0 and limit == None:
     data = execute(query)
     total = len(data)
     filtered = total
@@ -155,16 +158,17 @@ def query(args, query_params=None):
     if "orders" in query_params:
       orders = query_params["orders"].split(",")
 
-    searches = None
+    searches = {}
     for key, value in query_params.items():
-      if key in column_names(args):
-        if searches is None: searches = {}
-        searches[key] = query_params[key]
+      keyx = key[1:] # Remove leading underscore
+      # Temporary fix to avoid collision with "draw", "start", "length", "orders".
+      # TODO: Do this the right way.
+      if keyx in column_names(args):
+        searches[keyx] = query_params[key]
 
-    print(searches)
     print("Connecting to database file " + args['file_body'])
     conn = sqlite3.connect(args['file_body'])
-    DATA, ntotal, nfiltered = querydb(conn, args['table'], orders=orders, searches=searches, offset=start+1, limit=end-start)
+    DATA, ntotal, nfiltered = querydb(conn, args['table'], orders=orders, searches=searches, offset=start, limit=end-start)
     conn.close()
     return DATA, ntotal, nfiltered
 
