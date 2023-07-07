@@ -5,7 +5,7 @@
     <link href="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.css" rel="stylesheet"/>
     <script src="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.js"></script>
     <script src="//cdn.datatables.net/plug-ins/1.13.4/dataRender/ellipsis.js"></script>
-  <style>
+    <style>
     body {
       margin: 1em;
     }
@@ -83,8 +83,66 @@
 </head>
 <body>
   <p>To execute any search, press enter key. Shift+click to sort on multiple columns.</p>
+
+  <div id="showHideColumns" style="float:right;display:inline-block;margin-right:1em">
+    <span id="showAllColumns" style="display:none">
+      <button onclick="showAllColumns('#table1')">Show All Columns</button>
+    </span>
+    <span id="hideEmptyColumns" style="display:none">
+        <button onclick="hideEmptyColumns('#table1')">Hide Empty Columns</button>
+    </span>
+    <span id="clearAllFilters" style="display:none">
+      <button onclick="clearAllFilters('#table1')">Clear All Filters</button>
+  </span>
+</div>
   <table id="table1" class="display" style="width:100%"></table>
   <script>
+
+    function showAllColumns(tableid) {
+      $("#showAllColumns button").append(" ... processing");
+      setTimeout(() => {
+        let texto = $("#showAllColumns").text();
+        $("#showAllColumns button").text(texto.replace(" ... processing", ""));
+        let table = $(tableid).DataTable();
+        table.columns().visible(true);
+        $("#hideEmptyColumns").show();
+        $("#showAllColumns").hide();
+      },0)
+    }
+
+    function hideEmptyColumns(tableid) {
+      let data = $(tableid).DataTable().data();
+      let columnEmpty = [];
+      for (let r = 0; r < data.length; r++) {
+        for (let c = 0; c < data[r].length; c++) {
+          if (r == 0) {
+            columnEmpty.push(true);
+          }
+          if (data[r][c] !== null && data[r][c] !== "") {
+            columnEmpty[c] = false;
+          }
+        }
+      }
+      let emptyColumns = [];
+      let n = 0;
+      for (let c = 0; c < columnEmpty.length; c++) {
+        if (columnEmpty[c] === true) {
+          n = n+1;
+          emptyColumns.push(c);
+        }
+      }
+      $(tableid).DataTable().columns(emptyColumns).visible(false);
+      if (n > 0) {
+        $("#showAllColumns").show();
+        $("#hideEmptyColumns").hide();
+      }
+    }
+
+    function clearAllFilters(tableid) {
+      $('input').each(function (idx, el) {$(el).val('')});
+      $(tableid).DataTable().search('').columns().search('').draw();
+    }
+
     $(document).ready(function () {
 
       init();
@@ -217,14 +275,6 @@
               } else {
                 $("#table1_paginate").show();
               }
-              if (0) {
-                // Too slow
-                table.api().columns({page: 'current'}).every( function (index) {
-                  if (this.data().join('') === '') {
-                    table.api().columns(index).visible(false);
-                  }
-                });
-              }
             })
             .trigger('draw.dt');
             // trigger() above needed for initial load for b/c draw.dt not triggered.
@@ -234,6 +284,7 @@
           $('#table1_info').insertAfter('#table1_filter');
           $('#table1_paginate').insertAfter('#table1_filter');
           $('#dataTables_length').append('<br>');
+          $('#showHideColumns').insertBefore('#table1_info');
 
           // A resize triggers left column header width
           // to match the width of the body columns.
@@ -256,8 +307,20 @@
 
           adjustDOM(this);
 
+          var numCols = $('#table1').DataTable().columns().nodes().length;
+          var numColsVisible = $('#table1').DataTable().columns(':visible').nodes().length;
+
+          if (numColsVisible == numCols) {
+            $("#hideEmptyColumns").show();
+            $('#showAllColumns').hide();
+          } else {
+            $("#hideEmptyColumns").hide();
+            $('#showAllColumns').show();
+          }
+
           this.api().columns().every( function () {
 
+            //console.log(this.column().visible())
             var that = this;
 
             // Create the `select` element
@@ -268,10 +331,12 @@
               .on("keydown", function() {
                 if (!config["search"]["return"]) {
                   that.search($(this).val()).draw();
+                  $('#clearAllFilters').show();
                 } else {
                   var keycode = (event.keyCode ? event.keyCode : event.which);
                   if(keycode == '13'){
                     that.search($(this).val()).draw();
+                    $('#clearAllFilters').show();
                   }
                 }
               });
