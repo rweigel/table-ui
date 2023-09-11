@@ -91,14 +91,14 @@
 
       // Could do this before document.ready
       async function getHeader() {
-        let resp = await fetch("/header");
+        let resp = await fetch(window.location.href + "header");
         const header = await resp.json();
         return header;
       }
 
       async function getConfig(header) {
 
-        let resp = await fetch("/config");
+        let resp = await fetch(window.location.href + "config");
         const cfgo = await resp.json();
 
         columnDefs = [];
@@ -138,7 +138,7 @@
 
         if (cfg['serverSide']) {
           cfg['ajax'] = {
-            "url": "data/",
+            "url": window.location.href + "data/",
             "type": "get",
             "data": function(dtp) {
               for (let c = 0; c < dtp.columns.length; c++) {
@@ -166,7 +166,7 @@
             }
           };
         } else {
-          cfg['ajax'] = "data/";
+          cfg['ajax'] = window.location.href + "data/";
         }
         return cfg;
       }
