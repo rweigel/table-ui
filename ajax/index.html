@@ -83,7 +83,7 @@
   </style>
 </head>
 <body>
-  <p>To execute any search, press enter key. Shift+click to sort on multiple columns.</p>
+  <p>To execute any search, press enter key. Shift+click to sort on multiple columns. A entry of <code>⎵</code> means value is a single blank space.</p>
 
   <div id="showHideColumns" style="float:right;display:inline-block;margin-right:1em">
     <span id="showAllColumns" style="display:none">
@@ -144,20 +144,34 @@
       $(tableid).DataTable().search('').columns().search('').draw();
     }
 
-    $(document).ready(function () {
+    function parseQueryString() {
+      // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
+      var nvpair = {};
+      var qs = window.location.hash.replace('#', '');
+      if (qs.length == 0) {
+              return {};
+      }
+      var pairs = qs.split('&');
+      $.each(pairs, function(i, v){
+        var pair = v.split('=');
+        nvpair[pair[0]] = decodeURIComponent(pair[1].replace(/\+/g," "));
+      });
+      return nvpair;
+}
+
+$(document).ready(function () {
 
       init();
 
       // Could do this before document.ready
       async function getHeader() {
-        let resp = await fetch(window.location.href + "header");
+        let resp = await fetch(window.location.pathname + "header");
         const header = await resp.json();
         return header;
       }
 
       async function getConfig(header) {
-
-        let resp = await fetch(window.location.href + "config");
+        let resp = await fetch(window.location.pathname + "config");
         const cfgo = await resp.json();
 
         columnDefs = [];
@@ -197,7 +211,7 @@
 
         if (cfg['serverSide']) {
           cfg['ajax'] = {
-            "url": window.location.href + "data/",
+            "url": window.location.pathname + "data/",
             "type": "get",
             "data": function(dtp) {
               for (let c = 0; c < dtp.columns.length; c++) {
@@ -221,6 +235,17 @@
               delete dtp.search;
               delete dtp.order;
               console.log(dtp)
+              console.log(location.hash);
+              let qs = parseQueryString(location.hash);
+              console.log({...dtp, ...qs});
+              $('#table1').dataTable().api().columns().every( function () {
+                let name = cfg.columnDefs[this.index()]['name'];
+                //console.log(name)
+                if (qs["_" + name]) {
+                  console.log("Setting search for " + name + " to " + qs[name]);
+                  this.search(qs["_" + name]);
+                }
+              });
               return dtp;
             }
           };
