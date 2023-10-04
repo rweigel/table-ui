@@ -141,6 +141,7 @@
 
     function clearAllFilters(tableid) {
       $('input').each(function (idx, el) {$(el).val('')});
+      location.hash = "";
       $(tableid).DataTable().search('').columns().search('').draw();
     }
 
@@ -272,7 +273,7 @@
                 if (searchValue) {
                   let name = dtp.columns[c]['name'];
                   dtp["_" + name] = searchValue;
-                  updateQueryString("_" + "_" + name, searchValue);
+                  updateQueryString("_" + name, searchValue);
                 }
               }
 
