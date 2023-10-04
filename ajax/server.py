@@ -138,9 +138,9 @@ def querydb(conn, table, query="", orders=None, searches=None, offset=0, limit=N
 def query(args, query_params=None):
 
   start = None
-  if query_params is not None and "start" in query_params:
-    start = int(query_params["start"])
-    end = int(query_params["start"]) + int(query_params["length"])
+  if query_params is not None and "_start" in query_params:
+    start = int(query_params["_start"])
+    end = int(query_params["_start"]) + int(query_params["_length"])
 
   if args['table'] is None:
     with open(args['file_body']) as f:
@@ -155,16 +155,13 @@ def query(args, query_params=None):
     import sqlite3
 
     orders = None
-    if "orders" in query_params:
-      orders = query_params["orders"].split(",")
+    if "_orders" in query_params:
+      orders = query_params["_orders"].split(",")
 
     searches = {}
     for key, value in query_params.items():
-      keyx = key[1:] # Remove leading underscore
-      # Temporary fix to avoid collision with "draw", "start", "length", "orders".
-      # TODO: Do this the right way.
-      if keyx in column_names(args):
-        searches[keyx] = query_params[key]
+      if key in column_names(args):
+        searches[key] = query_params[key]
 
     print("Connecting to database file " + args['file_body'])
     conn = sqlite3.connect(args['file_body'])
@@ -201,7 +198,7 @@ def api_init(app, args):
 
     query_params = dict(request.query_params)
 
-    if not "start" in query_params:
+    if not "_start" in query_params:
       # No server-side processing. Serve entire file or table.
       data, ntotal, nfiltered = query(args)
       return JSONResponse(content={"data": data})
@@ -209,7 +206,7 @@ def api_init(app, args):
     data, ntotal, nfiltered = query(args, query_params=query_params)
 
     content = {
-                "draw": query_params["draw"],
+                "draw": query_params["_draw"],
                 "recordsTotal": ntotal,
                 "recordsFiltered": nfiltered,
                 "data": data

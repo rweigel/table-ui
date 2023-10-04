@@ -265,6 +265,7 @@
             "data": function(dtp) {
               console.log("Search executed");
 
+              // Get search entries
               for (let c = 0; c < dtp.columns.length; c++) {
                 let searchValue = dtp.columns[c].search.value;
                 if (dtp.draw == 1) {
@@ -272,21 +273,32 @@
                 }
                 if (searchValue) {
                   let name = dtp.columns[c]['name'];
-                  dtp["_" + name] = searchValue;
-                  updateQueryString("_" + name, searchValue);
+                  dtp[name] = searchValue;
+                  updateQueryString(name, searchValue);
                 }
               }
 
-              orders = [];
-              for (let i = 0; i < dtp.order.length; i++) {
-                let  c = dtp.order[i].column;
-                let name = dtp.columns[c]['name'];
-                orders.push(dtp.order[i]['dir'] == 'asc' ? name : '-' + name);
+              if (dtp.search.value) {
+                dtp._globalsearch = dtp.search.value;
               }
-              //dtp.orderby = names[dtp.order[0]['column']];
-              dtp.orders = orders.join(",");
-              if (dtp.search.value)
-                dtp.globalsearch = dtp.search.value;
+
+              _orders = [];
+              for (let i = 0; i < dtp.order.length; i++) {
+                let c = dtp.order[i].column;
+                let name = dtp.columns[c]['name'];
+                _orders.push(dtp.order[i]['dir'] == 'asc' ? name : '-' + name);
+              }
+              dtp._orders = _orders.join(",");
+
+              dtp._length = dtp.length;
+              delete dtp.length;
+
+              dtp._start = dtp.start;
+              delete dtp.start;
+
+              dtp._draw = dtp.draw;
+              delete dtp.draw;
+
               delete dtp.columns;
               delete dtp.search;
               delete dtp.order;
