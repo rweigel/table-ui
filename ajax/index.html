@@ -157,9 +157,56 @@
         nvpair[pair[0]] = decodeURIComponent(pair[1].replace(/\+/g," "));
       });
       return nvpair;
-}
+    }
 
-$(document).ready(function () {
+    function updateQueryString(name, val) {
+      let qs = parseQueryString();
+      qs[name] = val;
+      location.hash = decodeURIComponent($.param(qs));
+    }
+
+    function getInitialSearch(tableid,index) {
+
+      // TODO: Cache qs and localStorage result.
+      let qs = parseQueryString(location.hash);
+      //console.log(qs)
+      if (localStorage.getItem('config')) {
+        config = JSON.parse(localStorage.getItem('config'));
+      }
+      //console.log(config.columnDefs[index]['name'])
+      if (qs["_" + config.columnDefs[index]['name']]) {
+        let val = qs["_" + config.columnDefs[index]['name']];
+        console.log(`getInitialSearch(): Query string search val for column #${index} = "${val}"`);
+        return val;
+      }
+      //console.log(config.columnDefs[index]['name'])
+
+      // Restore state saved values
+      let state = $('#'+tableid).dataTable().api().column(index).state.loaded();
+      if (state) {
+        let val = state.columns[index];
+        if (val.search.search) {
+          console.log(`getInitialSearch(): Saved state search val for column #${index} = "${val.search.search}"`);
+          return val.search.search;
+        }
+        //input.val(val.search.search);
+      }
+      return "";
+
+      $('#'+tableid).dataTable().api().columns().every( function () {
+        let name = cfg.columnDefs[this.index()]['name'];
+        let input = $(`#${tableid} input #${name}`);
+        //console.log(name)
+        if (qs["_" + name]) {
+          console.log("Setting search for " + name + " to " + qs[name]);
+          $(this).val(qs["_" + name])
+          //this.search(qs["_" + name]);
+        }
+
+      });
+    }
+
+    $(document).ready(function () {
 
       init();
 
@@ -171,6 +218,7 @@ $(document).ready(function () {
       }
 
       async function getConfig(header) {
+
         let resp = await fetch(window.location.pathname + "config");
         const cfgo = await resp.json();
 
@@ -214,13 +262,20 @@ $(document).ready(function () {
             "url": window.location.pathname + "data/",
             "type": "get",
             "data": function(dtp) {
+              console.log("Search executed");
+
               for (let c = 0; c < dtp.columns.length; c++) {
-                let name = dtp.columns[c]['name'];
                 let searchValue = dtp.columns[c].search.value;
+                if (dtp.draw == 1) {
+                  searchValue = getInitialSearch('table1',c);
+                }
                 if (searchValue) {
+                  let name = dtp.columns[c]['name'];
                   dtp["_" + name] = searchValue;
+                  updateQueryString("_" + "_" + name, searchValue);
                 }
               }
+
               orders = [];
               for (let i = 0; i < dtp.order.length; i++) {
                 let  c = dtp.order[i].column;
@@ -234,24 +289,15 @@ $(document).ready(function () {
               delete dtp.columns;
               delete dtp.search;
               delete dtp.order;
+
               console.log(dtp)
-              console.log(location.hash);
-              let qs = parseQueryString(location.hash);
-              console.log({...dtp, ...qs});
-              $('#table1').dataTable().api().columns().every( function () {
-                let name = cfg.columnDefs[this.index()]['name'];
-                //console.log(name)
-                if (qs["_" + name]) {
-                  console.log("Setting search for " + name + " to " + qs[name]);
-                  this.search(qs["_" + name]);
-                }
-              });
               return dtp;
             }
           };
         } else {
           cfg['ajax'] = window.location.href + "data/";
         }
+        localStorage.setItem('config', JSON.stringify(cfg));
         return cfg;
       }
 
@@ -289,18 +335,35 @@ $(document).ready(function () {
         //console.log(dataTableOptions);
 
         let table = $('#table1').DataTable(dataTableOptions);
-        //new $.fn.dataTable.FixedColumns( table );
 
         function adjustDOM(table) {
 
           $("#table1")
             .on('draw.dt', function () {
+              let qs = parseQueryString();
+              if (Object.keys(qs).length > 0) {
+                $('#clearAllFilters').show();
+              } else {
+                $('#clearAllFilters').hide();
+              }
+
               // Hide paging if only one page on draw event.
               if ($("#table1").dataTable().api().page.info().pages == 1) {
                 $("#table1_paginate").hide();
               } else {
                 $("#table1_paginate").show();
               }
+              var numCols = $('#table1').DataTable().columns().nodes().length;
+              var numColsVisible = $('#table1').DataTable().columns(':visible').nodes().length;
+
+              if (numColsVisible == numCols) {
+                $("#hideEmptyColumns").show();
+                $('#showAllColumns').hide();
+              } else {
+                $("#hideEmptyColumns").hide();
+                $('#showAllColumns').show();
+              }
+
             })
             .trigger('draw.dt');
             // trigger() above needed for initial load for b/c draw.dt not triggered.
@@ -330,49 +393,30 @@ $(document).ready(function () {
         }
 
         function dtInitComplete() {
+          console.log("dtInitComplete()")
 
           adjustDOM(this);
 
-          var numCols = $('#table1').DataTable().columns().nodes().length;
-          var numColsVisible = $('#table1').DataTable().columns(':visible').nodes().length;
-
-          if (numColsVisible == numCols) {
-            $("#hideEmptyColumns").show();
-            $('#showAllColumns').hide();
-          } else {
-            $("#hideEmptyColumns").hide();
-            $('#showAllColumns').show();
-          }
-
           this.api().columns().every( function () {
-
-            //console.log(this.column().visible())
-            var that = this;
+            let that = this;
 
             // Create the `select` element
             $("thead tr:eq(0) > th").eq(this.index()).html('');
-            let input = $(`<input type="text" placeholder="Search col." style="max-width:5em"/>`);
+            let input = $(`<input index="${this.index()}" type="text" placeholder="Search col." style="max-width:5em"/>`);
+            let val = getInitialSearch('table1',this.index());
             input
+              .val(val)
               .appendTo($("thead tr:eq(0) > th").eq(this.index()))
               .on("keydown", function() {
                 if (!config["search"]["return"]) {
                   that.search($(this).val()).draw();
-                  $('#clearAllFilters').show();
                 } else {
                   var keycode = (event.keyCode ? event.keyCode : event.which);
                   if(keycode == '13'){
                     that.search($(this).val()).draw();
-                    $('#clearAllFilters').show();
                   }
                 }
               });
-            // Restore state saved values
-            var state = this.state.loaded();
-            if (state) {
-              var val = state.columns[this.index()];
-              input.val(val.search.search);
-            }
-
           });
         }
       }
