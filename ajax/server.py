@@ -51,7 +51,6 @@ def cli():
           'file_conf': file_conf,
           'table': table,
           'root_dir': os.path.dirname(__file__)
-
         }
 
 
