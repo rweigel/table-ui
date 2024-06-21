@@ -51,7 +51,6 @@ def cli():
           'file_conf': file_conf,
           'table': table,
           'root_dir': os.path.dirname(__file__)
-
         }
 
 
@@ -105,7 +104,12 @@ def querydb(conn, table, query="", orders=None, searches=None, offset=0, limit=N
     keys = list(searches.keys())
     where = []
     for key in keys:
-      where.append(f" `{key}` LIKE '%{searches[key]}%'")
+      if searches[key] == "''" or searches[key] == '""':
+        where.append(f" `{key}` = ''")
+      elif searches[key].startswith("'") and searches[key].endswith("'"):
+        where.append(f" `{key}` = {searches[key]}")
+      else:
+        where.append(f" `{key}` LIKE '%{searches[key]}%'")
     if len(where) == 0:
       return ""
     return "WHERE" + " AND ".join(where)
@@ -158,10 +162,12 @@ def query(args, query_params=None):
     if "_orders" in query_params:
       orders = query_params["_orders"].split(",")
 
+    import urllib
     searches = {}
     for key, value in query_params.items():
       if key in column_names(args):
-        searches[key] = query_params[key]
+        #searches[key] = query_params[key]
+        searches[key] = urllib.parse.unquote(query_params[key], encoding='utf-8', errors='replace')
 
     print("Connecting to database file " + args['file_body'])
     conn = sqlite3.connect(args['file_body'])
