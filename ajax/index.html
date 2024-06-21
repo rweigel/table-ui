@@ -110,7 +110,9 @@
   </div>
   <table id="table1" class="display" style="width:100%"></table>
   <script>
-
+    if (!location.href.endsWith('/')) {
+	location.href = location.href + "/";
+    }
     function showAllColumns(tableid) {
       $("#showAllColumns button").append(" ... processing");
       setTimeout(() => {
