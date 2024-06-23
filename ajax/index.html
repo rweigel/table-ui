@@ -23,6 +23,7 @@
     #showHideColumns {
       float: right;
       margin-right: 1em;
+      padding-top: 0.1em;
     }
     .dataTables_wrapper .dataTables_paginate .paginate_button {
       padding: 0em;
@@ -194,18 +195,19 @@
 
       // TODO: Cache qs and localStorage result.
       let qs = parseQueryString(location.hash);
-      //console.log(qs)
       if (localStorage.getItem('config')) {
         config = JSON.parse(localStorage.getItem('config'));
       }
       //console.log(config.columnDefs[index]['name'])
-      if (qs["_" + config.columnDefs[index]['name']]) {
-        let val = qs["_" + config.columnDefs[index]['name']];
+      //if (qs["_" + config.columnDefs[index]['name']]) {
+      if (qs[config.columnDefs[index]['name']]) {
+        //let val = qs["_" + config.columnDefs[index]['name']];
+        let val = qs[config.columnDefs[index]['name']];
         console.log(`getInitialSearch(): Query string search val for column #${index} = "${val}"`);
         return val;
       }
+      return
       //console.log(config.columnDefs[index]['name'])
-
       // Restore state saved values
       let state = $('#'+tableid).dataTable().api().column(index).state.loaded();
       if (state) {
@@ -214,7 +216,6 @@
           console.log(`getInitialSearch(): Saved state search val for column #${index} = "${val.search.search}"`);
           return val.search.search;
         }
-        //input.val(val.search.search);
       }
       return "";
 
@@ -265,7 +266,7 @@
         "serverSide": false,
         "deferRender": true,
         "stateSave": true,
-        "lengthMenu": [ [2, 50, 100, 500, 1000, -1], [2, 50, 100, 500, 1000, "All"] ],
+        "lengthMenu": [ [50, 100, 500, 1000, -1], [50, 100, 500, 1000, "All"] ],
         "processing": true,
         "lengthChange": true,
         "scrollX": true,
