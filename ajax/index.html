@@ -251,16 +251,38 @@
 
       columnDefs = [];
       searchCols = [];
+
       for (let i = 0; i < columnNames.length; i++) {
         columnDefs.push({
           "name": columnNames[i],
           "targets": i,
-          "visible": true,
+          "visible": true
           //"render": DataTable.render.ellipsis( 10 ) // ellipsis.js plug-in
         });
+        if (i == 0 && columnNames[0] == "datasetID") {
+          // Should set this in config (and function definition) b/c it does
+          //  not apply to all tables. Here we know CDAWeb table has "datasetId"
+          // as first column.
+          columnDefs[i]['render'] = linksCDAWeb
+        }
         searchCols.push(null);
       }
 
+      function linksCDAWeb(data, type, full, meta) {
+        if (type === 'display') {
+          // TODO: Not all have "_v01".
+          let base = "https://cdaweb.gsfc.nasa.gov/pub/software/cdawlib/";
+          let fnameCDF = base + "0MASTERS/" + data.toLowerCase() + "_00000000_v01.cdf";
+          let fnameJSON = base + "0JSONS/" + data.toLowerCase() + "_00000000_v01.json";
+          let fnameSKT = base + "0SKELTABLES/" + data.toLowerCase() + "_00000000_v01.skt";
+          data = `${data}`
+          data += `&nbsp;<a href="${fnameCDF}" title="Master CDF">M</a>`
+          data += `&nbsp;<a href="${fnameJSON}" title="JSON">J</a>`
+          data += `&nbsp;<a href="${fnameSKT}" title="Skeleton Table">S</a>`;
+          return data
+        }
+        return data;
+      }
       // https://datatables.net/reference/option/
       let cfg = {
         "serverSide": false,
@@ -389,8 +411,8 @@
       // to match the width of the body columns.
       setTimeout(function() {$(window).resize()}, 0);
 
-      // Make the added header search row fixed b/c the fixedColumns
-      // plugin does not seem to "see" the added row.
+      // Make the added header search row fixed b/c the fixedColumns plugin
+      // does not seem to "see" the added row.
       $("thead tr:eq(0) > th:eq(0)")
         .css('position', 'sticky')
         .css('left', '0px')

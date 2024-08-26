@@ -39,7 +39,7 @@ def read_and_prep(header_file, matrix_file):
     for j, col in enumerate(row):
       if len(matrix[i]) != len(header):
         print("ERROR: Number of columns in row " + str(i) + " does not match header.")
-        exit()
+        exit(1)
       matrix[i][j] = str(matrix[i][j])
 
   dt = "{:.2f} [s]".format(time.time() - start)
