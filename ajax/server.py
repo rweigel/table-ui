@@ -2,64 +2,173 @@ import os
 import sys
 import time
 import json
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 try:
   import uvicorn
   import fastapi
+  import sqlite3
 except:
-  print(os.popen('pip install uvicorn fastapi').read())
+  print(os.popen('pip install uvicorn fastapi sqlite3').read())
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, Response, FileResponse
+from fastapi.responses import Response, JSONResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+
+
+def serve(args):
+  checkdb(args)
+
+  app = FastAPI()
+  api_init(app, args)
+
+  kwargs = {
+              'host': args['host'],
+              'port': args['port'],
+              'server_header': False
+            }
+  uvicorn.run(app, **kwargs)
+
 
 def cli():
 
-  port = sys.argv[1]
-  host = "0.0.0.0"
-  file_head = "data/hapi.table.head.json"
-  file_body = "data/hapi.table.body.json"
-  file_conf = "data/hapi.table.conf.json"
+  clkws = {
+    "id": {
+      "help": "ID or pattern for dataset IDs to include (prefix with ^ to use pattern match, e.g., '^A|^B') (default: ^.*)"
+    },
+    "root-dir": {
+      "help": "Root directory with subdirs of js, css, and img",
+      "default": os.path.dirname(__file__)
+    },
+    "sqldb": {
+      "help": "File containing SQL database",
+      "default": None
+    },
+    "table": {
+      "help": "Name of table in sqldb. Defaults to file name without extension of sqldb",
+      "default": None
+    },
+    "config": {
+      "help": "JSON file containing configuration. See https://datatables.net/reference/option/ for options.",
+      "default": os.path.join(os.path.dirname(__file__), 'config.json')
+    },
+    "render": {
+      "help": "Javascript file with DataTables rendering function. Relative paths are relative to root-dir",
+      "default": 'js/render.js'
+    },
+    "port": {
+      "help": "Serve table as a web page at http://localhost:port. Must specify --table_name",
+      "type": int,
+      "default": 5001
+    },
+    "host": {
+      "help": "Serve table as a web page at http://localhost:port. Must specify --table_name",
+      "default": "0.0.0.0"
+    },
+    "json-head": {
+      "metavar": "FILE",
+      "help": "JSON file containing array of header names. Ignored if sqldb given. Requres --json-body to be given.",
+      "default": None
+    },
+    "json-body": {
+      "metavar": "FILE",
+      "help": "JSON array with (row) arrays of length header. Ignored if sqldb given. Requires --json-header to be given.",
+      "default": None
+    }
+  }
 
-  if len(sys.argv) > 2:
-    file_head = sys.argv[2]
-  if not os.path.exists(file_head):
-    print("WARNING: File not found: " + file_head)
+  import argparse
+  parser = argparse.ArgumentParser()
+  for k, v in clkws.items():
+    parser.add_argument(f'--{k}', **v)
 
-  if len(sys.argv) > 3:
-    file_body = sys.argv[3]
-  if not os.path.exists(file_body):
-    print("ERROR: File not found: " + file_body)
+  args = vars(parser.parse_args())
+
+  if not os.path.isabs(args['render']):
+    args['render'] = os.path.join(args['root_dir'], args['render'])
+
+  if not args['sqldb'] and not args['json_head'] and not args['json_body']:
+    print("ERROR: Must specify --sqldb or --json-header and --json-body")
     exit(1)
 
-  if len(sys.argv) > 4:
-    table = os.path.basename(sys.argv[4])
-  elif file_body.endswith(".sql"):
-      table = os.path.basename(file_body.replace(".sql", ""))
-  else:
-    table = None
-  if table is not None:
-    # TODO: Check if table exists in database
-    pass
+  if args['sqldb'] is None:
+    if not args['json_head'] or not args['json_body']:
+      print("ERROR: Must specify --json-header and --json-body if not using --sqldb")
+      exit(1)
 
-  return {
-          'port': int(port),
-          'host': host,
-          'file_head': file_head,
-          'file_body': file_body,
-          'file_conf': file_conf,
-          'table': table,
-          'root_dir': os.path.dirname(__file__)
-        }
+    file_head = args['json_head']
+    if file_head is None:
+      print("WARNING: No json-head file given. Using indices as column names.")
+    else:
+      if not os.path.exists(file_head):
+        args['json_head'] = None
+        print("WARNING: File not found: " + file_head + ". Using indices as column names.")
+
+    json_body = args['json_body']
+    if not os.path.exists(json_body):
+      print("ERROR: File not found: " + json_body)
+      exit(1)
+  else:
+
+    if args['table'] is None:
+      args['table'] = os.path.splitext(os.path.basename(args['sqldb']))[0]
+      # TODO: Check if table exists in database
+      pass
+
+  return args
 
 
 def column_names(args):
-  if not os.path.exists(args['file_head']):
-    #print("WARNING: File not found: " + args['file_head'])
-    return {}
-  with open(args['file_head']) as f:
-    return json.load(f)
+
+  if args['sqldb'] is not None:
+    connection = sqlite3.connect(args['sqldb'])
+    cursor = connection.cursor()
+    query_ = f"select * from '{args['table']}';"
+    try:
+      logger.info(f"Executing {query_}")
+      cursor.execute(query_)
+      connection.close()
+      return [description[0] for description in cursor.description]
+    except Exception as e:
+      print(f"Error executing query for column names using '{query_}' on {args['sqldb']}")
+      raise e
+
+  if args['json_body'] and args['json_head'] is None:
+    return list(range(0, len(args['json_body'][0])))
+
+  with open(args['json_head']) as f:
+    try:
+      header = json.load(f)
+    except:
+      header = list(range(0, len(args['json_body'][0])))
+    return header
+
+
+def checkdb(args):
+
+  if args['sqldb'] is None:
+    return
+
+  import sqlite3
+  connection = sqlite3.connect(args['sqldb'])
+
+  query_ = "SELECT name FROM sqlite_master WHERE type='table';"
+  try:
+    cursor = connection.cursor()
+    cursor.execute(query_)
+    table_names = list(cursor.fetchall()[0])
+  except Exception as e:
+    print(f"Error executing query for table names using '{query_}' on {args['sqldb']}")
+    raise e
+  logger.info(f"Tables in {args['sqldb']}: {table_names}")
+
+  connection.close()
+
+  logger.info(f"Found {len(column_names(args))} columns")
 
 
 def querydb(conn, table, query="", orders=None, searches=None, offset=0, limit=None):
@@ -68,11 +177,11 @@ def querydb(conn, table, query="", orders=None, searches=None, offset=0, limit=N
 
   def execute(query):
     start = time.time()
-    print(query)
+    logger.info(f"Executing {query}")
     result = cursor.execute(query)
     data = result.fetchall()
     dt = "{:.4f} [s]".format(time.time() - start)
-    print(f"Took {dt} to query and fetch")
+    logger.info(f"Took {dt} to query and fetch")
     return data
 
   def ntotal():
@@ -97,8 +206,7 @@ def querydb(conn, table, query="", orders=None, searches=None, offset=0, limit=N
     return orderstr
 
   def clause(searches):
-    print("----")
-    print(searches)
+    logger.info(f"Search: {searches}")
     if searches is None:
       return ""
     keys = list(searches.keys())
@@ -146,17 +254,16 @@ def query(args, query_params=None):
     start = int(query_params["_start"])
     end = int(query_params["_start"]) + int(query_params["_length"])
 
-  if args['table'] is None:
-    with open(args['file_body']) as f:
+  if args['sqldb'] is None:
+    with open(args['json_body']) as f:
       # TODO: Stream
-      print("Reading: " + args['file_body'])
+      print("Reading: " + args['json_body'])
       DATA = json.load(f)
       if start is None:
         return DATA, len(DATA), len(DATA)
       else:
         return DATA[start:end], len(DATA), len(DATA)
   else:
-    import sqlite3
 
     orders = None
     if "_orders" in query_params:
@@ -169,8 +276,8 @@ def query(args, query_params=None):
         #searches[key] = query_params[key]
         searches[key] = urllib.parse.unquote(query_params[key], encoding='utf-8', errors='replace')
 
-    print("Connecting to database file " + args['file_body'])
-    conn = sqlite3.connect(args['file_body'])
+    logger.info("Connecting to database file " + args['sqldb'])
+    conn = sqlite3.connect(args['sqldb'])
     DATA, ntotal, nfiltered = querydb(conn, args['table'], orders=orders, searches=searches, offset=start, limit=end-start)
     conn.close()
     return DATA, ntotal, nfiltered
@@ -179,21 +286,41 @@ def query(args, query_params=None):
 def api_init(app, args):
 
   def cors_headers(response: Response):
-      response.headers["Access-Control-Allow-Origin"] = "*"
-      response.headers["Access-Control-Allow-Headers"] = "*"
-      response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
-      return response 
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+    return response
+
+  # Serve static files
+  directory = os.path.join(args['root_dir'], 'js')
+  app.mount("/js", StaticFiles(directory=directory))
+  directory = os.path.join(args['root_dir'], 'css')
+  app.mount("/js", StaticFiles(directory=directory))
+  directory = os.path.join(args['root_dir'], 'img')
+  app.mount("/img", StaticFiles(directory=directory))
 
   @app.route("/", methods=["GET", "HEAD"])
-  def config(request: Request):
-    return FileResponse(os.path.join(os.path.dirname(__file__),'index.html'))
+  def indexhtml(request: Request):
+    fname = os.path.join(os.path.dirname(__file__),'index.html')
+    logger.info("Reading: " + fname)
+    with open(fname) as f:
+      indexhtml_ = f.read()
+      return HTMLResponse(indexhtml_.replace("__TABLENAME__", args['table']))
 
   @app.route("/config", methods=["GET", "HEAD"])
   def config(request: Request):
-    if args['file_body'].endswith(".sql"):
-      return JSONResponse(content={"serverSide": True})
-    else:
-      return JSONResponse(content={})
+    with open(args['config']) as f:
+      logger.info("Reading: " + args['config'])
+      config_ = json.load(f)
+
+    if args['sqldb'] is not None:
+      config_["serverSide"] = True
+
+    return JSONResponse(content=config_)
+
+  @app.route("/render.js", methods=["GET", "HEAD"])
+  def render(request: Request):
+    return FileResponse(args['render'])
 
   @app.route("/header", methods=["GET", "HEAD"])
   def header(request: Request):
@@ -220,18 +347,6 @@ def api_init(app, args):
 
     return JSONResponse(content=content)
 
-  # Serve static files
-  app.mount("/", StaticFiles(directory=args['root_dir']), name="root")
-
-
-args = cli()
-app = FastAPI()
-api_init(app, args)
 
 if __name__ == "__main__":
-  ukwargs = {
-              'host': args['host'],
-              'port': args['port'],
-              'server_header': False
-            }
-  uvicorn.run(app, **ukwargs)
+  serve(cli())

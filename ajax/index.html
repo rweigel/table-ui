@@ -2,9 +2,12 @@
 <html>
 <head>
   <meta charset="UTF-8">
+    <title>__TABLENAME__</title>
+    <link rel="icon" href="img/favicon.svg">
     <link href="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.css" rel="stylesheet"/>
     <script src="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.js"></script>
     <script src="//cdn.datatables.net/plug-ins/1.13.4/dataRender/ellipsis.js"></script>
+    <script src="render.js"></script>
     <style>
     body {
       margin: 1em;
@@ -110,7 +113,7 @@
 
   <div id="showHideColumns">
     <!--These three must be one line to avoid newlines in button text-->
-    <div><input type="checkbox" id="showAllColumns" checked="true"><label for="showAllColumns">Show All Columns</label></div>
+    <span><input type="checkbox" id="showAllColumns" checked="true"><label for="showAllColumns">Show All Columns</label></span>
     <span id="clearAllFilters" style="display:none"><button onclick="clearAllFilters('#table1')">Clear All Filters</button></span>
   </div>
   <table id="table1" class="display" style="width:100%"></table>
@@ -153,38 +156,12 @@
       if (localStorage.getItem('config')) {
         config = JSON.parse(localStorage.getItem('config'));
       }
-      //console.log(config.columnDefs[index]['name'])
-      //if (qs["_" + config.columnDefs[index]['name']]) {
       if (qs[config.columnDefs[index]['name']]) {
         //let val = qs["_" + config.columnDefs[index]['name']];
         let val = qs[config.columnDefs[index]['name']];
         console.log(`getInitialSearch(): Query string search val for column #${index} = "${val}"`);
         return val;
       }
-      return
-      //console.log(config.columnDefs[index]['name'])
-      // Restore state saved values
-      let state = $('#'+tableid).dataTable().api().column(index).state.loaded();
-      if (state) {
-        let val = state.columns[index];
-        if (val.search.search) {
-          console.log(`getInitialSearch(): Saved state search val for column #${index} = "${val.search.search}"`);
-          return val.search.search;
-        }
-      }
-      return "";
-
-      $('#'+tableid).dataTable().api().columns().every( function () {
-        let name = cfg.columnDefs[this.index()]['name'];
-        let input = $(`#${tableid} input #${name}`);
-        //console.log(name)
-        if (qs["_" + name]) {
-          console.log("Setting search for " + name + " to " + qs[name]);
-          $(this).val(qs["_" + name])
-          //this.search(qs["_" + name]);
-        }
-
-      });
     }
 
     async function getHeader() {
@@ -195,78 +172,44 @@
     }
 
     async function getConfig(columnEmpty) {
-      const header = await getHeader();
-
-      columnNames = header;
 
       let resp = await fetch(window.location.pathname + "config");
-      const cfgo = await resp.json();
+      const config = await resp.json();
 
-      columnDefs = [];
-      searchCols = [];
-      for (let i = 0; i < columnNames.length; i++) {
-        let visible = columnEmpty ? columnEmpty[i] === false : true;
-        //console.log(`Column ${columnNames[i]} visible: ${visible}`);
-        columnDefs.push({
-          "name": columnNames[i],
-          "targets": i,
-          "visible": visible,
-          //"render": DataTable.render.ellipsis( 10 ) // ellipsis.js plug-in
-        });
-        if (i == 0 && columnNames[0] == "datasetID") {
-          // Should set this in config (and function definition) b/c it does
-          //  not apply to all tables. Here we know CDAWeb table has "datasetId"
-          // as first column.
-          columnDefs[i]['render'] = linksCDAWeb
-        }
-        searchCols.push(null);
+      let columnNames = [];
+      if (!config['searchCols'] || !config['columnDefs']) {
+        columnNames = await getHeader();
+        config['searchCols'] = config['searchCols'] ? config['searchCols'] : new Array(columnNames.length).fill(null);
       }
 
-      function linksCDAWeb(data, type, full, meta) {
-        if (type === 'display') {
-          // TODO: Not all have "_v01".
-          let base = "https://cdaweb.gsfc.nasa.gov/pub/software/cdawlib/";
-          let fnameCDF = base + "0MASTERS/" + data.toLowerCase() + "_00000000_v01.cdf";
-          let fnameJSON = base + "0JSONS/" + data.toLowerCase() + "_00000000_v01.json";
-          let fnameSKT = base + "0SKELTABLES/" + data.toLowerCase() + "_00000000_v01.skt";
-          data = `${data}`
-          data += `&nbsp;<a href="${fnameCDF}" title="Master CDF">M</a>`
-          data += `&nbsp;<a href="${fnameJSON}" title="JSON">J</a>`
-          data += `&nbsp;<a href="${fnameSKT}" title="Skeleton Table">S</a>`;
-          return data
+      let renderFunction = null;
+      renderFunction = window.render ? window.render : null;
+      if (!config['columnDefs']) {
+        config['columnDefs'] = [];
+        for (let i = 0; i < columnNames.length; i++) {
+          let visible = columnEmpty ? columnEmpty[i] === false : true;
+          config['columnDefs'].push({
+            "name": columnNames[i],
+            "targets": i,
+            "visible": visible,
+            //"render": DataTable.render.ellipsis( 10 ) // ellipsis.js plug-in
+          });
+          if (renderFunction) {
+            tableName = $('title').text();
+            _renderFunction = renderFunction(tableName, columnNames[i])
+            if (_renderFunction) {
+              config['columnDefs'][i]['render'] = renderFunction(tableName, columnNames[i]);
+            }
+          }
         }
-        return data;
       }
 
-      // https://datatables.net/reference/option/
-      let cfg = {
-        "serverSide": false,
-        "deferRender": true,
-        "stateSave": true,
-        "lengthMenu": [ [2, 50, 100, 500, 1000, -1], [2, 50, 100, 500, 1000, "All"] ],
-        "processing": true,
-        "lengthChange": true,
-        "scrollX": true,
-        "scrollY": true,
-        "autoWidth": true,
-        "fixedHeader": true,
-        "fixedColumns": true,
-        "search": {
-          "regex": true,
-          "smart": false,
-          "return": true // If true, must hit return key to invoke search
-        },
-        "columnDefs": columnDefs,
-        "searchCols": searchCols,
-      };
-      cfg = {...cfg, ...cfgo};
-
-      if (cfg['serverSide']) {
-        cfg['ajax'] = {
+      if (config['serverSide']) {
+        config['ajax'] = {
           "url": window.location.pathname + "data/",
           "type": "get",
           "data": function(dtp) {
-            console.log("Search executed");
+            console.log("Search executed. Returning:");
 
             // Get search entries
             for (let c = 0; c < dtp.columns.length; c++) {
@@ -305,14 +248,18 @@
             delete dtp.search;
             delete dtp.order;
 
+            console.log(dtp);
+
             return dtp;
           }
         };
       } else {
-        cfg['ajax'] = window.location.href + "data/";
+        config['ajax'] = window.location.href + "data/";
       }
-      localStorage.setItem('config', JSON.stringify(cfg));
-      return cfg;
+      localStorage.setItem('config', JSON.stringify(config));
+      console.log("getConfig() returning config:")
+      console.log(config)
+      return config;
     }
 
     function adjustDOM(table) {
