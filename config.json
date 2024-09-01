@@ -2,7 +2,7 @@
   "serverSide": false,
   "deferRender": true,
   "stateSave": true,
-  "lengthMenu": [ [50, 100, 500, 1000, 2, -1], [2, 50, 100, 500, 1000, 2, "All"] ],
+  "lengthMenu": [ [10, 50, 100, 500, 1000, -1], [10, 50, 100, 500, 1000, "All"] ],
   "processing": true,
   "lengthChange": true,
   "scrollX": true,

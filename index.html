@@ -2,12 +2,16 @@
 <html>
 <head>
   <meta charset="UTF-8">
+    <title>__TABLENAME__</title>
+    <link rel="icon" href="img/favicon.svg">
     <link href="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.css" rel="stylesheet"/>
     <script src="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.js"></script>
     <script src="//cdn.datatables.net/plug-ins/1.13.4/dataRender/ellipsis.js"></script>
-  <style>
+    <script src="render.js"></script>
+    <style>
     body {
       margin: 1em;
+      margin-top: 0.5em;
     }
     #table1 {
       width:100%;
@@ -15,13 +19,19 @@
     }
     #table1_filter {
       float: left;
+      display: none;
     }
-    #table1_length {
-      float: right;
+    summary {
+      cursor: pointer;
     }
-    .dataTables_paginate {
-      float: left;
+    #showHideColumns {
+      margin-right: 1em;
+      padding-bottom: 0.5em;
     }
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+      padding: 0em;
+    }
+
     table.dataTable thead th {
       font-size: 0.8em;
     }
@@ -38,14 +48,19 @@
       font-size: 10pt;
     }
     .dataTables_length {
-      padding-top: 0.34em;
-    }
-    .dataTables_wrapper .dataTables_paginate {
-      padding-top: 0em;
+      padding-left: 0.5em;
     }
     .dataTables_wrapper .dataTables_info {
-      padding-top: 0em;
+      clear: none;
+      padding-top: 0.27em;
+      padding-left: 2em;
     }
+    .dataTables_wrapper .dataTables_paginate {
+      float: left;
+      text-align: right;
+      padding-top: 0.2em;
+      padding-left: 2em;
+  }
 
     table.dataTable td {
       text-align: center;
@@ -59,196 +74,373 @@
     table.dataTable tfoot th, table.dataTable tfoot td {
       padding: 1px;
     }
+
+    /* https://simurai.com/blog/2011/07/26/webkit-scrollbar */
+    .dataTables_scrollBody::-webkit-scrollbar {
+      -webkit-appearance: none;
+      width: 1px;
+    }
+    .dataTables_scrollBody::-webkit-scrollbar-thumb {
+      border-radius: 1px;
+      background-color: rgba(0,0,0,.5);
+      box-shadow: 0 0 1px rgba(255,255,255,.5);
+    }
+
+    /* https://stackoverflow.com/a/63507769 */
+    #table1 {
+      transform: rotateX(180deg);
+      overflow-x: auto;
+    }
+    .dataTables_scrollBody {
+      transform: rotateX(180deg);
+    }
+
   </style>
 </head>
 <body>
-  <!--p>To perform a regex search, start search with <code>^</code></p-->
+  <details style="background-color: white; float:right">
+    <summary>Instructions</summary>
+    <ul>
+      <li>To execute any search, press enter key after entering text in column text entry area.</li>
+      <li>Shift+click on sort arrows to sort on multiple columns.</li>
+      <li>A entry of <code>⎵</code> means value is a single blank space.</li>
+      <li>A search for <code>abc</code> on a column performs SQL <code>LIKE = '%abc%'</code>.</li>
+      <li>For an exact match search for <code>abc</code>, use single quotes: <code>'abc'</code>.</li>
+    </ul>
+  </details>
+  <script>
+  </script>
+
+  <div id="showHideColumns">
+    <!--These three must be one line to avoid newlines in button text-->
+    <span><input type="checkbox" id="showAllColumns" checked="true"><label for="showAllColumns">Show All Columns</label></span>
+    <span id="clearAllFilters" style="display:none"><button onclick="clearAllFilters('#table1')">Clear All Filters</button></span>
+  </div>
   <table id="table1" class="display" style="width:100%"></table>
   <script>
-    $(document).ready(function () {
+    if (!location.href.endsWith('/')) {
+	    //location.href = location.href + "/";
+    }
 
-      init();
+    function clearAllFilters(tableid) {
+      $('input').each(function (idx, el) {$(el).val('')});
+      location.hash = "";
+      $(tableid).DataTable().search('').columns().search('').draw();
+    }
 
-      // Could do this before document.ready
-      async function getHeader() {
-        let resp = await fetch("/header");
-        const header = await resp.json();
-        return header;
+    function parseQueryString() {
+      // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
+      var nvpair = {};
+      var qs = window.location.hash.replace('#', '');
+      if (qs.length == 0) {
+        return {};
+      }
+      var pairs = qs.split('&');
+      $.each(pairs, function(i, v){
+        var pair = v.split('=');
+        nvpair[pair[0]] = decodeURIComponent(pair[1].replace(/\+/g," "));
+      });
+      return nvpair;
+    }
+
+    function updateQueryString(name, val) {
+      let qs = parseQueryString();
+      qs[name] = val;
+      location.hash = decodeURIComponent($.param(qs));
+    }
+
+    function getInitialSearch(tableid,index) {
+
+      // TODO: Cache qs and localStorage result.
+      let qs = parseQueryString(location.hash);
+      if (localStorage.getItem('config')) {
+        config = JSON.parse(localStorage.getItem('config'));
+      }
+      if (qs[config.columnDefs[index]['name']]) {
+        //let val = qs["_" + config.columnDefs[index]['name']];
+        let val = qs[config.columnDefs[index]['name']];
+        console.log(`getInitialSearch(): Query string search val for column #${index} = "${val}"`);
+        return val;
+      }
+    }
+
+    async function getHeader() {
+      let resp = await fetch(window.location.pathname + "header");
+      const header = await resp.json();
+      getHeader.header = header;
+      return header;
+    }
+
+    async function getConfig(columnEmpty) {
+
+      console.log("getConfig() called.")
+      console.log("getting config")
+      let resp = await fetch(window.location.pathname + "config");
+      const config = await resp.json();
+      console.log("got config")
+
+      let columnNames = [];
+      if (!config['searchCols'] || !config['columnDefs']) {
+        console.log("getting header")
+        columnNames = await getHeader();
+        console.log("got header")
+        config['searchCols'] = config['searchCols'] ? config['searchCols'] : new Array(columnNames.length).fill(null);
       }
 
-      async function getConfig(header) {
-
-        //let resp = await fetch("/config");
-        //const cfgo = await resp.json();
-
-        columnDefs = [];
-        searchCols = [];
-        for (let i = 0; i < header.length; i++) {
-          columnDefs.push({
-            "name": header[i],
+      let renderFunction = null;
+      renderFunction = window.render ? window.render : null;
+      if (!config['columnDefs']) {
+        console.log("Creating columnDefs")
+        config['columnDefs'] = [];
+        for (let i = 0; i < columnNames.length; i++) {
+          let visible = columnEmpty ? columnEmpty[i] === false : true;
+          config['columnDefs'].push({
+            "name": columnNames[i],
             "targets": i,
-            "visible": true,
+            "visible": visible,
             //"render": DataTable.render.ellipsis( 10 ) // ellipsis.js plug-in
-        });
-          searchCols.push(null);
-        }
-
-        // https://datatables.net/reference/option/
-        let cfg = {
-          "serverSide": false,
-          "deferRender": true,
-          "stateSave": true,
-          "lengthMenu": [ [10, 50, 100, 500, 1000, -1], [10, 50, 100, 500, 1000, "All"] ],
-          "lengthChange": true,
-          "processing": true, // Show "processing" indicator
-          "scrollX": true,
-          "scrollY": true,
-          "autoWidth": true,
-          //"fixedHeader": {"footer": true},
-          "fixedHeader": true,
-          "search": {
-            "regex": true,
-            "smart": false,
-            "return": true // If true, must hit return key to invoke search
-          },
-          "columnDefs": columnDefs,
-          "searchCols": searchCols,
-        };
-
-        if (cfg['severSearch']) {
-          cfg['ajax'] = {
-            "url": "data/",
-            "type": "get",
-            "data": function(dtp) {
-              let names = [];
-              for (let c = 0; c < dtp.columns.length; c++) {
-                names.push(dtp.columns[c].name);
-                let searchValue = dtp.columns[c].search.value;
-                if (searchValue) {
-                  dtp[name] = searchValue;
-                }
-              }
-              dtp.search = dtp.search.value;
-              dtp.orderby = names[dtp.order[0]['column']];
-              dtp.orderdir = dtp.order[0]['column']['dir'] == 'asc' ? 'asc' : 'desc';
-              dtp.globalsearch = dtp.search;
-              delete dtp.search;
-              delete dtp.columns;
-              delete dtp.order;
-              return dtp;
+          });
+          if (renderFunction) {
+            tableName = $('title').text();
+            _renderFunction = renderFunction(tableName, columnNames[i])
+            if (_renderFunction) {
+              config['columnDefs'][i]['render'] = renderFunction(tableName, columnNames[i]);
             }
-          };
-        } else {
-          cfg['ajax'] = "data/";
+          }
         }
-
-        return cfg;
+        console.log("Created columnDefs")
       }
 
-      async function init() {
-        const header = await getHeader();
-        const config = await getConfig(header);
+      if (config['serverSide']) {
+        config['ajax'] = {
+          "url": window.location.pathname + "data/",
+          "type": "get",
+          "data": function(dtp) {
+            console.log("Search executed. Returning:");
 
-        // Add header names to table. Two rows are added.
-        // The first row is for sorting, second row is for filtering.
-        $('#table1').append('<thead><tr></tr><tr></tr></thead>');
-        let thead = $('#table1 > thead > tr');
-        for (let i = 0; i < header.length; i++) {
-          thead.append(`<th>${header[i]}</th>`);
-        }
-        // Create table body
-        $('#table1').append('<tbody></tbody>');
+            // Get search entries
+            for (let c = 0; c < dtp.columns.length; c++) {
+              let searchValue = dtp.columns[c].search.value;
+              if (dtp.draw == 1) {
+                searchValue = getInitialSearch('table1',c);
+              }
+              if (searchValue) {
+                let name = dtp.columns[c]['name'];
+                dtp[name] = searchValue;
+                updateQueryString(name, searchValue);
+              }
+            }
+            if (dtp.search.value) {
+              dtp._globalsearch = dtp.search.value;
+            }
 
-        // Hide paging if only one page
-        $("#table1").on('length.dt', function () {
+            _orders = [];
+            for (let i = 0; i < dtp.order.length; i++) {
+              let c = dtp.order[i].column;
+              let name = dtp.columns[c]['name'];
+              _orders.push(dtp.order[i]['dir'] == 'asc' ? name : '-' + name);
+            }
+            dtp._orders = _orders.join(",");
+
+            dtp._length = dtp.length;
+            delete dtp.length;
+
+            dtp._start = dtp.start;
+            delete dtp.start;
+
+            dtp._draw = dtp.draw;
+            delete dtp.draw;
+
+            delete dtp.columns;
+            delete dtp.search;
+            delete dtp.order;
+
+            console.log(dtp);
+
+            return dtp;
+          }
+        };
+      } else {
+        config['ajax'] = window.location.href + "data/";
+      }
+      localStorage.setItem('config', JSON.stringify(config));
+      console.log("getConfig() returning config:")
+      console.log(config)
+      return config;
+    }
+
+    function adjustDOM(table) {
+      console.log("adjustDOM() called.")
+      $("#table1")
+        .on('draw.dt', function () {
+          let qs = parseQueryString();
+          if (Object.keys(qs).length > 0) {
+            $('#clearAllFilters').show();
+          } else {
+            $('#clearAllFilters').hide();
+          }
+
+          // Hide paging if only one page on draw event.
           if ($("#table1").dataTable().api().page.info().pages == 1) {
             $("#table1_paginate").hide();
           } else {
             $("#table1_paginate").show();
           }
-        });
+          //var numCols = $('#table1').DataTable().columns().nodes().length;
+          //var numColsVisible = $('#table1').DataTable().columns(':visible').nodes().length;
+        })
+        .trigger('draw.dt');
+        // trigger() above needed for initial load for b/c draw.dt not triggered.
 
-        // https://datatables.net/reference/option/
-        let dataTableOptions =
-          {
-            ...config,
-            "initComplete": dtInitComplete,
-          };
+      let input = $('#table1_filter input').attr('placeholder','Global search')
+      $('#table1_filter label').replaceWith(input[0]);
+      $('#table1_info').insertAfter('#table1_filter');
 
-        //console.log(dataTableOptions);
-
-        let table = $('#table1').DataTable(dataTableOptions);
-        new $.fn.dataTable.FixedColumns( table );
-
-        function adjustDOM() {
-
-          $("#table1")
-            .on('draw.dt', function () {
-              // Hide paging if only one page on draw event.
-              if ($("#table1").dataTable().api().page.info().pages == 1) {
-                $("#table1_paginate").hide();
-              } else {
-                $("#table1_paginate").show();
-              }
-            })
-            .trigger('draw.dt');
-            // trigger() above needed for initial load for b/c draw.dt not triggered.
-  
-          let input = $('#table1_filter input').attr('placeholder','Global search')
-          $('#table1_filter label').replaceWith(input[0]);
-          $('#table1_info').insertAfter('#table1_filter');
-          $('#table1_paginate').insertAfter('#table1_filter');
-          $('#dataTables_length').append('<br>');
-  
-          // A resize triggers left column header width
-          // to match the width of the body columns.
-          setTimeout(function() {$(window).resize()}, 0);
-  
-          // Make the added header search row fixed b/c the fixedColumns
-          // plugin does not seem to "see" the added row.
-          $("thead tr:eq(0) > th:eq(0)")
-            .css('position', 'sticky')
-            .css('left', '0px')
-            .css('z-index', '1000000')
-            .css('background-color', 'white');
-  
-          // Prevent double header on first column showing when
-          // on initial scroll.
-          //$('.dataTables_scroll thead th').css('z-index',-1);
-        }
-  
-        function dtInitComplete() {
-
-          adjustDOM();
-
-          this.api().columns().every( function () {
-            var that = this;
-
-            // Create the `select` element
-            $("thead tr:eq(0) > th").eq(this.index()).html('');
-            var input = $('<input type="text" placeholder="Search col."/>')
-              .appendTo($("thead tr:eq(0) > th").eq(this.index()))
-              .on("keydown", function() {
-                if (!config["search"]["return"]) {
-                  that.search($(this).val()).draw();
-                } else {
-                  var keycode = (event.keyCode ? event.keyCode : event.which);
-                  if(keycode == '13'){
-                    that.search($(this).val()).draw();
-                  }
-                }
-              });
-            //$("thead tr:eq(0)").before($("thead tr:eq(1)"));
-            // Restore state saved values
-            var state = this.state.loaded();
-            if (state) {
-              var val = state.columns[this.index()];
-              input.val(val.search.search);
-            }
-
-          });
-        }
+      let numCols = $('#table1').DataTable().columns().nodes().length;
+      let numColsVisible = $('#table1').DataTable().columns(':visible').nodes().length;
+      let colInfo = ` and all ${numCols} columns`;
+      if (numCols != numColsVisible) {
+        colInfo = ` and ${numColsVisible}/${numCols} columns`;
       }
-    });
+
+      let txt = $('#table1_info')
+                  .text()
+                  .replace(' to ','-')
+                  .replace('entries', colInfo)
+                  .replace('Showing ','Showing rows ')
+      $('#table1_info').text(txt);
+      $('#table1_paginate').insertAfter('#table1_filter');
+
+      $('#nCols').text(numCols);
+
+      let select = $('#table1_length select')
+      select.appendTo('#table1_length')
+      $('#table1_length label').text('Rows per page: ')
+      //let html = $('#table1_length').html()
+      //$('#table1_length').html(html.replace('entries','rows'));
+
+      x = $('#table1_next');
+      html = x.html();
+      x.html(html.replace('Next','Next page'));
+      //$('#table1_info').after(x)
+
+      // A resize triggers left column header width
+      // to match the width of the body columns.
+      setTimeout(function() {$(window).resize()}, 0);
+
+      // Make the added header search row fixed b/c the fixedColumns plugin
+      // does not seem to "see" the added row.
+      $("thead tr:eq(0) > th:eq(0)")
+        .css('position', 'sticky')
+        .css('left', '0px')
+        .css('z-index', '1000000')
+        .css('background-color', 'white');
+
+      // Prevent double header on first column showing when
+      // on initial scroll.
+      //$('.dataTables_scroll thead th').css('z-index',-1);
+      console.log("adjustDOM() finished.")
+    }
+
+    function dtInitComplete() {
+      console.log("dtInitComplete() called.")
+      const table = $('#table1').dataTable();
+      adjustDOM(table);
+
+      console.log("Setting search.")
+      table.api().columns().every( function () {
+        let that = this;
+        // Create the `select` element
+        $("thead tr:eq(0) > th").eq(this.index()).html('');
+        let input = $(`<input index="${this.index()}" type="text" placeholder="Search col." style="max-width:5em"/>`);
+        let val = getInitialSearch('table1',this.index());
+        input
+          .val(val)
+          .appendTo($("thead tr:eq(0) > th").eq(this.index()))
+          .on("keydown", function() {
+            if (!config["search"]["return"]) {
+              that.search($(this).val()).draw();
+            } else {
+              var keycode = (event.keyCode ? event.keyCode : event.which);
+              if(keycode == '13'){
+                that.search($(this).val()).draw();
+              }
+            }
+          });
+      });
+      console.log("Set search.")
+
+      console.log("dtInitComplete() finished.")
+    }
+
+    async function init(columnEmpty) {
+
+      let xtable = $('#table1_wrapper');
+      if (xtable.length > 0) {
+        console.log("Destroying table")
+        // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
+        $('#table1').DataTable().state.clear();
+        //localStorage.clear();
+        $('#table1').DataTable().destroy();
+        xtable.remove();
+        $('#table1').empty();
+        $('#showAllColumns').unbind();
+        console.log("Destroyed table")
+      }
+
+      const config = await getConfig(columnEmpty);
+
+      // Add header names to table. Two rows are added.
+      // The first row is for sorting, second row is for filtering.
+      $('#table1').append('<thead><tr></tr><tr></tr></thead>');
+      let thead = $('#table1 > thead > tr');
+      for (let i = 0; i < config.columnDefs.length; i++) {
+        thead.append(`<th>${config.columnDefs[i]['name']}</th>`);
+      }
+      // Create table body
+      $('#table1').append('<tbody></tbody>');
+
+      // Hide paging if only one page
+      $("#table1").on('length.dt', function () {
+        if ($("#table1").dataTable().api().page.info().pages == 1) {
+          $("#table1_paginate").hide();
+        } else {
+          $("#table1_paginate").show();
+        }
+      });
+
+      $('#showAllColumns').click(function() {
+        if ($(this).is(':checked')) {
+          init();
+        } else {
+          let data = $('#table1').DataTable().data();
+          let columnEmpty = [];
+          for (let r = 0; r < data.length; r++) {
+            for (let c = 0; c < data[r].length; c++) {
+              if (r == 0) {
+                columnEmpty.push(true);
+              }
+              if (data[r][c] !== null && data[r][c] !== "") {
+                columnEmpty[c] = false;
+              }
+            }
+          }
+          init(columnEmpty);
+        }
+      });
+
+      // https://datatables.net/reference/option/
+      let dataTableOptions =
+        {
+          ...config,
+          "initComplete": dtInitComplete,
+        };
+      let table = $('#table1').DataTable(dataTableOptions);
+      console.log("init() complete.")
+    }
+
+    console.log("Document ready. Calling init()")
+    $(document).ready(()=>init());
   </script>
 </body>
+</html>
