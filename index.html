@@ -150,7 +150,11 @@
 
     function updateQueryString(name, val) {
       let qs = parseQueryString();
-      qs[name] = val;
+      if (val === null) {
+        delete qs[name];
+      } else {
+        qs[name] = val;
+      }
       location.hash = decodeURIComponent($.param(qs));
     }
 
@@ -178,6 +182,7 @@
         config['searchCols'] = config['searchCols'] ? config['searchCols'] : new Array(columnNames.length).fill(null);
         console.log("  set searchCols")
       }
+      config.columnNames = columnNames;
 
       let renderFunction = null;
       renderFunction = window.render ? window.render : null;
@@ -218,30 +223,41 @@
             console.log("config['ajax'] callback. Preparing query parameters for AJAX search using dtp object:");
             console.log(dtp);
 
-            let qs = parseQueryString(location.hash);
-            // Get search entries
-            console.log("  reading column search values from dtp object.");
             let searchValue;
-            let inputs = $('input.columnSearch');
-            for (input of inputs) {
-              let name = $(input).attr('name');
-              if (dtp.draw == 1) {
-                searchValue = qs[name];
-                if (searchValue) {
-                  console.log(`  first query so using initial search value for column '${name}' from hash; it is ${searchValue}`);
+            if (dtp.draw == 1) {
+              let config = getConfig.config;
+              let qs = parseQueryString(location.hash);
+              console.log("  query string:")
+              console.log(qs);
+              // TODO: Need to validate that the query string keys are valid column names.
+              let alerted = false;
+              for (const [key, val] of Object.entries(qs)) {
+                if (config.columnNames.includes(key)) {
+                  console.log(`  found ${key} = ${val} in query string. Using it.`);
+                } else {
+                  console.log(`  found ${key} = ${val} in query string, but it is not a valid column name. Removing it from hash.`);
+                  if (alerted == false) {
+                    alerted = true;
+                    alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
+                  }
+                  updateQueryString(key, null);
                 }
-              } else {
+                dtp[key] = val;
+              }
+            } else {
+              let inputs = $('input.columnSearch');
+              console.log("  inputs:")
+              console.log(inputs)
+                for (input of inputs) {
+                let name = $(input).attr('name');
                 searchValue = $(input).val();
                 if (searchValue) {
-                  console.log(`  first query so got initial search value for column '${name}'; it is ${searchValue}`);
-                }
-              }
-              if (searchValue) {
-                console.log(`  Search value for column '${name}' is not undefined. Updating dtp query object.`);
-                dtp[name] = searchValue;
-                if (dtp.draw > 1) {
-                  console.log(`  Updating query string with search value for column '${name}' using found search value.`);
-                  updateQueryString(name, searchValue);
+                  console.log(`  Search value for column '${name}' is not undefined. Updating dtp query object.`);
+                  dtp[name] = searchValue;
+                  if (dtp.draw > 1) {
+                    console.log(`  Updating query string with search value for column '${name}' using found search value.`);
+                    updateQueryString(name, searchValue);
+                  }
                 }
               }
             }
