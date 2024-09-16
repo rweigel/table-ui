@@ -83,7 +83,7 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
       logger.info("Reading: " + dtconfig)
       content = json.load(f)
 
-    if dbinfo['sqldb'] is not None:
+    if 'sqldb' in dbinfo:
       content["serverSide"] = True
 
     return fastapi.responses.JSONResponse(content=content)
@@ -103,11 +103,14 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
 
     if "_start" not in query_params:
       # No server-side processing. Serve entire JSON.
-      result = _query(dbinfo)
-      return JSONResponse(content={"data": result['data']})
+      with open(dbinfo['jsondb']) as f:
+        # TODO: Stream
+        logger.info("Reading: " + dbinfo['jsondb'])
+        data = json.load(f)
+      return fastapi.responses.JSONResponse({"data": data})
+
 
     result = _query(dbinfo, query_params=query_params)
-
     content = {
                 "draw": query_params["_draw"],
                 "recordsTotal": result['recordsTotal'],
@@ -172,31 +175,20 @@ def _query(dbinfo, query_params=None):
     end = int(query_params["_start"]) + int(query_params["_length"])
     limit = end - start
 
-  if dbinfo['sqldb'] is None:
-    with open(dbinfo['jsondb']) as f:
-      # TODO: Stream
-      print("Reading: " + dbinfo['jsondb'])
-      data = json.load(f)
-      if start is None:
-        return data, len(data), len(data)
-      else:
-        return data[start:end], len(data), len(data)
-  else:
+  orders = None
+  if "_orders" in query_params:
+    orders = query_params["_orders"].split(",")
 
-    orders = None
-    if "_orders" in query_params:
-      orders = query_params["_orders"].split(",")
+  searches = {}
+  if query_params is not None:
+    print("Query params: ", query_params)
+    for key, _ in query_params.items():
+      if key in dbinfo['column_names']:
+        searches[key] = urllib.parse.unquote(query_params[key], encoding='utf-8', errors='replace')
 
-    searches = {}
-    if query_params is not None:
-      print("Query params: ", query_params)
-      for key, _ in query_params.items():
-        if key in dbinfo['column_names']:
-          searches[key] = urllib.parse.unquote(query_params[key], encoding='utf-8', errors='replace')
-
-    logger.info("Connecting to database file " + dbinfo['sqldb'])
-    result = _dbquery(dbinfo, orders=orders, searches=searches, limit=limit, offset=start)
-    return result
+  logger.info("Connecting to database file " + dbinfo['sqldb'])
+  result = _dbquery(dbinfo, orders=orders, searches=searches, limit=limit, offset=start)
+  return result
 
 def _dbinfo(sqldb=None, table_name=None, json_head=None, json_body=None):
 

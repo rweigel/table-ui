@@ -1,6 +1,7 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
+    <title>DataTables example</title>
     <link rel="stylesheet"
         href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css"/>
 	<style>
@@ -514,36 +515,36 @@
             </tr>
         </tbody>
     </table>
-<script src="https://code.jquery.com/jquery-3.5.1.min.js">
-</script>
-<script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js">
-</script>
-<script>
-// https://datatables.net/examples/api/multi_filter.html
-$(document).ready(function() {
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js">
+    </script>
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js">
+    </script>
+    <script>
+    // https://datatables.net/examples/api/multi_filter.html
+    $(document).ready(function() {
 
-// Setup - add a text input to each footer cell
-$('#example tfoot th').each( function () {
-	var title = $(this).text();
-	$(this).html('<p><input type="text" placeholder="Search col."/></p>');
-} );
+        // Setup - add a text input to each footer cell
+        $('#example tfoot th').each( function () {
+            var title = $(this).text();
+            $(this).html('<p><input type="text" placeholder="Search col."/></p>');
+        } );
 
-// DataTable
-var table = $('#example').DataTable({
-	paging: false,
-	initComplete: function () {
-		// Apply the search
-		this.api().columns().every( function () {
-			var that = this;
-			$( 'input', this.footer() ).on( 'keyup change clear', function () {
-				if ( that.search() !== this.value ) {
-					that.search( this.value ).draw();
-				}
-			});
-		});
-	}
-});
-});
+        // DataTable
+        var table = $('#example').DataTable({
+            paging: false,
+            initComplete: function () {
+                // Apply the search
+                this.api().columns().every( function () {
+                    var that = this;
+                    $( 'input', this.footer() ).on( 'keyup change clear', function () {
+                        if ( that.search() !== this.value ) {
+                            that.search( this.value ).draw();
+                        }
+                    });
+                });
+            }
+        });
+    });
 </script>
 </body>
 </html>

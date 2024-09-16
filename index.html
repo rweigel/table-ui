@@ -113,18 +113,23 @@
 
   <div id="showHideColumns">
     <!--These three must be one line to avoid newlines in button text-->
-    <span><input type="checkbox" id="showAllColumns" checked="true"><label for="showAllColumns">Show All Columns</label></span>
+    <span title="show columns with no content on page"><input type="checkbox" checked="checked" id="showAllColumns"><label for="showAllColumns">Show All Columns</label></span>
     <span id="clearAllFilters" style="display:none"><button onclick="clearAllFilters('#table1')">Clear All Filters</button></span>
   </div>
   <table id="table1" class="display" style="width:100%"></table>
   <script>
+    console.log("Document ready. Calling init()")
+    $(document).ready(()=>init());
+
     if (!location.href.endsWith('/')) {
 	    //location.href = location.href + "/";
     }
 
     function clearAllFilters(tableid) {
-      $('input').each(function (idx, el) {$(el).val('')});
       location.hash = "";
+      init();
+      return;
+      $('input').each(function (idx, el) {$(el).val('')});
       $(tableid).DataTable().search('').columns().search('').draw();
     }
 
@@ -149,21 +154,6 @@
       location.hash = decodeURIComponent($.param(qs));
     }
 
-    function getInitialSearch(tableid,index) {
-
-      // TODO: Cache qs and localStorage result.
-      let qs = parseQueryString(location.hash);
-      if (localStorage.getItem('config')) {
-        config = JSON.parse(localStorage.getItem('config'));
-      }
-      if (qs[config.columnDefs[index]['name']]) {
-        //let val = qs["_" + config.columnDefs[index]['name']];
-        let val = qs[config.columnDefs[index]['name']];
-        console.log(`getInitialSearch(): Query string search val for column #${index} = "${val}"`);
-        return val;
-      }
-    }
-
     async function getHeader() {
       let resp = await fetch(window.location.pathname + "header");
       const header = await resp.json();
@@ -173,24 +163,33 @@
 
     async function getConfig(columnEmpty) {
 
-      console.log("getConfig() called.")
-      console.log("getting config")
-      let resp = await fetch(window.location.pathname + "config");
+      const url = window.location.pathname + "config"
+      console.log("  getting config from " + url)
+      let resp = await fetch(url);
       const config = await resp.json();
-      console.log("got config")
+      console.log("  got config")
 
       let columnNames = [];
       if (!config['searchCols'] || !config['columnDefs']) {
-        console.log("getting header")
+        console.log("  getting header")
         columnNames = await getHeader();
-        console.log("got header")
+        console.log("  got header")
+        console.log("  setting searchCols")
         config['searchCols'] = config['searchCols'] ? config['searchCols'] : new Array(columnNames.length).fill(null);
+        console.log("  set searchCols")
       }
 
       let renderFunction = null;
       renderFunction = window.render ? window.render : null;
       if (!config['columnDefs']) {
-        console.log("Creating columnDefs")
+        console.log("  creating columnDefs")
+        if (!columnEmpty) {
+          console.log("  getConfig was not passed a columnEmpty array. Setting visibility of all columns to true.")
+        } else {
+          console.log("  getConfig was passed columnEmpty:")
+          console.log(columnEmpty)
+          console.log("  using to set visibility")
+        }
         config['columnDefs'] = [];
         for (let i = 0; i < columnNames.length; i++) {
           let visible = columnEmpty ? columnEmpty[i] === false : true;
@@ -208,7 +207,7 @@
             }
           }
         }
-        console.log("Created columnDefs")
+        console.log("  created columnDefs")
       }
 
       if (config['serverSide']) {
@@ -216,20 +215,37 @@
           "url": window.location.pathname + "data/",
           "type": "get",
           "data": function(dtp) {
-            console.log("Search executed. Returning:");
+            console.log("config['ajax'] callback. Preparing query parameters for AJAX search using dtp object:");
+            console.log(dtp);
 
+            let qs = parseQueryString(location.hash);
             // Get search entries
-            for (let c = 0; c < dtp.columns.length; c++) {
-              let searchValue = dtp.columns[c].search.value;
+            console.log("  reading column search values from dtp object.");
+            let searchValue;
+            let inputs = $('input.columnSearch');
+            for (input of inputs) {
+              let name = $(input).attr('name');
               if (dtp.draw == 1) {
-                searchValue = getInitialSearch('table1',c);
+                searchValue = qs[name];
+                if (searchValue) {
+                  console.log(`  first query so using initial search value for column '${name}' from hash; it is ${searchValue}`);
+                }
+              } else {
+                searchValue = $(input).val();
+                if (searchValue) {
+                  console.log(`  first query so got initial search value for column '${name}'; it is ${searchValue}`);
+                }
               }
               if (searchValue) {
-                let name = dtp.columns[c]['name'];
+                console.log(`  Search value for column '${name}' is not undefined. Updating dtp query object.`);
                 dtp[name] = searchValue;
-                updateQueryString(name, searchValue);
+                if (dtp.draw > 1) {
+                  console.log(`  Updating query string with search value for column '${name}' using found search value.`);
+                  updateQueryString(name, searchValue);
+                }
               }
             }
+
             if (dtp.search.value) {
               dtp._globalsearch = dtp.search.value;
             }
@@ -255,17 +271,16 @@
             delete dtp.search;
             delete dtp.order;
 
+            console.log("  returning updated dtp object:")
             console.log(dtp);
 
             return dtp;
           }
         };
       } else {
-        config['ajax'] = window.location.href + "data/";
+        config['ajax'] = window.location.pathname + "data/";
       }
-      localStorage.setItem('config', JSON.stringify(config));
-      console.log("getConfig() returning config:")
-      console.log(config)
+      console.log("  returning config:")
       return config;
     }
 
@@ -343,26 +358,33 @@
     }
 
     function dtInitComplete() {
-      console.log("dtInitComplete() called.")
+
+      console.log("dtInitComplete() called. DOM is ready.")
       const table = $('#table1').dataTable();
       adjustDOM(table);
 
-      console.log("Setting search.")
+      console.log("Setting search inputs with initial search values and setting search event.")
+      const qs = parseQueryString();
+      let config = getConfig.config;
       table.api().columns().every( function () {
         let that = this;
-        // Create the `select` element
-        $("thead tr:eq(0) > th").eq(this.index()).html('');
-        let input = $(`<input index="${this.index()}" type="text" placeholder="Search col." style="max-width:5em"/>`);
-        let val = getInitialSearch('table1',this.index());
+        // Create `select` element
+        let index = this.index();
+        name = config.columnDefs[index]['name'];
+        $("thead tr:eq(0) > th").eq(index).html('');
+        let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
+
+        let val = qs[name] || '';
         input
           .val(val)
-          .appendTo($("thead tr:eq(0) > th").eq(this.index()))
+          .appendTo($("thead tr:eq(0) > th").eq(index))
           .on("keydown", function() {
+            console.log(that)
             if (!config["search"]["return"]) {
               that.search($(this).val()).draw();
             } else {
-              var keycode = (event.keyCode ? event.keyCode : event.which);
-              if(keycode == '13'){
+              let keycode = (event.keyCode ? event.keyCode : event.which);
+              if (keycode == '13'){
                 that.search($(this).val()).draw();
               }
             }
@@ -389,6 +411,7 @@
       }
 
       const config = await getConfig(columnEmpty);
+      getConfig.config = config;
 
       // Add header names to table. Two rows are added.
       // The first row is for sorting, second row is for filtering.
@@ -397,6 +420,7 @@
       for (let i = 0; i < config.columnDefs.length; i++) {
         thead.append(`<th>${config.columnDefs[i]['name']}</th>`);
       }
+
       // Create table body
       $('#table1').append('<tbody></tbody>');
 
@@ -409,6 +433,7 @@
         }
       });
 
+      console.log("Setting click event for showAllColumns checkbox.")
       $('#showAllColumns').click(function() {
         if ($(this).is(':checked')) {
           init();
@@ -435,12 +460,12 @@
           ...config,
           "initComplete": dtInitComplete,
         };
+
+      console.log("Calling DataTable()")
       let table = $('#table1').DataTable(dataTableOptions);
       console.log("init() complete.")
     }
 
-    console.log("Document ready. Calling init()")
-    $(document).ready(()=>init());
   </script>
 </body>
 </html>
