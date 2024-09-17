@@ -51,7 +51,6 @@ def serve(sqldb=None, table_name=None,
 
 def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
 
-
   def cors_headers(response: fastapi.Response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "*"
@@ -61,12 +60,9 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles
-  directory = os.path.join(root_dir, 'js')
-  app.mount("/js", StaticFiles(directory=directory))
-  directory = os.path.join(root_dir, 'css')
-  app.mount("/css", StaticFiles(directory=directory))
-  directory = os.path.join(root_dir, 'img')
-  app.mount("/img", StaticFiles(directory=directory))
+  for dir in ['js', 'css', 'img']:
+    directory = os.path.join(root_dir, dir)
+    app.mount(f"/{dir}/", StaticFiles(directory=directory))
 
   @app.route("/", methods=["GET", "HEAD"])
   def indexhtml(request: fastapi.Request):
@@ -82,7 +78,6 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
     with open(dtconfig) as f:
       logger.info("Reading: " + dtconfig)
       content = json.load(f)
-
     if 'sqldb' in dbinfo:
       content["serverSide"] = True
 
