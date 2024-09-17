@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
     <title>__TABLENAME__</title>
@@ -97,7 +98,9 @@
 
   </style>
 </head>
+
 <body>
+
   <details style="background-color: white; float:right">
     <summary>Instructions</summary>
     <ul>
@@ -108,18 +111,18 @@
       <li>For an exact match search for <code>abc</code>, use single quotes: <code>'abc'</code>.</li>
     </ul>
   </details>
-  <script>
-  </script>
 
   <div style="padding-bottom:3px">
-  <span id="showHideColumns">
-    <!--These three must be one line to avoid newlines in button text-->
-    <span title="show columns with no content on page"><input type="checkbox" checked="checked" id="showAllColumns"><label for="showAllColumns">Show All Columns</label></span>
-    <span id="clearAllFilters" style="display:none"><button onclick="clearAllFilters('#table1')">Clear All Filters</button></span>
-  </span>
-  <span id="tableInfo"></span>
+    <span id="showHideColumns">
+      <!--These must be one line to avoid newlines in button text-->
+      <span title="show columns with no content on page"><input type="checkbox" checked="checked" id="showAllColumns"><label for="showAllColumns">Show All Columns</label></span>
+      <span id="clearAllFilters" style="display:none"><button onclick="clearAllFilters('#table1')">Clear All Filters</button></span>
+    </span>
+    <span id="tableInfo"></span>
   </div>
+
   <table id="table1" class="display" style="width:100%"></table>
+
   <script>
     console.log("Document ready. Calling init()")
     $(document).ready(() =>init());
@@ -515,5 +518,7 @@
     }
 
   </script>
+
 </body>
+
 </html>
