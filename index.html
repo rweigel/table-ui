@@ -124,16 +124,9 @@
     console.log("Document ready. Calling init()")
     $(document).ready(() =>init());
 
-    if (!location.href.endsWith('/')) {
-	    //location.href = location.href + "/";
-    }
-
-    function clearAllFilters(tableid) {
+    function clearAllFilters(tableID) {
       location.hash = "";
       init();
-      return;
-      $('input').each(function (idx, el) {$(el).val('')});
-      $(tableid).DataTable().search('').columns().search('').draw();
     }
 
     function parseQueryString() {
@@ -192,8 +185,23 @@
       }
       config.columnNames = columnNames;
 
-      let renderColumnFunction = window.renderColumn ? window.renderColumn : null;
       if (!config['columnDefs']) {
+        _columnDefs(columnNames, columnEmpty);
+      }
+
+      config['ajax'] = window.location.pathname + "data/";
+      if (config['serverSide']) {
+        config['ajax'] = {
+          "url": window.location.pathname + "data/",
+          "type": "get",
+          "data": _ajaxData
+        };
+      }
+
+      console.log("  returning config:")
+      return config;
+
+      function _columnDefs(columnName, columnEmpty) {
         console.log("  creating columnDefs")
         if (!columnEmpty) {
           console.log("  getConfig was not passed a columnEmpty array. Setting visibility of all columns to true.")
@@ -202,121 +210,121 @@
           console.log(columnEmpty)
           console.log("  using to set visibility")
         }
+
+        let renderColumnFunction = window.renderColumn ? window.renderColumn : null;
         config['columnDefs'] = [];
         for (let i = 0; i < columnNames.length; i++) {
           let visible = columnEmpty ? columnEmpty[i] === false : true;
           config['columnDefs'].push({
             "name": columnNames[i],
             "targets": i,
-            "visible": visible,
-            //"render": DataTable.render.ellipsis( 10 ) // ellipsis.js plug-in
+            "visible": visible
           });
+          // ellipsis.js plug-in
+          // config['columnDefs'][i]['render'] = DataTable.render.ellipsis( 10 )
           if (renderColumnFunction) {
-            const _renderColumnFunction = renderColumnFunction(columnNames[i], config)
-            if (_renderColumnFunction) {
-              config['columnDefs'][i]['render'] = _renderColumnFunction;
+            const render = renderColumnFunction(columnNames[i], config)
+            if (render) {
+              config['columnDefs'][i]['render'] = render
             }
           }
         }
         console.log("  created columnDefs")
       }
 
-      if (config['serverSide']) {
-        config['ajax'] = {
-          "url": window.location.pathname + "data/",
-          "type": "get",
-          "data": function(dtp) {
-            console.log("config['ajax'] callback. Preparing query parameters for AJAX search using dtp object:");
-            console.log(dtp);
+      function _ajaxData(dtp) {
+      console.log("config['ajax'] callback. Preparing query parameters for AJAX search using dtp object:");
+      console.log(dtp);
 
-            let searchValue;
-            if (dtp.draw == 1) {
-              let config = getConfig.config;
-              let qs = parseQueryString(location.hash);
-              console.log("  query string:")
-              console.log(qs);
-              // TODO: Need to validate that the query string keys are valid column names.
-              let alerted = false;
-              for (const [key, val] of Object.entries(qs)) {
-                if (config.columnNames.includes(key)) {
-                  console.log(`  found ${key} = '${val}' in query string. Using it.`);
-                } else {
-                  console.log(`  found ${key} = '${val}'' in query string, but it is not a valid column name. Removing it from hash.`);
-                  if (alerted == false) {
-                    alerted = true;
-                    alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
-                  }
-                  updateQueryString(key, null);
-                }
-                dtp[key] = val;
-              }
-            } else {
-              let inputs = $('.dataTables_scrollHead input.columnSearch');
-              console.log(inputs.length)
-              for (input of inputs) {
-                let name = $(input).attr('name');
-                searchValue = $(input).val();
-                if (searchValue) {
-                  console.log(`Found search value for column '${name}'. Updating dtp query object.`);
-                  $(input).css('background-color', 'yellow');
-                  dtp[name] = searchValue;
-                  if (dtp.draw > 1) {
-                    console.log(`Updating query string with search value for column '${name}'.`);
-                    updateQueryString(name, searchValue);
-                  }
-                } else {
-                  console.log(`No search value for column '${name}'.`);
-                  $(input).css('background-color', '');
-                  let qs = parseQueryString();
-                  if (qs[name]) {
-                    console.log(` Found ${name} in query string. Removing from query string.`);
-                    updateQueryString(name, null);
-                  }
-                }
-              }
+      let searchValue;
+      if (dtp.draw == 1) {
+        let config = getConfig.config;
+        let qs = parseQueryString(location.hash);
+        console.log("  query string:")
+        console.log(qs);
+        // TODO: Need to validate that the query string keys are valid column names.
+        let alerted = false;
+        for (const [key, val] of Object.entries(qs)) {
+          if (config.columnNames.includes(key)) {
+            console.log(`  found ${key} = '${val}' in query string. Using it.`);
+          } else {
+            console.log(`  found ${key} = '${val}'' in query string, but it is not a valid column name. Removing it from hash.`);
+            if (alerted == false) {
+              alerted = true;
+              alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
             }
-
-            if (dtp.search.value) {
-              dtp._globalsearch = dtp.search.value;
-            }
-
-            _orders = [];
-            for (let i = 0; i < dtp.order.length; i++) {
-              let c = dtp.order[i].column;
-              let name = dtp.columns[c]['name'];
-              _orders.push(dtp.order[i]['dir'] == 'asc' ? name : '-' + name);
-            }
-            dtp._orders = _orders.join(",");
-
-            dtp._length = dtp.length;
-            delete dtp.length;
-
-            dtp._start = dtp.start;
-            delete dtp.start;
-
-            dtp._draw = dtp.draw;
-            delete dtp.draw;
-
-            delete dtp.columns;
-            delete dtp.search;
-            delete dtp.order;
-
-            console.log("  returning updated dtp object:")
-            console.log(dtp);
-
-            return dtp;
+            updateQueryString(key, null);
           }
-        };
+          dtp[key] = val;
+        }
       } else {
-        config['ajax'] = window.location.pathname + "data/";
+        let inputs = $('.dataTables_scrollHead input.columnSearch');
+        console.log(inputs.length)
+        for (input of inputs) {
+          let name = $(input).attr('name');
+          searchValue = $(input).val();
+          if (searchValue) {
+            console.log(`Found search value for column '${name}'. Updating dtp query object.`);
+            $(input).css('background-color', 'yellow');
+            dtp[name] = searchValue;
+            if (dtp.draw > 1) {
+              console.log(`Updating query string with search value for column '${name}'.`);
+              updateQueryString(name, searchValue);
+            }
+          } else {
+            console.log(`No search value for column '${name}'.`);
+            $(input).css('background-color', '');
+            let qs = parseQueryString();
+            if (qs[name]) {
+              console.log(` Found ${name} in query string. Removing from query string.`);
+              updateQueryString(name, null);
+            }
+          }
+        }
       }
-      console.log("  returning config:")
-      return config;
+
+      if (dtp.search.value) {
+        dtp._globalsearch = dtp.search.value;
+      }
+
+      _orders = [];
+      for (let i = 0; i < dtp.order.length; i++) {
+        let c = dtp.order[i].column;
+        let name = dtp.columns[c]['name'];
+        _orders.push(dtp.order[i]['dir'] == 'asc' ? name : '-' + name);
+      }
+      dtp._orders = _orders.join(",");
+
+      dtp._length = dtp.length;
+      delete dtp.length;
+
+      dtp._start = dtp.start;
+      delete dtp.start;
+
+      dtp._draw = dtp.draw;
+      delete dtp.draw;
+
+      delete dtp.columns;
+      delete dtp.search;
+      delete dtp.order;
+
+      console.log("  returning updated dtp object:")
+      console.log(dtp);
+
+      return dtp;
     }
 
-    function adjustDOM(table) {
+    }
+
+    function adjustDOM(tableID) {
+
       console.log("adjustDOM() called.")
-      $("#table1")
+      const table_info = `${tableID}_info`;
+      const table_length = `${tableID}_length`;
+      const table_filter = `${tableID}_filter`;
+      const table_paginate = `${tableID}_paginate`;
+
+      $(tableID)
         .on('draw.dt', function () {
           let qs = parseQueryString();
           if (Object.keys(qs).length > 0) {
@@ -326,48 +334,41 @@
           }
 
           // Hide paging if only one page on draw event.
-          if ($("#table1").dataTable().api().page.info().pages == 1) {
+          if ($(tableID).dataTable().api().page.info().pages == 1) {
             $("#table1_paginate").hide();
           } else {
-            $("#table1_paginate").show();
+            $(table_paginate).show();
           }
-          //var numCols = $('#table1').DataTable().columns().nodes().length;
-          //var numColsVisible = $('#table1').DataTable().columns(':visible').nodes().length;
         })
         .trigger('draw.dt');
         // trigger() above needed for initial load for b/c draw.dt not triggered.
 
-      let input = $('#table1_filter input').attr('placeholder','Global search')
-      $('#table1_filter label').replaceWith(input[0]);
-      $('#table1_info').insertAfter('#table1_filter');
+      let input = $(`${table_filter} input`).attr('placeholder','Global search')
+      $(`${table_filter} label`).replaceWith(input[0]);
+      $(`${table_info}`).insertAfter(table_filter);
 
-      let numCols = $('#table1').DataTable().columns().nodes().length;
-      let numColsVisible = $('#table1').DataTable().columns(':visible').nodes().length;
+      let numCols = $(tableID).DataTable().columns().nodes().length;
+      let numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length;
       let colInfo = ` and all ${numCols} columns`;
       if (numCols != numColsVisible) {
         colInfo = ` and ${numColsVisible}/${numCols} columns`;
       }
 
-      let txt = $('#table1_info')
+      let txt = $(table_info)
                   .text()
                   .replace(' to ','-')
                   .replace('entries', colInfo)
                   .replace('Showing ','Showing rows ')
-      $('#table1_info').text(txt);
-      $('#table1_paginate').insertAfter('#table1_filter');
+      $(table_info).text(txt);
+      $(table_paginate).insertAfter(table_filter);
 
-      $('#nCols').text(numCols);
+      let select = $(`${table_length} select`)
+      select.appendTo(table_length)
+      $(`${table_length} label`).text('Rows per page: ')
 
-      let select = $('#table1_length select')
-      select.appendTo('#table1_length')
-      $('#table1_length label').text('Rows per page: ')
-      //let html = $('#table1_length').html()
-      //$('#table1_length').html(html.replace('entries','rows'));
-
-      x = $('#table1_next');
-      html = x.html();
-      x.html(html.replace('Next','Next page'));
-      //$('#table1_info').after(x)
+      const next = $(`${tableID}_next`);
+      const html = next.html();
+      next.html(html.replace('Next','Next page'));
 
       // A resize triggers left column header width
       // to match the width of the body columns.
@@ -375,7 +376,7 @@
 
       // Make the added header search row fixed b/c the fixedColumns plugin
       // does not seem to "see" the added row.
-      $("thead tr:eq(0) > th:eq(0)")
+      $(`${tableID} thead tr:eq(0) > th:eq(0)`)
         .css('position', 'sticky')
         .css('left', '0px')
         .css('z-index', '1000000')
@@ -391,7 +392,7 @@
 
       console.log("dtInitComplete() called. DOM is ready.")
       const table = $('#table1').dataTable();
-      adjustDOM(table);
+      adjustDOM('#table1');
 
       console.log("Setting search inputs with initial search values and setting search event.")
       const qs = parseQueryString();
@@ -431,19 +432,8 @@
 
     async function init(columnEmpty) {
 
-      let xtable = $('#table1_wrapper');
-      if (xtable.length > 0) {
-        console.log("Destroying table")
-        // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
-        $('#tableInfo').empty();
-        $('#table1').DataTable().state.clear();
-        //localStorage.clear();
-        $('#table1').DataTable().destroy();
-        xtable.remove();
-        $('#table1').empty();
-        $('#showAllColumns').unbind();
-        console.log("Destroyed table")
-      }
+      _destroy("#table1");
+
       let renderTableInfo = window.renderTableInfo ? window.renderTableInfo : null;
       const config = await getConfig(columnEmpty);
       getConfig.config = config;
@@ -503,6 +493,25 @@
       console.log("Calling DataTable()")
       let table = $('#table1').DataTable(dataTableOptions);
       console.log("init() complete.")
+
+      function _destroy(tableID) {
+        if (!$.fn.DataTable.isDataTable(tableID)) {
+          return
+        }
+
+        let tableWrapper = $(tableID + "_wrapper");
+        if (tableWrapper.length > 0) {
+          console.log("Destroying table")
+          // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
+          $('#tableInfo').empty();
+          $(tableID).DataTable().state.clear();
+          $(tableID).DataTable().destroy();
+          tableWrapper.remove();
+          $(tableID).empty();
+          $('#showAllColumns').unbind();
+          console.log("Destroyed table")
+        }
+      }
     }
 
   </script>
