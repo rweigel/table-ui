@@ -80,7 +80,8 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
       content = json.load(f)
     if 'sqldb' in dbinfo:
       content["serverSide"] = True
-
+    if 'tableMetadata' not in content:
+      content['tableMetadata'] = dbinfo['tableMetadata']
     return fastapi.responses.JSONResponse(content=content)
 
   @app.route("/render.js", methods=["GET", "HEAD"])
@@ -150,7 +151,9 @@ def _table_names(sqldb=None):
   try:
     cursor = connection.cursor()
     cursor.execute(query_)
-    table_names = list(cursor.fetchall()[0])
+    table_names = []
+    for row in cursor.fetchall():
+      table_names.append(row[0])
   except Exception as e:
     print(f"Error executing query for table names using '{query_}' on {sqldb}")
     raise e
@@ -215,6 +218,18 @@ def _dbinfo(sqldb=None, table_name=None, json_head=None, json_body=None):
     else:
       logger.info(f"No table name given; using first table returned from list of table names: '{table_name}'")
       table_name = table_names[0]
+
+    table_metadata = f'{table_name}.metadata'
+    if f'{table_metadata}' in table_names:
+      conn = sqlite3.connect(sqldb)
+      cursor = conn.cursor()
+      query = f"SELECT * FROM `{table_metadata}`"
+      cursor.execute(query)
+      row = cursor.fetchone()
+      if row is not None:
+        logger.info(f"Table metadata: {row[1]}")
+      conn.close()
+      dbinfo["tableMetadata"] = json.loads(row[1])
 
   conn = sqlite3.connect(sqldb)
   cursor = conn.cursor()

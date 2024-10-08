@@ -118,7 +118,7 @@
       <span title="show columns with no content on page"><input type="checkbox" checked="checked" id="showAllColumns"><label for="showAllColumns">Show All Columns</label></span>
       <span id="clearAllFilters" style="display:none"><button onclick="clearAllFilters('#table1')">Clear All Filters</button></span>
     </span>
-    <span id="tableInfo"></span>
+    <span id="tableMetadata"></span>
   </div>
 
   <table id="table1" class="display" style="width:100%"></table>
@@ -183,7 +183,9 @@
         columnNames = await getHeader();
         console.log("  got header")
         console.log("  setting searchCols")
-        config['searchCols'] = config['searchCols'] ? config['searchCols'] : new Array(columnNames.length).fill(null);
+        config['searchCols'] = config['searchCols'] ?
+                               config['searchCols'] :
+                               new Array(columnNames.length).fill(null);
         console.log("  set searchCols")
       }
       config.columnNames = columnNames;
@@ -411,7 +413,7 @@
         let val = qs[name] || '';
         input
           .val(val)
-          .attr('title','Hit enter to search')
+          .attr('title','Press enter to search')
           .appendTo($("thead tr:eq(0) > th").eq(index))
           .on("keydown", function() {
             if (!config["search"]["return"]) {
@@ -425,7 +427,7 @@
           });
           if (val) {
             input.css('background-color', 'yellow');
-            input.attr('title','Remove text and hit enter to clear search')
+            input.attr('title','Remove text and press enter to clear search')
           }
         });
       console.log("Set search.")
@@ -437,13 +439,12 @@
 
       _destroy("#table1");
 
-      let renderTableInfo = window.renderTableInfo ? window.renderTableInfo : null;
       const config = await getConfig(columnEmpty);
       getConfig.config = config;
 
-      const tableInfo = renderTableInfo ? renderTableInfo(config) : "";
-      console.log(renderTableInfo(config))
-      $('#tableInfo').html(tableInfo);
+      const renderTableMetadata = window.renderTableMetadata ? window.renderTableMetadata : null;
+      const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : "";
+      $('#tableMetadata').html(tableMetadata);
 
       // Add header names to table. Two rows are added.
       // The first row is for sorting, second row is for filtering.
@@ -482,7 +483,7 @@
               }
             }
           }
-          init(columnEmpty);
+          setTimeout(() => init(columnEmpty), 1);
         }
       });
 
@@ -506,7 +507,7 @@
         if (tableWrapper.length > 0) {
           console.log("Destroying table")
           // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
-          $('#tableInfo').empty();
+          $('#tableMetadata').empty();
           $(tableID).DataTable().state.clear();
           $(tableID).DataTable().destroy();
           tableWrapper.remove();

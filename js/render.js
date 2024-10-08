@@ -43,17 +43,8 @@ function renderColumn (columnName, tableConfig) {
   }
 }
 
-function renderTableInfo (config) {
-  let html = `This table is draws content from the <code>${config.tableName}</code> table in `
-  html += '<a href="http://mag.gmu.edu/git-data/cdawmeta/data/table">the tables directory</a>.'
-  if (config.tableName === 'cdaweb.dataset') {
-    html += ' This table contains information from <a href="https://spdf.gsfc.nasa.gov/pub/catalogs/all.xml">all.xml</a> and <code>CDFglobalAttributes</code> in the <a href="https://cdaweb.gsfc.nasa.gov/pub/software/cdawlib/0JSONS/">Master CDF files</a>.'
-  }
-  if (config.tableName === 'spase.dataset') {
-    html += ' This table contains non-<code>Parameter</code> SPASE <code>NumericalData</code> metadata.'
-  }
-  if (config.tableName === 'spase.parameter') {
-    html += ' This table contains only information in SPASE <code>NumericalData/Parameter</code> metadata.'
-  }
-  return html
+function renderTableMetadata (config) {
+  const description = config.tableMetadata.description
+  const creationDate = config.tableMetadata.creationDate
+  return `${description} Table created <code>${creationDate}</code>`
 }
