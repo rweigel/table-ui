@@ -379,17 +379,6 @@
       // to match the width of the body columns.
       setTimeout(function() {$(window).resize()}, 0);
 
-      // Make the added header search row fixed b/c the fixedColumns plugin
-      // does not seem to "see" the added row.
-      $(`${tableID} thead tr:eq(0) > th:eq(0)`)
-        .css('position', 'sticky')
-        .css('left', '0px')
-        .css('z-index', '1000000')
-        .css('background-color', 'white');
-
-      // Prevent double header on first column showing when
-      // on initial scroll.
-      //$('.dataTables_scroll thead th').css('z-index',-1);
       console.log("adjustDOM() finished.")
     }
 
@@ -397,7 +386,6 @@
 
       console.log("dtInitComplete() called. DOM is ready.")
       const table = $('#table1').dataTable();
-      adjustDOM('#table1');
 
       console.log("Setting search inputs with initial search values and setting search event.")
       const qs = parseQueryString();
@@ -407,6 +395,7 @@
         // Create `select` element
         let index = this.index();
         name = config.columnDefs[index]['name'];
+        // Note that the header table does not have an id. It should.
         $("thead tr:eq(0) > th").eq(index).html('');
         let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
 
@@ -432,6 +421,8 @@
         });
       console.log("Set search.")
 
+      adjustDOM('#table1');
+
       console.log("dtInitComplete() finished.")
     }
 
@@ -449,10 +440,22 @@
       // Add header names to table. Two rows are added.
       // The first row is for sorting, second row is for filtering.
       $('#table1').append('<thead><tr></tr><tr></tr></thead>');
-      let thead = $('#table1 > thead > tr');
+      let tr1 = $('#table1 > thead > tr:eq(1)');
       for (let i = 0; i < config.columnDefs.length; i++) {
-        thead.append(`<th>${config.columnDefs[i]['name']}</th>`);
+        tr1.append(`<th>${config.columnDefs[i]['name']}</th>`);
       }
+      let tr2 = $('#table1 > thead > tr:eq(0)');
+      for (let i = 0; i < config.columnDefs.length; i++) {
+        tr2.append(`<th></th>`);
+      }
+
+      // Make the added header search row fixed b/c the fixedColumns plugin
+      // does not seem to "see" the extra row.
+      $(`#table1 thead tr:eq(0) > th:eq(0)`)
+        .css('position', 'sticky')
+        .css('left', '0px')
+        .css('z-index', '1000000')
+        .css('background-color', 'white');
 
       // Create table body
       $('#table1').append('<tbody></tbody>');
