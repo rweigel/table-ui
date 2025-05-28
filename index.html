@@ -242,10 +242,10 @@
       console.log(dtp);
 
       let searchValue;
-      if (dtp.draw == 1) {
+      if (dtp.draw === 1) {
         let config = getConfig.config;
         let qs = parseQueryString(location.hash);
-        console.log("  query string:")
+        console.log("  dtp.draw == 1; query string:")
         console.log(qs);
         // TODO: Need to validate that the query string keys are valid column names.
         let alerted = false;
@@ -264,8 +264,8 @@
         }
       } else {
         let inputs = $('.dataTables_scrollHead input.columnSearch');
-        console.log(inputs.length)
-        for (input of inputs) {
+        console.log(` Reading ${inputs.length} column search inputs.`);
+        for (let input of inputs) {
           let name = $(input).attr('name');
           searchValue = $(input).val();
           if (searchValue) {
@@ -273,11 +273,11 @@
             $(input).css('background-color', 'yellow');
             dtp[name] = searchValue;
             if (dtp.draw > 1) {
-              console.log(`Updating query string with search value for column '${name}'.`);
+              console.log(`Updating query string with search value for column '${name}' = '${searchValue}'.`);
               updateQueryString(name, searchValue);
             }
           } else {
-            console.log(`No search value for column '${name}'.`);
+            //console.log(`No search value for column '${name}'.`);
             $(input).css('background-color', '');
             let qs = parseQueryString();
             if (qs[name]) {
@@ -375,9 +375,23 @@
       const html = next.html();
       next.html(html.replace('Next','Next page'));
 
-      // A resize triggers left column header width
-      // to match the width of the body columns.
-      setTimeout(function() {$(window).resize()}, 0);
+      setTimeout(function() {
+
+        // A resize triggers left column header width
+        // to match the width of the left column body.
+        $(window).resize()
+        $('[aria-describedby=table1_info]').removeAttr('aria-hidden')
+        // The above line is needed to prevent the following error (which results
+        // in updates to search inputs not being read by code that steps through
+        // columns search inputs):
+        // Blocked aria-hidden on an element because its descendant retained focus.
+        // The focus must not be hidden from assistive technology users. Avoid
+        // using aria-hidden on a focused element or its ancestor. Consider using
+        // the inert attribute instead, which will also prevent focus. For more
+        // details, see the aria-hidden section of the WAI-ARIA specification at https://w3c.github.io/aria/#aria-hidden.
+        // Element with focus: <input.columnSearch>
+
+      }, 0);
 
       console.log("adjustDOM() finished.")
     }
