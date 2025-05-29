@@ -76,6 +76,11 @@
       padding: 1px;
     }
 
+    div.dataTables_processing {
+      z-index: 101;
+      top: 0px;
+    }
+
     /* https://simurai.com/blog/2011/07/26/webkit-scrollbar */
     .dataTables_scrollBody::-webkit-scrollbar {
       -webkit-appearance: none;
@@ -200,7 +205,7 @@
           "url": window.location.pathname + "data/",
           "type": "get",
           "data": _ajaxData
-        };
+        }
       }
 
       console.log("  returning config:")
@@ -321,6 +326,36 @@
 
     }
 
+    function setEvents(tableID) {
+      const table_paginate = `${tableID}_paginate`;
+
+      $(tableID).on('preDraw.dt', function () {
+        console.log('setEvents() => preDraw.dt triggered')
+      })
+
+      console.log('setEvents() => Triggering draw.dt')
+      $(tableID)
+        .on('draw.dt', function () {
+          console.log('setEvents() => draw.dt triggered')
+          let qs = parseQueryString();
+          if (Object.keys(qs).length > 0) {
+            $('#clearAllFilters').show();
+          } else {
+            $('#clearAllFilters').hide();
+          }
+
+          // Hide paging if only one page.
+          if ($(tableID).dataTable().api().page.info().pages === 1) {
+            $("#table1_paginate").hide();
+          } else {
+            $(table_paginate).show();
+          }
+        })
+        .trigger('draw.dt');
+        // trigger() above needed for initial load.
+
+    }
+
     function adjustDOM(tableID) {
 
       console.log("adjustDOM() called.")
@@ -329,25 +364,6 @@
       const table_filter = `${tableID}_filter`;
       const table_paginate = `${tableID}_paginate`;
 
-      $(tableID)
-        .on('draw.dt', function () {
-          let qs = parseQueryString();
-          if (Object.keys(qs).length > 0) {
-            $('#clearAllFilters').show();
-          } else {
-            $('#clearAllFilters').hide();
-          }
-
-          // Hide paging if only one page on draw event.
-          if ($(tableID).dataTable().api().page.info().pages == 1) {
-            $("#table1_paginate").hide();
-          } else {
-            $(table_paginate).show();
-          }
-        })
-        .trigger('draw.dt');
-        // trigger() above needed for initial load for b/c draw.dt not triggered.
-
       let input = $(`${table_filter} input`).attr('placeholder','Global search')
       $(`${table_filter} label`).replaceWith(input[0]);
       $(`${table_info}`).insertAfter(table_filter);
@@ -355,7 +371,7 @@
       let numCols = $(tableID).DataTable().columns().nodes().length;
       let numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length;
       let colInfo = ` and all ${numCols} columns`;
-      if (numCols != numColsVisible) {
+      if (numCols !== numColsVisible) {
         colInfo = ` and ${numColsVisible}/${numCols} columns`;
       }
 
@@ -379,7 +395,9 @@
 
         // A resize triggers left column header width
         // to match the width of the left column body.
+        console.log("adjustDOM() => resizing window to adjust column widths.")
         $(window).resize()
+
         $('[aria-describedby=table1_info]').removeAttr('aria-hidden')
         // The above line is needed to prevent the following error (which results
         // in updates to search inputs not being read by code that steps through
@@ -435,6 +453,7 @@
         });
       console.log("Set search.")
 
+      setEvents('#table1');
       adjustDOM('#table1');
 
       console.log("dtInitComplete() finished.")
@@ -468,7 +487,7 @@
       $(`#table1 thead tr:eq(0) > th:eq(0)`)
         .css('position', 'sticky')
         .css('left', '0px')
-        .css('z-index', '1000000')
+        .css('z-index', '101')
         .css('background-color', 'white');
 
       // Create table body
