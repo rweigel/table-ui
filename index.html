@@ -175,23 +175,23 @@
     async function getConfig(columnEmpty) {
 
       const url = window.location.pathname + "config"
-      console.log("  getting config from " + url)
+      console.log("getting config from " + url)
       let resp = await fetch(url);
       const config = await resp.json();
-      console.log("  got config")
+      console.log("got config")
 
       const tableName = $('title').text();
       config.tableName = tableName;
       let columnNames = [];
       if (!config['searchCols'] || !config['columnDefs']) {
-        console.log("  getting header")
+        console.log("getting header")
         columnNames = await getHeader();
-        console.log("  got header")
-        console.log("  setting searchCols")
+        console.log("got header")
+        console.log("setting searchCols")
         config['searchCols'] = config['searchCols'] ?
                                config['searchCols'] :
                                new Array(columnNames.length).fill(null);
-        console.log("  set searchCols")
+        console.log("set searchCols")
       }
       config.columnNames = columnNames;
 
@@ -208,11 +208,11 @@
         }
       }
 
-      console.log("  returning config:")
+      console.log("returning config:")
       return config;
 
       function _columnDefs(columnName, columnEmpty) {
-        console.log("  creating columnDefs")
+        console.log("creating columnDefs")
         if (!columnEmpty) {
           console.log("  getConfig was not passed a columnEmpty array. Setting visibility of all columns to true.")
         } else {
@@ -239,90 +239,90 @@
             }
           }
         }
-        console.log("  created columnDefs")
+        console.log("created columnDefs")
       }
 
       function _ajaxData(dtp) {
-      console.log("config['ajax'] callback. Preparing query parameters for AJAX search using dtp object:");
-      console.log(dtp);
+        console.log("config['ajax'] callback. Preparing query parameters for AJAX search using dtp object:");
+        console.log(dtp);
 
-      let searchValue;
-      if (dtp.draw === 1) {
-        let config = getConfig.config;
-        let qs = parseQueryString(location.hash);
-        console.log("  dtp.draw == 1; query string:")
-        console.log(qs);
-        // TODO: Need to validate that the query string keys are valid column names.
-        let alerted = false;
-        for (const [key, val] of Object.entries(qs)) {
-          if (config.columnNames.includes(key)) {
-            console.log(`  found ${key} = '${val}' in query string. Using it.`);
-          } else {
-            console.log(`  found ${key} = '${val}'' in query string, but it is not a valid column name. Removing it from hash.`);
-            if (alerted == false) {
-              alerted = true;
-              alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
+        let searchValue;
+        if (dtp.draw === 1) {
+          let config = getConfig.config;
+          let qs = parseQueryString(location.hash);
+          console.log("  dtp.draw == 1; query string:")
+          console.log(qs);
+          // TODO: Need to validate that the query string keys are valid column names.
+          let alerted = false;
+          for (const [key, val] of Object.entries(qs)) {
+            if (config.columnNames.includes(key)) {
+              console.log(`  found ${key} = '${val}' in query string. Using it.`);
+            } else {
+              console.log(`  found ${key} = '${val}'' in query string, but it is not a valid column name. Removing it from hash.`);
+              if (alerted == false) {
+                alerted = true;
+                alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
+              }
+              updateQueryString(key, null);
             }
-            updateQueryString(key, null);
+            dtp[key] = val;
           }
-          dtp[key] = val;
-        }
-      } else {
-        let inputs = $('.dataTables_scrollHead input.columnSearch');
-        console.log(` Reading ${inputs.length} column search inputs.`);
-        for (let input of inputs) {
-          let name = $(input).attr('name');
-          searchValue = $(input).val();
-          if (searchValue) {
-            console.log(`Found search value for column '${name}'. Updating dtp query object.`);
-            $(input).css('background-color', 'yellow');
-            dtp[name] = searchValue;
-            if (dtp.draw > 1) {
-              console.log(`Updating query string with search value for column '${name}' = '${searchValue}'.`);
-              updateQueryString(name, searchValue);
-            }
-          } else {
-            //console.log(`No search value for column '${name}'.`);
-            $(input).css('background-color', '');
-            let qs = parseQueryString();
-            if (qs[name]) {
-              console.log(` Found ${name} in query string. Removing from query string.`);
-              updateQueryString(name, null);
+        } else {
+          let inputs = $('.dataTables_scrollHead input.columnSearch');
+          console.log(`Reading ${inputs.length} column search inputs.`);
+          for (let input of inputs) {
+            let name = $(input).attr('name');
+            searchValue = $(input).val();
+            if (searchValue) {
+              console.log(`Found search value for column '${name}'. Updating dtp query object.`);
+              $(input).css('background-color', 'yellow');
+              dtp[name] = searchValue;
+              if (dtp.draw > 1) {
+                console.log(`Updating query string with search value for column '${name}' = '${searchValue}'.`);
+                updateQueryString(name, searchValue);
+              }
+            } else {
+              //console.log(`No search value for column '${name}'.`);
+              $(input).css('background-color', '');
+              let qs = parseQueryString();
+              if (qs[name]) {
+                console.log(` Found ${name} in query string. Removing from query string.`);
+                updateQueryString(name, null);
+              }
             }
           }
         }
+
+        if (dtp.search.value) {
+          dtp._globalsearch = dtp.search.value;
+        }
+
+        _orders = [];
+        for (let i = 0; i < dtp.order.length; i++) {
+          let c = dtp.order[i].column;
+          let name = dtp.columns[c]['name'];
+          _orders.push(dtp.order[i]['dir'] == 'asc' ? name : '-' + name);
+        }
+        dtp._orders = _orders.join(",");
+
+        dtp._length = dtp.length;
+        delete dtp.length;
+
+        dtp._start = dtp.start;
+        delete dtp.start;
+
+        dtp._draw = dtp.draw;
+        delete dtp.draw;
+
+        delete dtp.columns;
+        delete dtp.search;
+        delete dtp.order;
+
+        console.log("  returning updated dtp object:")
+        console.log(dtp);
+
+        return dtp;
       }
-
-      if (dtp.search.value) {
-        dtp._globalsearch = dtp.search.value;
-      }
-
-      _orders = [];
-      for (let i = 0; i < dtp.order.length; i++) {
-        let c = dtp.order[i].column;
-        let name = dtp.columns[c]['name'];
-        _orders.push(dtp.order[i]['dir'] == 'asc' ? name : '-' + name);
-      }
-      dtp._orders = _orders.join(",");
-
-      dtp._length = dtp.length;
-      delete dtp.length;
-
-      dtp._start = dtp.start;
-      delete dtp.start;
-
-      dtp._draw = dtp.draw;
-      delete dtp.draw;
-
-      delete dtp.columns;
-      delete dtp.search;
-      delete dtp.order;
-
-      console.log("  returning updated dtp object:")
-      console.log(dtp);
-
-      return dtp;
-    }
 
     }
 
@@ -350,6 +350,7 @@
           } else {
             $(table_paginate).show();
           }
+
         })
         .trigger('draw.dt');
         // trigger() above needed for initial load.
@@ -388,8 +389,12 @@
       $(`${table_length} label`).text('Rows per page: ')
 
       const next = $(`${tableID}_next`);
-      const html = next.html();
-      next.html(html.replace('Next','Next page'));
+      if (next.length > 0) {
+        const html = next.html();
+        if (html) {
+          next.html(html.replace('Next','Next page'));
+        }
+      }
 
       setTimeout(function() {
 
@@ -406,7 +411,8 @@
         // The focus must not be hidden from assistive technology users. Avoid
         // using aria-hidden on a focused element or its ancestor. Consider using
         // the inert attribute instead, which will also prevent focus. For more
-        // details, see the aria-hidden section of the WAI-ARIA specification at https://w3c.github.io/aria/#aria-hidden.
+        // details, see the aria-hidden section of the WAI-ARIA specification at
+        // https://w3c.github.io/aria/#aria-hidden.
         // Element with focus: <input.columnSearch>
 
       }, 0);
@@ -422,20 +428,22 @@
       console.log("Setting search inputs with initial search values and setting search event.")
       const qs = parseQueryString();
       let config = getConfig.config;
-      table.api().columns().every( function () {
+      let visibleIndex = 0;
+      table.api().columns(':visible').every( function () {
         let that = this;
         // Create `select` element
         let index = this.index();
         name = config.columnDefs[index]['name'];
+        console.log(`  Setting search input for column ${index} named '${name}'. Visible: ${config.columnDefs[index].visible}`);
         // Note that the header table does not have an id. It should.
-        $("thead tr:eq(0) > th").eq(index).html('');
+        $("thead tr:eq(0) > th").eq(visibleIndex).html('');
         let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
 
         let val = qs[name] || '';
         input
           .val(val)
           .attr('title','Press enter to search')
-          .appendTo($("thead tr:eq(0) > th").eq(index))
+          .appendTo($("thead tr:eq(0) > th").eq(visibleIndex))
           .on("keydown", function() {
             if (!config["search"]["return"]) {
               that.search($(this).val()).draw();
@@ -450,6 +458,7 @@
             input.css('background-color', 'yellow');
             input.attr('title','Remove text and press enter to clear search')
           }
+          visibleIndex++;
         });
       console.log("Set search.")
 
@@ -465,6 +474,7 @@
 
       const config = await getConfig(columnEmpty);
       getConfig.config = config;
+      console.log(config)
 
       const renderTableMetadata = window.renderTableMetadata ? window.renderTableMetadata : null;
       const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : "";
@@ -505,8 +515,10 @@
       console.log("Setting click event for showAllColumns checkbox.")
       $('#showAllColumns').click(function() {
         if ($(this).is(':checked')) {
+          console.log("showAllColumns clicked to checked. Calling init() with no args to show all columns.")
           init();
         } else {
+          console.log("showAllColumns clicked to unchecked. Calling init() with columnEmpty arg to hide empty columns.")
           let data = $('#table1').DataTable().data();
           let columnEmpty = [];
           for (let r = 0; r < data.length; r++) {
@@ -530,18 +542,22 @@
           "initComplete": dtInitComplete,
         };
 
-      console.log("Calling DataTable()")
+      console.log("Calling DataTable() with options:")
+      console.log(dataTableOptions)
       let table = $('#table1').DataTable(dataTableOptions);
-      console.log("init() complete.")
+      console.log("DataTable() returned:")
+      console.log(table)
 
       function _destroy(tableID) {
+        console.log("_destroy() called.")
         if (!$.fn.DataTable.isDataTable(tableID)) {
+          console.log(`isDataTable('${tableID}') is false. Nothing to destroy.`)
           return
         }
 
         let tableWrapper = $(tableID + "_wrapper");
         if (tableWrapper.length > 0) {
-          console.log("Destroying table")
+          console.log(`  Destroying table ${tableID}`)
           // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
           $('#tableMetadata').empty();
           $(tableID).DataTable().state.clear();
@@ -549,7 +565,7 @@
           tableWrapper.remove();
           $(tableID).empty();
           $('#showAllColumns').unbind();
-          console.log("Destroyed table")
+          console.log(`  Destroyed table ${tableID}`)
         }
       }
     }
