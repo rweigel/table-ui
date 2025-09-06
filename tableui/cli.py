@@ -51,7 +51,7 @@ def args():
       "default": kwargs['sqldb']
     },
     "table-name": {
-      "help": "Name of table in sqldb. Defaults to file name without extension of sqldb",
+      "help": "Name of table in sqldb. Defaults to SQLDB without extension of sqldb",
       "default": kwargs['table_name']
     },
     "host": {
@@ -68,7 +68,7 @@ def args():
       "default": kwargs['root_dir']
     },
     "config": {
-      "help": "JSON file containing configuration. See https://datatables.net/reference/option/ for options. Relative paths are relative to root-dir",
+      "help": "JSON file containing configuration. See https://datatables.net/reference/option/ for options. Relative paths are relative to root-dir.",
       "default": kwargs['config']
     },
     "render": {
@@ -77,7 +77,7 @@ def args():
     },
     "json-head": {
       "metavar": "FILE",
-      "help": "JSON file containing array of header names. Ignored if sqldb given. Requres --json-body to be given.",
+      "help": "JSON file containing array of header names. Ignored if sqldb given. Requires --json-body to be given.",
       "default": kwargs['json_head']
     },
     "json-body": {

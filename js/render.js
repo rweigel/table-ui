@@ -44,7 +44,9 @@ function renderColumn (columnName, tableConfig) {
 }
 
 function renderTableMetadata (config) {
+  if (!config.tableMetadata) return ''
   const description = config.tableMetadata.description
   const creationDate = config.tableMetadata.creationDate
+  if (!description && !creationDate) return ''
   return `${description} Table created <code>${creationDate}</code>`
 }

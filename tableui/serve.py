@@ -81,7 +81,7 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
     if 'sqldb' in dbinfo:
       content["serverSide"] = True
     if 'tableMetadata' not in content:
-      content['tableMetadata'] = dbinfo['tableMetadata']
+      content['tableMetadata'] = dbinfo.get('tableMetadata', {})
     return fastapi.responses.JSONResponse(content=content)
 
   @app.route("/render.js", methods=["GET", "HEAD"])
@@ -144,6 +144,7 @@ def _column_names(sqldb=None, table_name=None, json_head=None, json_body=None):
       header = list(range(0, len(json_body[0])))
     return header
 
+
 def _table_names(sqldb=None):
   connection = sqlite3.connect(sqldb)
 
@@ -187,6 +188,7 @@ def _query(dbinfo, query_params=None):
   logger.info("Connecting to database file " + dbinfo['sqldb'])
   result = _dbquery(dbinfo, orders=orders, searches=searches, limit=limit, offset=start)
   return result
+
 
 def _dbinfo(sqldb=None, table_name=None, json_head=None, json_body=None):
 
