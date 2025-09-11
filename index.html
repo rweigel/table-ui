@@ -152,17 +152,82 @@
       return nvpair;
     }
 
+    function checkQueryString() {
+      console.log("checkQueryString() called. Checking query string for invalid column names.");
+      let config = getConfig.config;
+      let qs = parseQueryString(location.hash);
+      console.log("query string:")
+      console.log(qs);
+      let alerted = false;
+      for (const [key, val] of Object.entries(qs)) {
+        if (key.startsWith('_')) {
+          console.log(`  found state parameter '${key}' in query string. Leaving it.`);
+          continue;
+        }
+        if (config.columnNames.includes(key)) {
+          console.log(`  found valid key = '${key}' in query string.`);
+        } else {
+          console.log(`  found invalid key = '${key}' in query string. Removing it.`);
+          if (alerted === false) {
+            alerted = true;
+            alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
+          }
+          updateQueryString(key, null);
+        }
+      }
+    }
+
+    function setQueryStringFromSearch() {
+      console.log("setQueryStringFromSearch() called. Stepping through column search inputs.");
+      // Check query string for invalid column names
+      checkQueryString();
+      // Step through column search inputs and update query string
+      // Highlight inputs with search values and remove highlight for
+      // inputs with no search value.
+      let searchValue;
+      let inputs = $('.dataTables_scrollHead input.columnSearch');
+      console.log(`Reading ${inputs.length} column search inputs.`);
+      for (let input of inputs) {
+        let name = $(input).attr('name');
+        searchValue = $(input).val();
+        if (searchValue) {
+          console.log(`Found search value for column '${name}'. Updating dtp query object.`);
+          $(input).css('background-color', 'yellow');
+          console.log(`Updating query string with search value for column '${name}' = '${searchValue}'.`);
+          updateQueryString(name, searchValue);
+        } else {
+          //console.log(`No search value for column '${name}'.`);
+          $(input).css('background-color', '');
+          let qs = parseQueryString();
+          if (qs[name]) {
+            console.log(` Found ${name} in query string. Removing from query string.`);
+            updateQueryString(name, null);
+          }
+        }
+      }
+    }
+
     function updateQueryString(name, val) {
+      console.log(`updateQueryString() called with name='${name}' and val='${val}'`);
       let qs = parseQueryString();
       if (val === null) {
-        console.log(`  Removing ${name} from query string.`);
+        console.log(`Removing ${name} from query string.`);
         delete qs[name];
       } else {
         qs[name] = val;
       }
-      const hash = decodeURIComponent($.param(qs));
-      console.log("New hash " + hash)
-      location.hash = hash;
+
+      // Put _ parameters at end of query string
+      const sortedKeys = Object.keys(qs).sort((a, b) => {
+        if (a.startsWith('_')) return 1;
+        return -1;
+      });
+
+      const sortedQs = {};
+      for (const key of sortedKeys) {
+        sortedQs[key] = qs[key];
+      }
+      location.hash = decodeURIComponent($.param(sortedQs));
     }
 
     async function getHeader() {
@@ -246,50 +311,11 @@
         console.log("config['ajax'] callback. Preparing query parameters for AJAX search using dtp object:");
         console.log(dtp);
 
-        let searchValue;
-        if (dtp.draw === 1) {
-          let config = getConfig.config;
-          let qs = parseQueryString(location.hash);
-          console.log("  dtp.draw == 1; query string:")
-          console.log(qs);
-          // TODO: Need to validate that the query string keys are valid column names.
-          let alerted = false;
-          for (const [key, val] of Object.entries(qs)) {
-            if (config.columnNames.includes(key)) {
-              console.log(`  found ${key} = '${val}' in query string. Using it.`);
-            } else {
-              console.log(`  found ${key} = '${val}'' in query string, but it is not a valid column name. Removing it from hash.`);
-              if (alerted == false) {
-                alerted = true;
-                alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
-              }
-              updateQueryString(key, null);
-            }
+        let qs = parseQueryString();
+        for (const [key, val] of Object.entries(qs)) {
+          if (!(key in dtp) && config.columnNames.includes(key)) {
+            console.log(`  Adding ${key} = '${val}' from query string to dtp object.`);
             dtp[key] = val;
-          }
-        } else {
-          let inputs = $('.dataTables_scrollHead input.columnSearch');
-          console.log(`Reading ${inputs.length} column search inputs.`);
-          for (let input of inputs) {
-            let name = $(input).attr('name');
-            searchValue = $(input).val();
-            if (searchValue) {
-              console.log(`Found search value for column '${name}'. Updating dtp query object.`);
-              $(input).css('background-color', 'yellow');
-              dtp[name] = searchValue;
-              if (dtp.draw > 1) {
-                console.log(`Updating query string with search value for column '${name}' = '${searchValue}'.`);
-                updateQueryString(name, searchValue);
-              }
-            } else {
-              //console.log(`No search value for column '${name}'.`);
-              $(input).css('background-color', '');
-              let qs = parseQueryString();
-              if (qs[name]) {
-                console.log(` Found ${name} in query string. Removing from query string.`);
-                updateQueryString(name, null);
-              }
-            }
           }
         }
 
@@ -327,16 +353,47 @@
     }
 
     function setEvents(tableID) {
-      const table_paginate = `${tableID}_paginate`;
 
+      console.log('setEvents() => Setting search.dt.')
+      $(tableID).on('search.dt', function () {
+        console.log('setEvents() => search.dt triggered')
+        setQueryStringFromSearch()
+      });
+
+      $(tableID).on('stateSaveParams.dt', function (e, settings, data) {})
+
+      console.log('setEvents() => Setting page.dt.')
+      $(tableID).on('page.dt', function () {
+        // Could save state here instead of in saveStateParams.dt above.
+        console.log('setEvents() => page.dt triggered')
+        const info = $(tableID).DataTable().page.info();
+        updateQueryString('_page', info.page + 1);
+        //alert('Showing page: ' + info.page + ' of ' + info.pages);
+        $('#pageInfo').html('Showing page: ' + info.page + ' of ' + info.pages);
+      });
+
+      // Hide paging if only one page
+      console.log('setEvents() => Setting length.dt.')
+      $(tableID).on('length.dt', function (e, settings, len) {
+        console.log('setEvents() => length.dt triggered')
+        updateQueryString('_length', len);
+        if ($(tableID).dataTable().api().page.info().pages == 1) {
+          $(table_paginate).hide();
+        } else {
+          $(table_paginate).show();
+        }
+      });
+
+      console.log('setEvents() => Setting preDraw.dt.')
       $(tableID).on('preDraw.dt', function () {
         console.log('setEvents() => preDraw.dt triggered')
       })
 
-      console.log('setEvents() => Triggering draw.dt')
+      console.log('setEvents() => Setting draw.dt and triggering it.')
+      const table_paginate = `${tableID}_paginate`;
       $(tableID)
         .on('draw.dt', function () {
-          console.log('setEvents() => draw.dt triggered')
+          console.log('setEvents() => draw.dt triggered.')
           let qs = parseQueryString();
           if (Object.keys(qs).length > 0) {
             $('#clearAllFilters').show();
@@ -346,14 +403,41 @@
 
           // Hide paging if only one page.
           if ($(tableID).dataTable().api().page.info().pages === 1) {
-            $("#table1_paginate").hide();
+            $(table_paginate).hide();
           } else {
             $(table_paginate).show();
           }
 
+          adjustDOM(tableID);
+
         })
         .trigger('draw.dt');
         // trigger() above needed for initial load.
+
+
+      console.log("Setting click event for showAllColumns checkbox.")
+      $('#showAllColumns').click(function() {
+        if ($(this).is(':checked')) {
+          console.log("#showAllColumns clicked to checked. Calling init() with no args to show all columns.")
+          init();
+        } else {
+          console.log("#showAllColumns clicked to unchecked. Computing empty columns and calling init() with columnEmpty arg to hide empty columns.")
+          let data = $('#table1').DataTable().data();
+          let columnEmpty = [];
+          for (let r = 0; r < data.length; r++) {
+            for (let c = 0; c < data[r].length; c++) {
+              if (r == 0) {
+                columnEmpty.push(true);
+              }
+              if (data[r][c] !== null && data[r][c] !== "") {
+                columnEmpty[c] = false;
+              }
+            }
+          }
+          setTimeout(() => init(columnEmpty), 1);
+        }
+      });
+
 
     }
 
@@ -426,6 +510,7 @@
       const table = $('#table1').dataTable();
 
       console.log("Setting search inputs with initial search values and setting search event.")
+      checkQueryString();
       const qs = parseQueryString();
       let config = getConfig.config;
       let visibleIndex = 0;
@@ -446,11 +531,11 @@
           .appendTo($("thead tr:eq(0) > th").eq(visibleIndex))
           .on("keydown", function() {
             if (!config["search"]["return"]) {
-              that.search($(this).val()).draw();
+              that.search($(this).val()).draw('page');
             } else {
               let keycode = (event.keyCode ? event.keyCode : event.which);
               if (keycode == '13'){
-                that.search($(this).val()).draw();
+                that.search($(this).val()).draw('page');
               }
             }
           });
@@ -481,7 +566,7 @@
       $('#tableMetadata').html(tableMetadata);
 
       // Add header names to table. Two rows are added.
-      // The first row is for sorting, second row is for filtering.
+      // The first row is for name and sorting, second row is for filtering.
       $('#table1').append('<thead><tr></tr><tr></tr></thead>');
       let tr1 = $('#table1 > thead > tr:eq(1)');
       for (let i = 0; i < config.columnDefs.length; i++) {
@@ -503,42 +588,27 @@
       // Create table body
       $('#table1').append('<tbody></tbody>');
 
-      // Hide paging if only one page
-      $("#table1").on('length.dt', function () {
-        if ($("#table1").dataTable().api().page.info().pages == 1) {
-          $("#table1_paginate").hide();
-        } else {
-          $("#table1_paginate").show();
-        }
-      });
-
-      console.log("Setting click event for showAllColumns checkbox.")
-      $('#showAllColumns').click(function() {
-        if ($(this).is(':checked')) {
-          console.log("showAllColumns clicked to checked. Calling init() with no args to show all columns.")
-          init();
-        } else {
-          console.log("showAllColumns clicked to unchecked. Calling init() with columnEmpty arg to hide empty columns.")
-          let data = $('#table1').DataTable().data();
-          let columnEmpty = [];
-          for (let r = 0; r < data.length; r++) {
-            for (let c = 0; c < data[r].length; c++) {
-              if (r == 0) {
-                columnEmpty.push(true);
-              }
-              if (data[r][c] !== null && data[r][c] !== "") {
-                columnEmpty[c] = false;
-              }
-            }
-          }
-          setTimeout(() => init(columnEmpty), 1);
-        }
-      });
-
       // https://datatables.net/reference/option/
       let dataTableOptions =
         {
           ...config,
+          "stateSave": true,
+          "stateSaveCallBack": function(settings, data) {
+            alert('stateSaveCallBack called. Saving state.');
+          },
+          "stateLoadParams": function(settings, data) {
+            // displayStart and pageLength in top-level config is ignored if
+            // stateSave is true because state has precedence.
+            const qs = parseQueryString();
+            let length = parseInt(qs['_length'] || config['pageLength'] || 25)
+            let start = null;
+            if (qs['_page']) {
+              start = length*(-1 + parseInt(qs['_page']));
+              console.log(`stateLoadParams: setting start to ${start}.`);
+            }
+            data.start = start,
+            data.length = length
+          },
           "initComplete": dtInitComplete,
         };
 
@@ -550,14 +620,15 @@
 
       function _destroy(tableID) {
         console.log("_destroy() called.")
-        if (!$.fn.DataTable.isDataTable(tableID)) {
+
+        if (!DataTable.isDataTable(tableID)) {
           console.log(`isDataTable('${tableID}') is false. Nothing to destroy.`)
           return
         }
 
         let tableWrapper = $(tableID + "_wrapper");
         if (tableWrapper.length > 0) {
-          console.log(`  Destroying table ${tableID}`)
+          console.log(`Destroying table ${tableID}`)
           // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
           $('#tableMetadata').empty();
           $(tableID).DataTable().state.clear();
@@ -565,7 +636,7 @@
           tableWrapper.remove();
           $(tableID).empty();
           $('#showAllColumns').unbind();
-          console.log(`  Destroyed table ${tableID}`)
+          console.log(`Destroyed table ${tableID}`)
         }
       }
     }
