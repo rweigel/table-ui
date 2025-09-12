@@ -107,13 +107,18 @@
 <body>
 
   <details style="background-color: white; float:right">
-    <summary>Instructions</summary>
+    <summary>Documentation</summary>
     <ul>
       <li>To execute any search, press enter key after entering text in column text entry area.</li>
-      <li>Shift+click on sort arrows to sort on multiple columns.</li>
+      <li>Shift+click on sort arrows (<span style="font-size:small;opacity:0.25">▼</span> or <span style="font-size:small;opacity:0.25">▲</span>) to sort on multiple columns.</li>
       <li>A entry of <code>⎵</code> means value is a single blank space.</li>
-      <li>A search for <code>abc</code> on a column performs SQL <code>LIKE = '%abc%'</code>.</li>
+    </ul>
+    <ul>
+      <li>A search string <code>abc</code> on a column results in an SQL <code>LIKE = '%abc%'</code> query.</li>
+      <li>However, if search string starts and/or ends with <code>%</code>, the percentage wildcards are not added automatically.</li>
+      <li>See <a href="https://www.w3schools.com/sql/sql_like.asp">SQL LIKE</a> for more information on the SQL <code>LIKE</code> operator.</li>
       <li>For an exact match search for <code>abc</code>, use single quotes: <code>'abc'</code>.</li>
+      <li>All entries are stored as strings.</li>
     </ul>
   </details>
 
@@ -121,7 +126,7 @@
     <span id="showHideColumns">
       <!--These must be one line to avoid newlines in button text-->
       <span title="show/hide columns with no content"><input type="checkbox" checked="checked" id="showAllColumns"><label for="showAllColumns">Show All Columns</label></span>
-      <span id="clearAllFilters" style="display:none"><button onclick="clearAllFilters('#table1')">Clear All Filters</button></span>
+      <span id="clearAllSearches" style="display:none"><button onclick="clearAllSearches('#table1')">Clear All Searches</button></span>
     </span>
     <span id="tableMetadata"></span>
   </div>
@@ -132,7 +137,7 @@
     console.log("Document ready. Calling init()")
     $(document).ready(() =>init());
 
-    function clearAllFilters(tableID) {
+    function clearAllSearches(tableID) {
       location.hash = "";
       init();
     }
@@ -147,15 +152,20 @@
       var pairs = qs.split('&');
       $.each(pairs, function(i, v){
         var pair = v.split('=');
-        nvpair[pair[0]] = decodeURIComponent(pair[1].replace(/\+/g," "));
+        nvpair[pair[0]] = pair[1];
       });
       return nvpair;
+    }
+
+    function getQueryValue(name) {
+      let qs = parseQueryString();
+      return qs[name];
     }
 
     function checkQueryString() {
       console.log("checkQueryString() called. Checking query string for invalid column names.");
       let config = getConfig.config;
-      let qs = parseQueryString(location.hash);
+      let qs = parseQueryString();
       console.log("query string:")
       console.log(qs);
       let alerted = false;
@@ -368,7 +378,6 @@
         console.log('setEvents() => page.dt triggered')
         const info = $(tableID).DataTable().page.info();
         updateQueryString('_page', info.page + 1);
-        //alert('Showing page: ' + info.page + ' of ' + info.pages);
         $('#pageInfo').html('Showing page: ' + info.page + ' of ' + info.pages);
       });
 
@@ -377,12 +386,7 @@
       $(tableID).on('length.dt', function (e, settings, len) {
         console.log('setEvents() => length.dt triggered')
         updateQueryString('_length', len);
-        if ($(tableID).dataTable().api().page.info().pages == 1) {
-          $(table_paginate).hide();
-        } else {
-          $(table_paginate).show();
-        }
-      });
+      })
 
       console.log('setEvents() => Setting preDraw.dt.')
       $(tableID).on('preDraw.dt', function () {
@@ -396,9 +400,9 @@
           console.log('setEvents() => draw.dt triggered.')
           let qs = parseQueryString();
           if (Object.keys(qs).length > 0) {
-            $('#clearAllFilters').show();
+            $('#clearAllSearches').show();
           } else {
-            $('#clearAllFilters').hide();
+            $('#clearAllSearches').hide();
           }
 
           // Hide paging if only one page.
@@ -408,7 +412,16 @@
             $(table_paginate).show();
           }
 
-          adjustDOM(tableID);
+          const info = $(tableID).DataTable().page.info();
+          const _page = getQueryValue("_page") || 0
+          if (false && info.pages > 0 && _page > info.pages) {
+            updateQueryString('_page', 1);
+            $(tableID).DataTable().page(0).draw('page');
+            console.log(`setEvents() => _page > info.pages. Setting _page to 1 and drawing page 0.`)
+            return;
+          }
+
+          //adjustDOM(tableID);
 
         })
         .trigger('draw.dt');
@@ -422,7 +435,9 @@
           init();
         } else {
           console.log("#showAllColumns clicked to unchecked. Computing empty columns and calling init() with columnEmpty arg to hide empty columns.")
-          let data = $('#table1').DataTable().data();
+          //let data = $('#table1').DataTable().data();
+          let data = $('#table1').DataTable().rows({ page: 'current' }).data().toArray();
+          console.log(data)
           let columnEmpty = [];
           for (let r = 0; r < data.length; r++) {
             for (let c = 0; c < data[r].length; c++) {
@@ -472,11 +487,21 @@
       select.appendTo(table_length)
       $(`${table_length} label`).text('Rows per page: ')
 
+      const prev = $(`${tableID}_previous`);
+      prev.attr('title','Previous page');
+      if (prev.length > 0) {
+        const html = prev.html();
+        if (html) {
+          prev.html(html.replace('Previous','◀'));
+        }
+      }
+
       const next = $(`${tableID}_next`);
+      next.attr('title','Next page');
       if (next.length > 0) {
         const html = next.html();
         if (html) {
-          next.html(html.replace('Next','Next page'));
+          next.html(html.replace('Next','▶'));
         }
       }
 
@@ -508,7 +533,6 @@
 
       console.log("dtInitComplete() called. DOM is ready.")
       const table = $('#table1').dataTable();
-
       console.log("Setting search inputs with initial search values and setting search event.")
       checkQueryString();
       const qs = parseQueryString();
@@ -555,7 +579,18 @@
 
     async function init(columnEmpty) {
 
-      _destroy("#table1");
+
+      const tableID = '#table1';
+      let displayStart = undefined;
+      let pageLength = getQueryValue('_length') || undefined;
+      if (DataTable.isDataTable(tableID)) {
+        console.log(`isDataTable('${tableID}') is true. Destroying existing table before re-creating it.`)
+        const table = $(tableID).DataTable();
+        const state = table.state();
+        displayStart = state.start;
+        console.log("Current DataTable state:", state);
+        _destroy(tableID);
+      }
 
       const config = await getConfig(columnEmpty);
       getConfig.config = config;
@@ -594,11 +629,17 @@
           ...config,
           "stateSave": true,
           "stateSaveCallBack": function(settings, data) {
-            alert('stateSaveCallBack called. Saving state.');
+            alert('stateSaveCallBack called.');
           },
+          displayStart: displayStart,
+          pageLength: pageLength || config['pageLength'] || 25,
           "stateLoadParams": function(settings, data) {
-            // displayStart and pageLength in top-level config is ignored if
-            // stateSave is true because state has precedence.
+            // displayStart and pageLength in top-level config above are ignored if
+            // stateSave is true because saved state has precedence over this setting.
+            // Setting the state above is needed because after init(emptyColumn)
+            // is called, stateLoadParams is not triggered and the
+            // _destroy() must delete state because its column visibility
+            // will be used instead of the new column visibility.
             const qs = parseQueryString();
             let length = parseInt(qs['_length'] || config['pageLength'] || 25)
             let start = null;
@@ -616,15 +657,9 @@
       console.log(dataTableOptions)
       let table = $('#table1').DataTable(dataTableOptions);
       console.log("DataTable() returned:")
-      console.log(table)
 
       function _destroy(tableID) {
         console.log("_destroy() called.")
-
-        if (!DataTable.isDataTable(tableID)) {
-          console.log(`isDataTable('${tableID}') is false. Nothing to destroy.`)
-          return
-        }
 
         let tableWrapper = $(tableID + "_wrapper");
         if (tableWrapper.length > 0) {

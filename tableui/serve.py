@@ -170,8 +170,9 @@ def _query(dbinfo, query_params=None):
   start = 0
   limit = None
   if query_params is not None and "_start" in query_params:
-    start = int(query_params["_start"])
-    end = int(query_params["_start"]) + int(query_params["_length"])
+    query_params.get("_start", 0)
+    start = int(start)
+    end = start + int(query_params["_length"])
     limit = end - start
 
   orders = None
@@ -288,6 +289,10 @@ def _dbquery(dbinfo, orders=None, searches=None, limit=None, offset=0):
         where.append(f" `{key}` = ''")
       elif searches[key].startswith("'") and searches[key].endswith("'"):
         where.append(f" `{key}` = {searches[key]}")
+      elif searches[key].startswith('%') and not searches[key].endswith('%'):
+        where.append(f" `{key}` LIKE '{searches[key]}'")
+      elif not searches[key].startswith('%') and searches[key].endswith('%'):
+        where.append(f" `{key}` LIKE '{searches[key]}'")
       else:
         where.append(f" `{key}` LIKE '%{searches[key]}%'")
     if len(where) == 0:
