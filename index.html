@@ -29,6 +29,9 @@
       margin-right: 1em;
       padding-bottom: 0.5em;
     }
+    #clearAllSearches {
+      margin-right: 1em;
+    }
     .dataTables_wrapper .dataTables_paginate .paginate_button {
       padding: 0em;
     }
@@ -49,18 +52,20 @@
       font-size: 10pt;
     }
     .dataTables_length {
-      padding-left: 0.5em;
+      display: inline-block;
+      margin-right: 1em;
     }
     .dataTables_wrapper .dataTables_info {
       clear: none;
-      padding-top: 0.27em;
-      padding-left: 2em;
+      padding-top: 0.37em;
+      padding-left: 1em;
+      float: right;
     }
     .dataTables_wrapper .dataTables_paginate {
       float: left;
       text-align: right;
       padding-top: 0.2em;
-      padding-left: 2em;
+      padding-left: 0.2em;
   }
 
     table.dataTable td {
@@ -91,7 +96,9 @@
       background-color: rgba(0,0,0,.5);
       box-shadow: 0 0 1px rgba(255,255,255,.5);
     }
-
+    h1 {
+      font-size: 1em;
+    }
     /* https://stackoverflow.com/a/63507769 */
     #table1 {
       transform: rotateX(180deg);
@@ -108,11 +115,15 @@
 
   <details style="background-color: white; float:right">
     <summary>Documentation</summary>
+    <h1>Table Description</h1>
+    <div id="tableMetadata"></div>
+    <h1>Usage</h1>
     <ul>
       <li>To execute any search, press enter key after entering text in column text entry area.</li>
       <li>Shift+click on sort arrows (<span style="font-size:small;opacity:0.25">▼</span> or <span style="font-size:small;opacity:0.25">▲</span>) to sort on multiple columns.</li>
       <li>A entry of <code>⎵</code> means value is a single blank space.</li>
     </ul>
+    <h1>Search</h1>
     <ul>
       <li>A search string <code>abc</code> on a column results in an SQL <code>LIKE = '%abc%'</code> query.</li>
       <li>However, if search string starts and/or ends with <code>%</code>, the percentage wildcards are not added automatically.</li>
@@ -122,13 +133,12 @@
     </ul>
   </details>
 
-  <div style="padding-bottom:3px">
+  <div id="controls" style="padding-bottom:3px">
     <span id="showHideColumns">
       <!--These must be one line to avoid newlines in button text-->
-      <span title="show/hide columns with no content"><input type="checkbox" checked="checked" id="showAllColumns"><label for="showAllColumns">Show All Columns</label></span>
-      <span id="clearAllSearches" style="display:none"><button onclick="clearAllSearches('#table1')">Clear All Searches</button></span>
+      <span title="show/hide columns with no content"><input type="checkbox" id="hideEmptyColumns"><label for="hideEmptyColumns">Hide Empty Columns</label></span>
     </span>
-    <span id="tableMetadata"></span>
+    <span id="clearAllSearches" style="display:none" title="Clear all searches"><button onclick="clearAllSearches('#table1')">Clear</button></span>
   </div>
 
   <table id="table1" class="display" style="width:100%"></table>
@@ -201,7 +211,7 @@
         let name = $(input).attr('name');
         searchValue = $(input).val();
         if (searchValue) {
-          console.log(`Found search value for column '${name}'. Updating dtp query object.`);
+          console.log(`Found search value for column '${name}'. Updating query string and highlighting input.`);
           $(input).css('background-color', 'yellow');
           console.log(`Updating query string with search value for column '${name}' = '${searchValue}'.`);
           updateQueryString(name, searchValue);
@@ -274,7 +284,9 @@
         _columnDefs(columnNames, columnEmpty);
       }
 
+      // Why is this needed when config['serverSide'] = false?
       config['ajax'] = window.location.pathname + "data/";
+
       if (config['serverSide']) {
         config['ajax'] = {
           "url": window.location.pathname + "data/",
@@ -367,6 +379,7 @@
       console.log('setEvents() => Setting search.dt.')
       $(tableID).on('search.dt', function () {
         console.log('setEvents() => search.dt triggered')
+        updateQueryString('_page', null);
         setQueryStringFromSearch()
       });
 
@@ -377,11 +390,9 @@
         // Could save state here instead of in saveStateParams.dt above.
         console.log('setEvents() => page.dt triggered')
         const info = $(tableID).DataTable().page.info();
-        updateQueryString('_page', info.page + 1);
         $('#pageInfo').html('Showing page: ' + info.page + ' of ' + info.pages);
       });
 
-      // Hide paging if only one page
       console.log('setEvents() => Setting length.dt.')
       $(tableID).on('length.dt', function (e, settings, len) {
         console.log('setEvents() => length.dt triggered')
@@ -413,29 +424,32 @@
           }
 
           const info = $(tableID).DataTable().page.info();
-          const _page = getQueryValue("_page") || 0
-          if (false && info.pages > 0 && _page > info.pages) {
-            updateQueryString('_page', 1);
-            $(tableID).DataTable().page(0).draw('page');
-            console.log(`setEvents() => _page > info.pages. Setting _page to 1 and drawing page 0.`)
-            return;
+          if (info.pages > 0) {
+            const _page = getQueryValue("_page")
+            if (_page) {
+              if (parseInt(_page) > info.pages) {
+                console.log(`setEvents() => _page = ${_page} > info.pages = ${info.pages}. Setting _page to ${info.pages} and drawing page ${info.pages-1}.`)
+                updateQueryString('_page', info.pages);
+                $(tableID).DataTable().page(info.pages-1).draw('page');
+              }
+            } else {
+              updateQueryString('_page', 1);
+              $(tableID).DataTable().page(0).draw('page');
+              console.log(`setEvents() => _page > info.pages. Setting _page to 1 and drawing page 0.`)
+            }
           }
-
-          //adjustDOM(tableID);
+          adjustDOM(tableID);
 
         })
         .trigger('draw.dt');
         // trigger() above needed for initial load.
 
 
-      console.log("Setting click event for showAllColumns checkbox.")
-      $('#showAllColumns').click(function() {
+      console.log("Setting click event for hideEmptyColumns checkbox.")
+      $('#hideEmptyColumns').click(function() {
         if ($(this).is(':checked')) {
-          console.log("#showAllColumns clicked to checked. Calling init() with no args to show all columns.")
-          init();
-        } else {
-          console.log("#showAllColumns clicked to unchecked. Computing empty columns and calling init() with columnEmpty arg to hide empty columns.")
-          //let data = $('#table1').DataTable().data();
+          console.log("#hideEmptyColumns clicked to unchecked. Computing empty columns and calling init() with columnEmpty arg to hide empty columns.")
+          updateQueryString('_cols', 'nonempty');
           let data = $('#table1').DataTable().rows({ page: 'current' }).data().toArray();
           console.log(data)
           let columnEmpty = [];
@@ -450,6 +464,10 @@
             }
           }
           setTimeout(() => init(columnEmpty), 1);
+        } else {
+          console.log("#hideEmptyColumns clicked to unchecked. Calling init() with no args to show all columns.")
+          updateQueryString('_cols', null);
+          init();
         }
       });
 
@@ -472,20 +490,26 @@
       let numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length;
       let colInfo = ` and all ${numCols} columns`;
       if (numCols !== numColsVisible) {
-        colInfo = ` and ${numColsVisible}/${numCols} columns`;
+        colInfo = ` and ${numColsVisible} of ${numCols} columns`;
       }
 
-      let txt = $(table_info)
-                  .text()
-                  .replace(' to ','-')
-                  .replace('entries', colInfo)
-                  .replace('Showing ','Showing rows ')
+      const info = $(tableID).DataTable().page.info();
+      //console.log(info)
+      let txt = `Showing ${parseInt(info.start)+1}-${parseInt(info.end)} of ${info.recordsDisplay} rows`
+      if (info.recordsDisplay === 0) {
+        txt = `Showing 0 rows`
+      }
+      if (info.recordsTotal != info.recordsDisplay) {
+        txt += ` (filtered from ${info.recordsTotal} total)`
+      }
+      txt += `${colInfo}.`
       $(table_info).text(txt);
       $(table_paginate).insertAfter(table_filter);
 
       let select = $(`${table_length} select`)
       select.appendTo(table_length)
       $(`${table_length} label`).text('Rows per page: ')
+      $('#table1_length').appendTo('#controls');
 
       const prev = $(`${tableID}_previous`);
       prev.attr('title','Previous page');
@@ -507,9 +531,7 @@
 
       setTimeout(function() {
 
-        // A resize triggers left column header width
-        // to match the width of the left column body.
-        console.log("adjustDOM() => resizing window to adjust column widths.")
+        console.log("Executing $(window).resize() to to trigger event that causes left column header width to match the width of the left column body.")
         $(window).resize()
 
         $('[aria-describedby=table1_info]').removeAttr('aria-hidden')
@@ -527,6 +549,73 @@
       }, 0);
 
       console.log("adjustDOM() finished.")
+    }
+
+    function _pageLength(config) {
+      // Return a pageLength and update lengthMenu if needed.
+      let pageLength = 25;
+      console.log(`Default pageLength is ${pageLength}`);
+      if (!config['pageLength']) {
+        try {
+          pageLength = config['lengthMenu'][0][0]
+          console.log(`Modifying default pageLength to be first entry in config['lengthMenu']: ${pageLength}`);
+        } catch(e) {
+          console.log("Could not get modified default pageLength from config['lengthMenu']. Using 25.")
+        }
+      }
+      if (getQueryValue('_length')) {
+        console.log(`Modifying default pageLength to be value from query string _length: ${getQueryValue('_length')}`);
+        pageLength = parseInt(getQueryValue('_length'));
+      }
+
+      if (config['lengthMenu']) {
+        try {
+          const menuVals = config['lengthMenu'][0];
+          const menuNames = config['lengthMenu'][1];
+          if (!menuVals.includes(pageLength)) {
+            menuVals.push(pageLength);
+            menuNames.push(pageLength);
+          }
+          config['lengthMenu'][0] = menuVals;
+          config['lengthMenu'][1] = menuNames;
+          console.log(`Updated config['lengthMenu'] to include pageLength = ${pageLength}`);
+        } catch(e) {
+          console.log(`Problem with config['lengthMenu']. Setting it to [[${pageLength}, -1], [${pageLength}, 'All']].`);
+          config['lengthMenu'] = [[pageLength, -1], [pageLength, "All"]];
+        }
+      } else {
+        console.log(`No config['lengthMenu']. Setting it to [[${pageLength}, -1], [${pageLength}, 'All']].`);
+        config['lengthMenu'] = [[pageLength, -1], [pageLength, "All"]];
+      }
+      // Sort lengthMenu[0] and lengthMenu[1] by lengthMenu[0] values but keep
+      // the correspondence between values and names.
+      if (config['lengthMenu']) {
+        let vals = config['lengthMenu'][0];
+        let names = config['lengthMenu'][1];
+        // Create array of [val, name], sort by val, then split back
+        let pairs = vals.map((v, i) => [v, names[i]]);
+        pairs.sort((a, b) => a[0] - b[0]);
+        config['lengthMenu'][0] = pairs.map(p => p[0]);
+        config['lengthMenu'][1] = pairs.map(p => p[1]);
+      }
+      // If -1 is in lengthMenu[0], put it at the end of the list.
+      if (config['lengthMenu']) {
+        let vals = config['lengthMenu'][0];
+        let names = config['lengthMenu'][1];
+        const minusOneIndex = vals.indexOf(-1);
+        if (minusOneIndex !== -1 && minusOneIndex !== vals.length - 1) {
+          // Remove -1 and its name
+          const [minusOneVal] = vals.splice(minusOneIndex, 1);
+          const [minusOneName] = names.splice(minusOneIndex, 1);
+          // Push to end
+          vals.push(minusOneVal);
+          names.push(minusOneName);
+        }
+        config['lengthMenu'][0] = vals;
+        config['lengthMenu'][1] = names;
+      }
+
+      return pageLength;
     }
 
     function dtInitComplete() {
@@ -572,17 +661,14 @@
       console.log("Set search.")
 
       setEvents('#table1');
-      adjustDOM('#table1');
 
       console.log("dtInitComplete() finished.")
     }
 
     async function init(columnEmpty) {
 
-
       const tableID = '#table1';
-      let displayStart = undefined;
-      let pageLength = getQueryValue('_length') || undefined;
+      let displayStart = 0;
       if (DataTable.isDataTable(tableID)) {
         console.log(`isDataTable('${tableID}') is true. Destroying existing table before re-creating it.`)
         const table = $(tableID).DataTable();
@@ -595,6 +681,9 @@
       const config = await getConfig(columnEmpty);
       getConfig.config = config;
       console.log(config)
+
+      // Get pageLength and update config['lengthMenu'] if needed.
+      const pageLength = _pageLength(config);
 
       const renderTableMetadata = window.renderTableMetadata ? window.renderTableMetadata : null;
       const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : "";
@@ -631,8 +720,8 @@
           "stateSaveCallBack": function(settings, data) {
             alert('stateSaveCallBack called.');
           },
-          displayStart: displayStart,
-          pageLength: pageLength || config['pageLength'] || 25,
+          displayStart: parseInt(displayStart),
+          pageLength: pageLength,
           "stateLoadParams": function(settings, data) {
             // displayStart and pageLength in top-level config above are ignored if
             // stateSave is true because saved state has precedence over this setting.
@@ -641,8 +730,8 @@
             // _destroy() must delete state because its column visibility
             // will be used instead of the new column visibility.
             const qs = parseQueryString();
-            let length = parseInt(qs['_length'] || config['pageLength'] || 25)
-            let start = null;
+            let length = parseInt(qs['_length']) || parseInt(config['pageLength']) || 25
+              let start = 0;
             if (qs['_page']) {
               start = length*(-1 + parseInt(qs['_page']));
               console.log(`stateLoadParams: setting start to ${start}.`);
@@ -670,7 +759,7 @@
           $(tableID).DataTable().destroy();
           tableWrapper.remove();
           $(tableID).empty();
-          $('#showAllColumns').unbind();
+          $('#hideEmptyColumns').unbind();
           console.log(`Destroyed table ${tableID}`)
         }
       }

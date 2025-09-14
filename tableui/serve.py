@@ -60,7 +60,7 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles
-  for dir in ['js', 'css', 'img']:
+  for dir in ['js', 'css', 'img', 'demo']:
     directory = os.path.join(root_dir, dir)
     app.mount(f"/{dir}/", StaticFiles(directory=directory))
 
@@ -80,8 +80,15 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
       content = json.load(f)
     if 'sqldb' in dbinfo:
       content["serverSide"] = True
-    if 'tableMetadata' not in content:
-      content['tableMetadata'] = dbinfo.get('tableMetadata', {})
+    if "tableUI" not in content:
+      content['tableUI'] = {"tableMetadata": {}}
+    if 'tableMetadata' in content:
+      content['tableUI']["tableMetadata"] = content['tableMetadata']
+    if "sqldb" in dbinfo:
+      content['tableUI']['sqldb'] = dbinfo["sqldb"]
+    if "jsondb" in dbinfo:
+      content['tableUI']['jsondb'] = dbinfo["jsondb"]
+    print(content)
     return fastapi.responses.JSONResponse(content=content)
 
   @app.route("/render.js", methods=["GET", "HEAD"])
@@ -99,9 +106,9 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
 
     if "_start" not in query_params:
       # No server-side processing. Serve entire JSON.
-      with open(dbinfo['jsondb']) as f:
+      with open(dbinfo['jsondb']['body']) as f:
         # TODO: Stream
-        logger.info("Reading: " + dbinfo['jsondb'])
+        logger.info("Reading: " + dbinfo['jsondb']['body'])
         data = json.load(f)
       return fastapi.responses.JSONResponse({"data": data})
 
@@ -207,7 +214,7 @@ def _dbinfo(sqldb=None, table_name=None, json_head=None, json_body=None):
       table_name = os.path.basename(json_body).split(".")[0]
       logger.info(f"No table name given; using '{table_name}'")
     dbinfo["table_name"] = table_name
-    dbinfo["jsondb"] = json_body
+    dbinfo["jsondb"] = {"body": json_body, "head": json_head}
     dbinfo["column_names"] = _column_names(json_head=json_head, json_body=json_body)
 
     return dbinfo

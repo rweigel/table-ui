@@ -18,5 +18,11 @@
     "return": true
   },
   "columnDefs": null,
-  "searchCols": null
+  "searchCols": null,
+  "tableUI": {
+    "tableMetadata": {
+      "description": "Demo table",
+      "creationDate": "2025-09-03"
+    }
+  }
 }

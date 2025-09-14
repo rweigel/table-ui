@@ -44,9 +44,21 @@ function renderColumn (columnName, tableConfig) {
 }
 
 function renderTableMetadata (config) {
-  if (!config.tableMetadata) return ''
-  const description = config.tableMetadata.description
-  const creationDate = config.tableMetadata.creationDate
+  console.log("renderTableMetadata(): config:")
+  console.log(config)
+  if (!config.tableUI.tableMetadata) return ''
+  const description = config.tableUI.tableMetadata.description
+  const creationDate = config.tableUI.tableMetadata.creationDate
   if (!description && !creationDate) return ''
-  return `${description} Table created <code>${creationDate}</code>`
+  let txt = `${description}. Created <code>${creationDate}</code>.`
+  txt += ' Table <a href="/config">config</a>'
+  if (config.tableUI.jsondb) {
+    if (config.tableUI.jsondb.body) {
+      txt += ` | <a href="${config.tableUI.jsondb.body}">body</a>`
+    }
+    if (config.tableUI.jsondb.head) {
+      txt += ` | <a href="${config.tableUI.jsondb.head}">cols</a>`
+    }
+  }
+  return txt
 }
