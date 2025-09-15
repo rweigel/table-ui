@@ -14,6 +14,10 @@
       margin: 1em;
       margin-top: 0.5em;
     }
+    button {
+      background-color: white;
+      border: 1px solid black;
+    }
     #table1 {
       width:100%;
       padding-top: 1em;
@@ -148,7 +152,13 @@
     $(document).ready(() =>init());
 
     function clearAllSearches(tableID) {
-      location.hash = "";
+      let qs = parseQueryString();
+      for (const key in qs) {
+        if (!key.startsWith('_')) {
+          delete qs[key];
+        }
+      }
+      location.hash = decodeURIComponent($.param(qs));
       init();
     }
 
@@ -156,7 +166,7 @@
       // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
       var nvpair = {};
       var qs = window.location.hash.replace('#', '');
-      if (qs.length == 0) {
+      if (qs.length === 0) {
         return {};
       }
       var pairs = qs.split('&');
@@ -167,8 +177,11 @@
       return nvpair;
     }
 
-    function getQueryValue(name) {
+    function getQueryValue(name, defaultValue) {
       let qs = parseQueryString();
+      if (!qs[name]) {
+        return defaultValue;
+      }
       return qs[name];
     }
 
@@ -377,20 +390,24 @@
     function setEvents(tableID) {
 
       console.log('setEvents() => Setting search.dt.')
-      $(tableID).on('search.dt', function () {
+      $(tableID).off('search.dt');
+      $(tableID).on('search.dt', function (event) {
         console.log('setEvents() => search.dt triggered')
-        updateQueryString('_page', null);
+        //updateQueryString('_page', null);
         setQueryStringFromSearch()
       });
 
       $(tableID).on('stateSaveParams.dt', function (e, settings, data) {})
 
       console.log('setEvents() => Setting page.dt.')
+      let pageChanged = false;
       $(tableID).on('page.dt', function () {
-        // Could save state here instead of in saveStateParams.dt above.
         console.log('setEvents() => page.dt triggered')
         const info = $(tableID).DataTable().page.info();
         $('#pageInfo').html('Showing page: ' + info.page + ' of ' + info.pages);
+        updateQueryString('_page', info.page + 1);
+        pageChanged = true;
+        //alert('pageChanged set to true');
       });
 
       console.log('setEvents() => Setting length.dt.')
@@ -406,8 +423,10 @@
 
       console.log('setEvents() => Setting draw.dt and triggering it.')
       const table_paginate = `${tableID}_paginate`;
+      _emptyColumns = emptyColumns(tableID, true);
       $(tableID)
         .on('draw.dt', function () {
+
           console.log('setEvents() => draw.dt triggered.')
           let qs = parseQueryString();
           if (Object.keys(qs).length > 0) {
@@ -426,52 +445,48 @@
           const info = $(tableID).DataTable().page.info();
           if (info.pages > 0) {
             const _page = getQueryValue("_page")
+            console.log(`setEvents() => _page = ${_page}, info.pages = ${info.pages}`)
             if (_page) {
               if (parseInt(_page) > info.pages) {
                 console.log(`setEvents() => _page = ${_page} > info.pages = ${info.pages}. Setting _page to ${info.pages} and drawing page ${info.pages-1}.`)
                 updateQueryString('_page', info.pages);
                 $(tableID).DataTable().page(info.pages-1).draw('page');
               }
-            } else {
-              updateQueryString('_page', 1);
-              $(tableID).DataTable().page(0).draw('page');
-              console.log(`setEvents() => _page > info.pages. Setting _page to 1 and drawing page 0.`)
             }
           }
+
           adjustDOM(tableID);
 
+          if (pageChanged && getQueryValue('_cols') === 'nonempty') {
+            pageChanged = false;
+            _emptyColumnsNow = emptyColumns(tableID, true);
+            if (_emptyColumns.length === _emptyColumnsNow.length) {
+              console.log("Number of empty columns has not changed. Not updating column visibility.")
+              return
+            }
+            console.log("Number of empty columns has changed. Calling init().")
+            _emptyColumns = _emptyColumnsNow;
+            //_destroy("#table1"); // Was needed at some point
+            init()
+          }
         })
         .trigger('draw.dt');
         // trigger() above needed for initial load.
 
-
       console.log("Setting click event for hideEmptyColumns checkbox.")
       $('#hideEmptyColumns').click(function() {
+        const table = $(tableID).dataTable();
         if ($(this).is(':checked')) {
-          console.log("#hideEmptyColumns clicked to unchecked. Computing empty columns and calling init() with columnEmpty arg to hide empty columns.")
+          console.log("#hideEmptyColumns clicked to checked.")
           updateQueryString('_cols', 'nonempty');
-          let data = $('#table1').DataTable().rows({ page: 'current' }).data().toArray();
-          console.log(data)
-          let columnEmpty = [];
-          for (let r = 0; r < data.length; r++) {
-            for (let c = 0; c < data[r].length; c++) {
-              if (r == 0) {
-                columnEmpty.push(true);
-              }
-              if (data[r][c] !== null && data[r][c] !== "") {
-                columnEmpty[c] = false;
-              }
-            }
-          }
-          setTimeout(() => init(columnEmpty), 1);
-        } else {
-          console.log("#hideEmptyColumns clicked to unchecked. Calling init() with no args to show all columns.")
-          updateQueryString('_cols', null);
+          //init(emptyColumns(tableID));
           init();
+        } else {
+          console.log("#hideEmptyColumns clicked to unchecked.")
+          updateQueryString('_cols', null);
+          init()
         }
       });
-
-
     }
 
     function adjustDOM(tableID) {
@@ -551,9 +566,43 @@
       console.log("adjustDOM() finished.")
     }
 
+    function emptyColumns(tableID, indices) {
+      let data = $(tableID).DataTable().rows({ page: 'current' }).data().toArray();
+      console.log("emptyColumns() called. Data for current page:")
+      console.log(data)
+      let columnEmpty = [];
+      for (let r = 0; r < data.length; r++) {
+        for (let c = 0; c < data[r].length; c++) {
+          if (r == 0) {
+            columnEmpty.push(true);
+          }
+          if (data[r][c] !== null && data[r][c] !== "") {
+            columnEmpty[c] = false;
+          }
+        }
+      }
+
+      if (indices) {
+        let columnEmpty2 = []
+        for (let c = 0; c < columnEmpty.length; c++) {
+          if (columnEmpty[c]) {
+            columnEmpty2.push(c);
+          }
+        }
+        console.log("Computed columnEmpty index array:")
+        console.log(columnEmpty2)
+        return columnEmpty2;
+      }
+
+      console.log("Computed columnEmpty array:")
+      console.log(columnEmpty)
+
+      return columnEmpty;
+    }
+
     function _pageLength(config) {
       // Return a pageLength and update lengthMenu if needed.
-      let pageLength = 25;
+      let pageLength = config['pageLength'] || 25;
       console.log(`Default pageLength is ${pageLength}`);
       if (!config['pageLength']) {
         try {
@@ -620,14 +669,35 @@
 
     function dtInitComplete() {
 
+      $("#table1").DataTable().page(getQueryValue('_page', 1)-1).draw('page');
+
       console.log("dtInitComplete() called. DOM is ready.")
       const table = $('#table1').dataTable();
+
       console.log("Setting search inputs with initial search values and setting search event.")
       checkQueryString();
+
+      if (getQueryValue('_cols') === 'nonempty') {
+        console.log("Setting hideEmptyColumns checkbox to checked because _cols=nonempty in query string.")
+        $('#hideEmptyColumns').prop('checked', true);
+        console.log("Hiding empty columns")
+        let columnEmpty = emptyColumns('#table1', true);
+        table.api().columns(columnEmpty).visible(false, false)
+      } else {
+        console.log("Showing all columns")
+        //table.api().columns().visible(true); // Set all columns to visible
+        //table.api().columns.adjust().draw(true);
+      }
+
+      console.log("Setting column search inputs.")
       const qs = parseQueryString();
       let config = getConfig.config;
       let visibleIndex = 0;
-      table.api().columns(':visible').every( function () {
+      table.api().columns().every( function () {
+        if (this.visible() === false) {
+          //console.log(`  Column ${this.index()} named '${config.columnDefs[this.index()]['name']}' is not visible. Skipping setting search input.`)
+          //return;
+        }
         let that = this;
         // Create `select` element
         let index = this.index();
@@ -668,12 +738,10 @@
     async function init(columnEmpty) {
 
       const tableID = '#table1';
-      let displayStart = 0;
       if (DataTable.isDataTable(tableID)) {
         console.log(`isDataTable('${tableID}') is true. Destroying existing table before re-creating it.`)
         const table = $(tableID).DataTable();
         const state = table.state();
-        displayStart = state.start;
         console.log("Current DataTable state:", state);
         _destroy(tableID);
       }
@@ -684,6 +752,7 @@
 
       // Get pageLength and update config['lengthMenu'] if needed.
       const pageLength = _pageLength(config);
+      let displayStart = pageLength * getQueryValue('_page', 1);
 
       const renderTableMetadata = window.renderTableMetadata ? window.renderTableMetadata : null;
       const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : "";
@@ -720,7 +789,7 @@
           "stateSaveCallBack": function(settings, data) {
             alert('stateSaveCallBack called.');
           },
-          displayStart: parseInt(displayStart),
+          displayStart: displayStart,
           pageLength: pageLength,
           "stateLoadParams": function(settings, data) {
             // displayStart and pageLength in top-level config above are ignored if
@@ -729,13 +798,9 @@
             // is called, stateLoadParams is not triggered and the
             // _destroy() must delete state because its column visibility
             // will be used instead of the new column visibility.
-            const qs = parseQueryString();
-            let length = parseInt(qs['_length']) || parseInt(config['pageLength']) || 25
-              let start = 0;
-            if (qs['_page']) {
-              start = length*(-1 + parseInt(qs['_page']));
-              console.log(`stateLoadParams: setting start to ${start}.`);
-            }
+            console.log("stateLoadParams() called. Modifying data.start and data.length based on query string.")
+            let length = pageLength;
+            let start = displayStart;
             data.start = start,
             data.length = length
           },
@@ -746,22 +811,29 @@
       console.log(dataTableOptions)
       let table = $('#table1').DataTable(dataTableOptions);
       console.log("DataTable() returned:")
+      console.log(table)
 
-      function _destroy(tableID) {
-        console.log("_destroy() called.")
+    }
 
-        let tableWrapper = $(tableID + "_wrapper");
-        if (tableWrapper.length > 0) {
-          console.log(`Destroying table ${tableID}`)
-          // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
-          $('#tableMetadata').empty();
-          $(tableID).DataTable().state.clear();
-          $(tableID).DataTable().destroy();
-          tableWrapper.remove();
-          $(tableID).empty();
-          $('#hideEmptyColumns').unbind();
-          console.log(`Destroyed table ${tableID}`)
-        }
+    function _destroy(tableID) {
+      console.log("_destroy() called.")
+
+      let tableWrapper = $(tableID + "_wrapper");
+      if (tableWrapper.length > 0) {
+        console.log(`Destroying table ${tableID}`)
+        // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
+        $(tableID).off('page.dt');
+        $(tableID).off('length.dt');
+        $(tableID).off('preDraw.dt')
+        $(tableID).off('draw.dt');
+        $('#tableMetadata').empty();
+        $('#table1_length').remove();
+        $(tableID).DataTable().state.clear();
+        $(tableID).DataTable().destroy();
+        tableWrapper.remove();
+        $(tableID).empty();
+        $('#hideEmptyColumns').unbind();
+        console.log(`Destroyed table ${tableID}`)
       }
     }
 
