@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DataTables colReorder.move Demo</title>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css"/>
+  <link rel="stylesheet" href="https://cdn.datatables.net/colreorder/1.6.2/css/colReorder.dataTables.min.css"/>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    #demoTable { width: 100%; }
+  </style>
+</head>
+<body>
+  <h2>DataTables <code>colReorder.move()</code> Demo</h2>
+  <p>This demo moves the third column to the first position after table initialization.</p>
+  <table id="demoTable" class="display">
+    <thead>
+      <tr>
+        <th>First</th>
+        <th>Second</th>
+        <th>Third</th>
+        <th>Fourth</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>A</td><td>B</td><td>C</td><td>D</td></tr>
+      <tr><td>E</td><td>F</td><td>G</td><td>H</td></tr>
+      <tr><td>I</td><td>J</td><td>K</td><td>L</td></tr>
+    </tbody>
+  </table>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/colreorder/1.6.2/js/dataTables.colReorder.min.js"></script>
+  <script>
+    $(document).ready(function() {
+      var table = $('#demoTable').DataTable({
+        "stateSave": true,
+        "colReorder": true,
+        "deferRender": true,
+        "fixedHeader": true,
+        "fixedColumns": true,
+        "stateLoadParams": function(settings, data) {
+          console.log("State load params:", data);
+        }
+      });
+      // Move the third column (index 1) to the first position (index 0)
+      table.colReorder.move(1, 0);
+    });
+  </script>
+</body>
+</html>

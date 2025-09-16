@@ -151,116 +151,163 @@
     console.log("Document ready. Calling init()")
     $(document).ready(() =>init());
 
-    function clearAllSearches(tableID) {
-      let qs = parseQueryString();
-      for (const key in qs) {
-        if (!key.startsWith('_')) {
-          delete qs[key];
-        }
+    async function init(columnEmpty) {
+
+      // TODO: columnEmpty is no longer used. Would it speed
+      // up init() if it were used in events?
+
+      const tableID = '#table1';
+      if (DataTable.isDataTable(tableID)) {
+        console.log(`isDataTable('${tableID}') is true. Destroying existing table before re-creating it.`)
+        const state = $(tableID).DataTable().state();
+        console.log("Current DataTable state:", state);
+        const table = $(tableID).DataTable();
+        destroy(tableID);
       }
-      location.hash = decodeURIComponent($.param(qs));
-      init();
+
+      const config = await getConfig(columnEmpty);
+      getConfig.config = config;
+      console.log(config)
+
+      // Get pageLength and update config['lengthMenu'] if needed.
+      const pageLength = _pageLength(config);
+      let displayStart = pageLength * getQueryValue('_page', 1);
+
+      // Get column order from _cols query string parameter. Also modifies 
+      // config.columnDefs[i].visible based on if _cols ends with ...
+      let columnOrder = _columnOrder(getConfig.config);
+      console.log("columnOrder:", columnOrder);
+
+      const renderTableMetadata = window.renderTableMetadata ? window.renderTableMetadata : null;
+      const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : "";
+      $('#tableMetadata').html(tableMetadata);
+
+      // Add header names to table. Two rows are added.
+      // The first row is for name and sorting, second row is for filtering.
+      $('#table1').append('<thead><tr></tr><tr></tr></thead>');
+      //$('#table1').append('<thead><tr></tr></thead>');
+      let tr1 = $('#table1 > thead > tr:eq(1)');
+      for (let i = 0; i < config.columnDefs.length; i++) {
+        tr1.append(`<th>${config.columnDefs[i]['name']}</th>`);
+      }
+      let tr2 = $('#table1 > thead > tr:eq(0)');
+      for (let i = 0; i < config.columnDefs.length; i++) {
+        tr2.append(`<th></th>`);
+      }
+
+      // Make the added header search row fixed b/c the fixedColumns plugin
+      // does not seem to "see" the extra row.
+      $(`#table1 thead tr:eq(0) > th:eq(0)`)
+        .css('position', 'sticky')
+        .css('left', '0px')
+        .css('z-index', '101')
+        .css('background-color', 'white');
+
+      // Create table body
+      $('#table1').append('<tbody></tbody>');
+
+      // https://datatables.net/reference/option/
+      let dataTableOptions =
+        {
+          ...config,
+          "stateSave": true,
+          "stateSaveCallBack": function(settings, data) {
+            alert('stateSaveCallBack called.');
+          },
+          colReorder: true,
+          //colReorder: {order: columnOrder}, // Not working: (columns end up wrong every other reload)
+          displayStart: displayStart,
+          pageLength: pageLength,
+          "stateLoadParams": function(settings, data) {
+            // displayStart and pageLength in top-level config above are ignored if
+            // stateSave is true because saved state has precedence over this setting.
+            // Setting the state above is needed because after init(emptyColumn)
+            // is called, stateLoadParams is not triggered and the
+            // destroy() must delete state because its column visibility
+            // will be used instead of the new column visibility.
+            console.log("stateLoadParams() called. Modifying data.start and data.length based on query string.")
+            console.log(data)
+            data.start = displayStart
+            data.length = pageLength
+            delete data.columns
+            delete data.ColReorder // Not clear why needed. See colReorder comment above.
+          },
+          "initComplete": function () {dtInitComplete(columnOrder)},
+          //"initComplete": dtInitComplete, // See colReorder comment above.
+        };
+
+      console.log("Calling DataTable() with options:")
+      console.log(dataTableOptions)
+      let table = $('#table1').DataTable(dataTableOptions);
+      console.log("DataTable() returned:")
+
     }
 
-    function parseQueryString() {
-      // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
-      var nvpair = {};
-      var qs = window.location.hash.replace('#', '');
-      if (qs.length === 0) {
-        return {};
-      }
-      var pairs = qs.split('&');
-      $.each(pairs, function(i, v){
-        var pair = v.split('=');
-        nvpair[pair[0]] = pair[1];
-      });
-      return nvpair;
-    }
+    function dtInitComplete(columnOrder) {
 
-    function getQueryValue(name, defaultValue) {
-      let qs = parseQueryString();
-      if (!qs[name]) {
-        return defaultValue;
-      }
-      return qs[name];
-    }
+      // It is not clear why this needs to be done here instead of
+      // being specified in config. See colReorder comment above.
+      console.log("dtInitComplete() => Reordering columns based on _cols query string parameter.");
+      $('#table1').dataTable().api().colReorder.order(columnOrder)
 
-    function checkQueryString() {
-      console.log("checkQueryString() called. Checking query string for invalid column names.");
-      let config = getConfig.config;
-      let qs = parseQueryString();
-      console.log("query string:")
-      console.log(qs);
-      let alerted = false;
-      for (const [key, val] of Object.entries(qs)) {
-        if (key.startsWith('_')) {
-          console.log(`  found state parameter '${key}' in query string. Leaving it.`);
-          continue;
-        }
-        if (config.columnNames.includes(key)) {
-          console.log(`  found valid key = '${key}' in query string.`);
-        } else {
-          console.log(`  found invalid key = '${key}' in query string. Removing it.`);
-          if (alerted === false) {
-            alerted = true;
-            alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
-          }
-          updateQueryString(key, null);
-        }
-      }
-    }
+      $("#table1").DataTable().page(getQueryValue('_page', 1)-1).draw('page');
 
-    function setQueryStringFromSearch() {
-      console.log("setQueryStringFromSearch() called. Stepping through column search inputs.");
-      // Check query string for invalid column names
+      console.log("dtInitComplete() called. DOM is ready.")
+      const table = $('#table1').dataTable();
+      console.log("Setting search inputs with initial search values and setting search event.")
       checkQueryString();
-      // Step through column search inputs and update query string
-      // Highlight inputs with search values and remove highlight for
-      // inputs with no search value.
-      let searchValue;
-      let inputs = $('.dataTables_scrollHead input.columnSearch');
-      console.log(`Reading ${inputs.length} column search inputs.`);
-      for (let input of inputs) {
-        let name = $(input).attr('name');
-        searchValue = $(input).val();
-        if (searchValue) {
-          console.log(`Found search value for column '${name}'. Updating query string and highlighting input.`);
-          $(input).css('background-color', 'yellow');
-          console.log(`Updating query string with search value for column '${name}' = '${searchValue}'.`);
-          updateQueryString(name, searchValue);
-        } else {
-          //console.log(`No search value for column '${name}'.`);
-          $(input).css('background-color', '');
-          let qs = parseQueryString();
-          if (qs[name]) {
-            console.log(` Found ${name} in query string. Removing from query string.`);
-            updateQueryString(name, null);
-          }
-        }
-      }
-    }
 
-    function updateQueryString(name, val) {
-      console.log(`updateQueryString() called with name='${name}' and val='${val}'`);
-      let qs = parseQueryString();
-      if (val === null) {
-        console.log(`Removing ${name} from query string.`);
-        delete qs[name];
+
+      if (getQueryValue('_cols_show') === 'nonempty') {
+        console.log("Setting hideEmptyColumns checkbox to checked because _cols_show=nonempty in query string.")
+        $('#hideEmptyColumns').prop('checked', true);
+        console.log("Hiding empty columns")
+        let columnEmpty = emptyColumns('#table1', true);
+        table.api().columns(columnEmpty).visible(false, false)
       } else {
-        qs[name] = val;
+        console.log("Showing all columns")
       }
 
-      // Put _ parameters at end of query string
-      const sortedKeys = Object.keys(qs).sort((a, b) => {
-        if (a.startsWith('_')) return 1;
-        return -1;
-      });
+      console.log("Setting column search inputs.")
+      const qs = parseQueryString();
+      let config = getConfig.config;
+      let visibleIndex = 0;
+      table.api().columns().every(function () {
+        let that = this;
+        // Create `select` element
+        let index = this.index();
+        let name = config.columnDefs[index]['name'];
+        console.log(`  Setting search input for column ${index} named '${name}'. Visible: ${config.columnDefs[index].visible}`);
+        // Note that the header table does not have an id. It should.
+        $("thead tr:eq(0) > th").eq(visibleIndex).html('');
+        let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
 
-      const sortedQs = {};
-      for (const key of sortedKeys) {
-        sortedQs[key] = qs[key];
-      }
-      location.hash = decodeURIComponent($.param(sortedQs));
+        let val = qs[name] || '';
+        input
+          .val(val)
+          .attr('title','Press enter to search')
+          .appendTo($("thead tr:eq(0) > th").eq(visibleIndex))
+          .on("keydown", function() {
+            if (!config["search"]["return"]) {
+              that.search($(this).val()).draw('page');
+            } else {
+              let keycode = (event.keyCode ? event.keyCode : event.which);
+              if (keycode == '13'){
+                that.search($(this).val()).draw('page');
+              }
+            }
+          });
+          if (val) {
+            input.css('background-color', 'yellow');
+            input.attr('title','Remove text and press enter to clear search')
+          }
+          visibleIndex++;
+        });
+      console.log("Set search.")
+
+      setEvents('#table1');
+
+      console.log("dtInitComplete() finished.")
     }
 
     async function getHeader() {
@@ -457,7 +504,7 @@
 
           adjustDOM(tableID);
 
-          if (pageChanged && getQueryValue('_cols') === 'nonempty') {
+          if (pageChanged && getQueryValue('_cols_show') === 'nonempty') {
             pageChanged = false;
             _emptyColumnsNow = emptyColumns(tableID, true);
             if (_emptyColumns.length === _emptyColumnsNow.length) {
@@ -466,7 +513,7 @@
             }
             console.log("Number of empty columns has changed. Calling init().")
             _emptyColumns = _emptyColumnsNow;
-            //_destroy("#table1"); // Was needed at some point
+            //destroy("#table1"); // Was needed at some point
             init()
           }
         })
@@ -478,12 +525,12 @@
         const table = $(tableID).dataTable();
         if ($(this).is(':checked')) {
           console.log("#hideEmptyColumns clicked to checked.")
-          updateQueryString('_cols', 'nonempty');
+          updateQueryString('_cols_show', 'nonempty');
           //init(emptyColumns(tableID));
           init();
         } else {
           console.log("#hideEmptyColumns clicked to unchecked.")
-          updateQueryString('_cols', null);
+          updateQueryString('_cols_show', null);
           init()
         }
       });
@@ -667,156 +714,82 @@
       return pageLength;
     }
 
-    function dtInitComplete() {
+    function _columnOrder(config) {
+      let colIndices = [];
+      let columnNames = getQueryValue('_cols');
 
-      $("#table1").DataTable().page(getQueryValue('_page', 1)-1).draw('page');
-
-      console.log("dtInitComplete() called. DOM is ready.")
-      const table = $('#table1').dataTable();
-
-      console.log("Setting search inputs with initial search values and setting search event.")
-      checkQueryString();
-
-      if (getQueryValue('_cols') === 'nonempty') {
-        console.log("Setting hideEmptyColumns checkbox to checked because _cols=nonempty in query string.")
-        $('#hideEmptyColumns').prop('checked', true);
-        console.log("Hiding empty columns")
-        let columnEmpty = emptyColumns('#table1', true);
-        table.api().columns(columnEmpty).visible(false, false)
-      } else {
-        console.log("Showing all columns")
-        //table.api().columns().visible(true); // Set all columns to visible
-        //table.api().columns.adjust().draw(true);
-      }
-
-      console.log("Setting column search inputs.")
-      const qs = parseQueryString();
-      let config = getConfig.config;
-      let visibleIndex = 0;
-      table.api().columns().every( function () {
-        if (this.visible() === false) {
-          //console.log(`  Column ${this.index()} named '${config.columnDefs[this.index()]['name']}' is not visible. Skipping setting search input.`)
-          //return;
+      if (!columnNames) {
+        // return [0, 1, 2, ..., n-1]
+        for (let i = 0; i < config.columnDefs.length; i++) {
+          colIndices.push(i);
         }
-        let that = this;
-        // Create `select` element
-        let index = this.index();
-        name = config.columnDefs[index]['name'];
-        console.log(`  Setting search input for column ${index} named '${name}'. Visible: ${config.columnDefs[index].visible}`);
-        // Note that the header table does not have an id. It should.
-        $("thead tr:eq(0) > th").eq(visibleIndex).html('');
-        let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
+        return colIndices;
+      }
 
-        let val = qs[name] || '';
-        input
-          .val(val)
-          .attr('title','Press enter to search')
-          .appendTo($("thead tr:eq(0) > th").eq(visibleIndex))
-          .on("keydown", function() {
-            if (!config["search"]["return"]) {
-              that.search($(this).val()).draw('page');
-            } else {
-              let keycode = (event.keyCode ? event.keyCode : event.which);
-              if (keycode == '13'){
-                that.search($(this).val()).draw('page');
-              }
-            }
-          });
-          if (val) {
-            input.css('background-color', 'yellow');
-            input.attr('title','Remove text and press enter to clear search')
+      let columnNameMap = _columnNameMap(config);
+
+      columnNames = columnNames.split(',');
+      let updateHash = false;
+      for (let i = 0; i < columnNames.length; i++) {
+        let colName = columnNames[i];
+        if (colName in columnNameMap) {
+          colIndices.push(columnNameMap[colName]);
+        } else if (colName === '...') {
+          delete columnNames[colName];
+        } else {
+          console.log(`Column name '${colName}' not found in config.columnDefs.`);
+          if (!updateHash) {
+            alert(`Column name in query string not found: "${colName}". Removing it and any other invalid column names from query string.`);
           }
-          visibleIndex++;
-        });
-      console.log("Set search.")
+          updateHash = true;
+          delete columnNames[i];
+        }
+      }
+      if (updateHash) {
+        console.log("Updating query string to remove invalid column names.")
+        columnNames = columnNames.filter(Boolean); // Remove any null/undefined values
+        console.log(columnNames)
+        updateQueryString('_cols', columnNames.join(','));
+      }
 
-      setEvents('#table1');
+      if (columnNames[columnNames.length - 1] !== '...') {
+        // Set visibility of all columns not in colIndices to false.
+        for (let i = 0; i < config.columnDefs.length; i++) {
+          if (!colIndices.includes(i)) {
+            console.log(`Setting visibility of ${config.columnDefs[i].name} to false`);
+            config.columnDefs[i].visible = false;
+          }
+        }
+      }
 
-      console.log("dtInitComplete() finished.")
+      // colReorder config requires including all columns, so append to end.
+      for (let i = 0; i < config.columnDefs.length; i++) {
+        if (!colIndices.includes(i)) {
+          colIndices.push(i);
+        }
+      }
+
+      return colIndices;
     }
 
-    async function init(columnEmpty) {
-
-      const tableID = '#table1';
-      if (DataTable.isDataTable(tableID)) {
-        console.log(`isDataTable('${tableID}') is true. Destroying existing table before re-creating it.`)
-        const table = $(tableID).DataTable();
-        const state = table.state();
-        console.log("Current DataTable state:", state);
-        _destroy(tableID);
-      }
-
-      const config = await getConfig(columnEmpty);
-      getConfig.config = config;
-      console.log(config)
-
-      // Get pageLength and update config['lengthMenu'] if needed.
-      const pageLength = _pageLength(config);
-      let displayStart = pageLength * getQueryValue('_page', 1);
-
-      const renderTableMetadata = window.renderTableMetadata ? window.renderTableMetadata : null;
-      const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : "";
-      $('#tableMetadata').html(tableMetadata);
-
-      // Add header names to table. Two rows are added.
-      // The first row is for name and sorting, second row is for filtering.
-      $('#table1').append('<thead><tr></tr><tr></tr></thead>');
-      let tr1 = $('#table1 > thead > tr:eq(1)');
+    function _columnNameMap(config, invert) {
+      // Create a map from column name to index
+      const columnNameMap = {};
       for (let i = 0; i < config.columnDefs.length; i++) {
-        tr1.append(`<th>${config.columnDefs[i]['name']}</th>`);
+        columnNameMap[config.columnDefs[i].name] = i;
       }
-      let tr2 = $('#table1 > thead > tr:eq(0)');
-      for (let i = 0; i < config.columnDefs.length; i++) {
-        tr2.append(`<th></th>`);
+      if (!invert) {
+        return columnNameMap;
       }
-
-      // Make the added header search row fixed b/c the fixedColumns plugin
-      // does not seem to "see" the extra row.
-      $(`#table1 thead tr:eq(0) > th:eq(0)`)
-        .css('position', 'sticky')
-        .css('left', '0px')
-        .css('z-index', '101')
-        .css('background-color', 'white');
-
-      // Create table body
-      $('#table1').append('<tbody></tbody>');
-
-      // https://datatables.net/reference/option/
-      let dataTableOptions =
-        {
-          ...config,
-          "stateSave": true,
-          "stateSaveCallBack": function(settings, data) {
-            alert('stateSaveCallBack called.');
-          },
-          displayStart: displayStart,
-          pageLength: pageLength,
-          "stateLoadParams": function(settings, data) {
-            // displayStart and pageLength in top-level config above are ignored if
-            // stateSave is true because saved state has precedence over this setting.
-            // Setting the state above is needed because after init(emptyColumn)
-            // is called, stateLoadParams is not triggered and the
-            // _destroy() must delete state because its column visibility
-            // will be used instead of the new column visibility.
-            console.log("stateLoadParams() called. Modifying data.start and data.length based on query string.")
-            let length = pageLength;
-            let start = displayStart;
-            data.start = start,
-            data.length = length
-          },
-          "initComplete": dtInitComplete,
-        };
-
-      console.log("Calling DataTable() with options:")
-      console.log(dataTableOptions)
-      let table = $('#table1').DataTable(dataTableOptions);
-      console.log("DataTable() returned:")
-      console.log(table)
-
+      let invertedColumnNameMap = {};
+      for (const [key, value] of Object.entries(columnNameMap)) {
+        invertedColumnNameMap[value] = key;
+      }
+      return invertedColumnNameMap;
     }
 
-    function _destroy(tableID) {
-      console.log("_destroy() called.")
+    function destroy(tableID) {
+      console.log("destroy() called.")
 
       let tableWrapper = $(tableID + "_wrapper");
       if (tableWrapper.length > 0) {
@@ -835,6 +808,118 @@
         $('#hideEmptyColumns').unbind();
         console.log(`Destroyed table ${tableID}`)
       }
+    }
+
+    function clearAllSearches(tableID) {
+      let qs = parseQueryString();
+      for (const key in qs) {
+        if (!key.startsWith('_')) {
+          delete qs[key];
+        }
+      }
+      location.hash = decodeURIComponent($.param(qs));
+      init();
+    }
+
+    function parseQueryString() {
+      // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
+      var nvpair = {};
+      var qs = window.location.hash.replace('#', '');
+      if (qs.length === 0) {
+        return {};
+      }
+      var pairs = qs.split('&');
+      $.each(pairs, function(i, v){
+        var pair = v.split('=');
+        nvpair[pair[0]] = pair[1];
+      });
+      return nvpair;
+    }
+
+    function getQueryValue(name, defaultValue) {
+      let qs = parseQueryString();
+      if (!qs[name]) {
+        return defaultValue;
+      }
+      return qs[name];
+    }
+
+    function checkQueryString() {
+      console.log("checkQueryString() called. Checking query string for invalid column names.");
+      let config = getConfig.config;
+      let qs = parseQueryString();
+      console.log("query string:")
+      console.log(qs);
+      let alerted = false;
+      for (const [key, val] of Object.entries(qs)) {
+        if (key.startsWith('_')) {
+          console.log(`  found state parameter '${key}' in query string. Leaving it.`);
+          continue;
+        }
+        if (config.columnNames.includes(key)) {
+          console.log(`  found valid key = '${key}' in query string.`);
+        } else {
+          console.log(`  found invalid key = '${key}' in query string. Removing it.`);
+          if (alerted === false) {
+            alerted = true;
+            alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
+          }
+          updateQueryString(key, null);
+        }
+      }
+    }
+
+    function setQueryStringFromSearch() {
+      console.log("setQueryStringFromSearch() called. Stepping through column search inputs.");
+      // Check query string for invalid column names
+      checkQueryString();
+      // Step through column search inputs and update query string
+      // Highlight inputs with search values and remove highlight for
+      // inputs with no search value.
+      let searchValue;
+      let inputs = $('.dataTables_scrollHead input.columnSearch');
+      console.log(`Reading ${inputs.length} column search inputs.`);
+      for (let input of inputs) {
+        let name = $(input).attr('name');
+        searchValue = $(input).val();
+        if (searchValue) {
+          console.log(`Found search value for column '${name}'. Updating query string and highlighting input.`);
+          $(input).css('background-color', 'yellow');
+          console.log(`Updating query string with search value for column '${name}' = '${searchValue}'.`);
+          updateQueryString(name, searchValue);
+        } else {
+          //console.log(`No search value for column '${name}'.`);
+          $(input).css('background-color', '');
+          let qs = parseQueryString();
+          if (qs[name]) {
+            console.log(` Found ${name} in query string. Removing from query string.`);
+            updateQueryString(name, null);
+          }
+        }
+      }
+    }
+
+    function updateQueryString(name, val) {
+      console.log(`updateQueryString() called with name='${name}' and val='${val}'`);
+      let qs = parseQueryString();
+      if (val === null) {
+        console.log(`Removing ${name} from query string.`);
+        delete qs[name];
+      } else {
+        qs[name] = val;
+      }
+
+      // Put _ parameters at end of query string
+      const sortedKeys = Object.keys(qs).sort((a, b) => {
+        if (a.startsWith('_')) return 1;
+        return -1;
+      });
+
+      const sortedQs = {};
+      for (const key of sortedKeys) {
+        sortedQs[key] = qs[key];
+      }
+      location.hash = decodeURIComponent($.param(sortedQs));
     }
 
   </script>
