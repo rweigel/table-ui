@@ -61,15 +61,12 @@
     }
     .dataTables_wrapper .dataTables_info {
       clear: none;
-      padding-top: 0.37em;
-      padding-left: 1em;
-      float: right;
+      padding-top: 0.45em;
+      padding-left: 0.5em;
     }
     .dataTables_wrapper .dataTables_paginate {
       float: left;
       text-align: right;
-      padding-top: 0.2em;
-      padding-left: 0.2em;
   }
 
     table.dataTable td {
@@ -205,7 +202,7 @@
 
       // Create table body
       $('#table1').append('<tbody></tbody>');
-
+      columnOrder = [0, 2, 1]
       // https://datatables.net/reference/option/
       let dataTableOptions =
         {
@@ -215,20 +212,27 @@
             alert('stateSaveCallBack called.');
           },
           colReorder: true,
-          //colReorder: {order: columnOrder}, // Not working: (columns end up wrong every other reload)
+          // Can't set columnOrder here because AJAX does not return
+          // data with columns according to columnOrder (could modify
+          // AJAX response to have correct order or change structure of
+          // response to be more verbose; see misc/simple/reorder.html
+          //  for example of modified AJAX response).
+          //colReorder: {order: columnOrder},
           displayStart: displayStart,
           pageLength: pageLength,
           "stateLoadParams": function(settings, data) {
             // displayStart and pageLength in top-level config above are ignored if
             // stateSave is true because saved state has precedence over this setting.
-            // Setting the state above is needed because after init(emptyColumn)
-            // is called, stateLoadParams is not triggered and the
+            // Setting the state above is needed because after init()
+            // is called a second time, stateLoadParams is not triggered.
             // destroy() must delete state because its column visibility
             // will be used instead of the new column visibility.
-            console.log("stateLoadParams() called. Modifying data.start and data.length based on query string.")
+            console.log("stateLoadParams() called. Deleting start, length, columns, and ColReorder from saved state data:") 
             console.log(data)
-            data.start = displayStart
-            data.length = pageLength
+            //data.start = displayStart
+            //data.length = pageLength
+            delete data.start
+            delete data.length
             delete data.columns
             delete data.ColReorder // Not clear why needed. See colReorder comment above.
           },
@@ -237,7 +241,9 @@
         };
 
       console.log("Calling DataTable() with options:")
-      console.log(dataTableOptions)
+      // dataTableOptions copy is needed b/c DataTable() modifies it
+      // and console.log() shows the modified version.
+      console.log(JSON.parse(JSON.stringify(dataTableOptions)));
       let table = $('#table1').DataTable(dataTableOptions);
       console.log("DataTable() returned:")
 
@@ -245,8 +251,8 @@
 
     function dtInitComplete(columnOrder) {
 
-      // It is not clear why this needs to be done here instead of
-      // being specified in config. See colReorder comment above.
+      // See colReorder comment above for why this needs to be done after
+      // dtInitComplete is called.
       console.log("dtInitComplete() => Reordering columns based on _cols query string parameter.");
       $('#table1').dataTable().api().colReorder.order(columnOrder)
 

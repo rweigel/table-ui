@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>colReorder issue</title>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css"/>
+  <link rel="stylesheet" href="https://cdn.datatables.net/colreorder/1.6.2/css/colReorder.dataTables.min.css"/>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    #demoTable { width: 100%; }
+  </style>
+</head>
+<body>
+  <table id="demoTable" class="display">
+    <thead>
+      <tr>
+        <th>a</th>
+        <th>b</th>
+        <th>c</th>
+      </tr>
+    </thead>
+  </table>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/colreorder/1.6.2/js/dataTables.colReorder.min.js"></script>
+  <script>
+    $(document).ready(function() {
+      $('#demoTable').DataTable(
+        {
+          "displayStart": 0,
+          "pageLength": 10,
+          "ajax": function (data, callback, settings) {
+              const cb1 = {
+                "data": [{"a": "a01", "b": "b01", "c": "c01"}],
+              }
+              callback(cb1);
+              // Does not work b/c columns are not reordered here.
+              // (also need to remove columns)
+              //const cb2 = {data: [["a01", "b01", "c01"]]}
+              //callback(cb2);
+            },
+          "columns": [
+            { data: "a", title: "a" },
+            { data: "b", title: "b" },
+            { data: "c", title: "c" }
+          ],
+          "colReorder": {
+            "order": [
+              0,
+              2,
+              1
+            ]
+          }
+        });
+      });
+  </script>
+</body>
+</html>
