@@ -513,7 +513,7 @@
           }
 
           adjustDOM(tableID);
-          if (lengthChanged) {
+          if (lengthChanged && getQueryValue('_cols_show') === 'nonempty') {
 	      init();
 	      return
           }
