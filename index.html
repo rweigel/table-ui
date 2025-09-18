@@ -123,6 +123,8 @@
       <li>To execute any search, press enter key after entering text in column text entry area.</li>
       <li>Shift+click on sort arrows (<span style="font-size:small;opacity:0.25">▼</span> or <span style="font-size:small;opacity:0.25">▲</span>) to sort on multiple columns.</li>
       <li>A entry of <code>⎵</code> means value is a single blank space.</li>
+      <li>To show only certain columns, enter, e.g., <code>_cols=a,b,c</code></li>
+      <li>To show certain columns in a particular order, enter, e.g., <code>_cols=c,b,a,...</code>. (The <code>...</code> indicates other columns should be displayed in default order.)</li>
     </ul>
     <h1>Search</h1>
     <ul>
@@ -202,7 +204,6 @@
 
       // Create table body
       $('#table1').append('<tbody></tbody>');
-      columnOrder = [0, 2, 1]
       // https://datatables.net/reference/option/
       let dataTableOptions =
         {
@@ -283,7 +284,8 @@
         // Create `select` element
         let index = this.index();
         let name = config.columnDefs[index]['name'];
-        console.log(`  Setting search input for column ${index} named '${name}'. Visible: ${config.columnDefs[index].visible}`);
+        //console.log(`  Setting search input for column ${index} named '${name}'. Visible: ${config.columnDefs[index].visible}`);
+
         // Note that the header table does not have an id. It should.
         $("thead tr:eq(0) > th").eq(visibleIndex).html('');
         let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
