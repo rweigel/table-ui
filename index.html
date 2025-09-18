@@ -466,9 +466,11 @@
       });
 
       console.log('setEvents() => Setting length.dt.')
+      let lengthChanged = false;	
       $(tableID).on('length.dt', function (e, settings, len) {
         console.log('setEvents() => length.dt triggered')
         updateQueryString('_length', len);
+        lengthChanged = true;
       })
 
       console.log('setEvents() => Setting preDraw.dt.')
@@ -511,7 +513,11 @@
           }
 
           adjustDOM(tableID);
-
+          if (lengthChanged) {
+	      init();
+	      return
+          }
+	    
           if (pageChanged && getQueryValue('_cols_show') === 'nonempty') {
             pageChanged = false;
             _emptyColumnsNow = emptyColumns(tableID, true);
