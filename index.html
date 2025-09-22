@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 
@@ -182,6 +183,7 @@
       $('#tableMetadata').html(tableMetadata);
 
       // Add header names to table. Two rows are added.
+
       // The first row is for name and sorting, second row is for filtering.
       $('#table1').append('<thead><tr></tr><tr></tr></thead>');
       //$('#table1').append('<thead><tr></tr></thead>');
@@ -204,6 +206,7 @@
 
       // Create table body
       $('#table1').append('<tbody></tbody>');
+
       // https://datatables.net/reference/option/
       let dataTableOptions =
         {
@@ -466,9 +469,11 @@
       });
 
       console.log('setEvents() => Setting length.dt.')
+      let lengthChanged = false;	
       $(tableID).on('length.dt', function (e, settings, len) {
         console.log('setEvents() => length.dt triggered')
         updateQueryString('_length', len);
+        lengthChanged = true;
       })
 
       console.log('setEvents() => Setting preDraw.dt.')
@@ -511,7 +516,11 @@
           }
 
           adjustDOM(tableID);
-
+          if (lengthChanged && getQueryValue('_cols_show') === 'nonempty') {
+	      init();
+	      return
+          }
+	    
           if (pageChanged && getQueryValue('_cols_show') === 'nonempty') {
             pageChanged = false;
             _emptyColumnsNow = emptyColumns(tableID, true);
