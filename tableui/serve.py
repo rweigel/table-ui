@@ -22,34 +22,79 @@ def serve(sqldb=None, table_name=None,
   kwargs = tableui.cli.defaults(locals())
 
   logger.info(f"Getting database info in file '{kwargs['sqldb']}'")
-  _kwargs = {
+  dbconfig = {
     "sqldb": kwargs['sqldb'],
     "table_name": kwargs['table_name'],
     "json_head": kwargs['json_head'],
     "json_body": kwargs['json_body']
   }
-  dbinfo = _dbinfo(**_kwargs)
 
   app = fastapi.FastAPI()
 
   logger.info("Initalizing API")
-  _kwargs = {
+  apiconfig = {
     "root_dir": kwargs['root_dir'],
-    "dbinfo": dbinfo,
     "dtrender": kwargs['render'],
-    "dtconfig": kwargs['config']
+    "dtconfig": kwargs['config'],
+    "dbconfig": dbconfig
   }
-  _api_init(app, **_kwargs)
+
+  # Read and checks config. Don't need output because output is
+  # read as needed for response in case it changes.
+  _read_config(apiconfig, warn=True)
+
+  _api_init(app, apiconfig)
 
   logger.info("Starting server")
-  _kwargs = {
+  runconfig = {
               "host": kwargs['host'],
               "port": kwargs['port'],
               "server_header": False
             }
-  uvicorn.run(app, **_kwargs)
+  uvicorn.run(app, **runconfig)
 
-def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
+def _read_config(apiconfig, warn=False):
+
+  if not os.path.exists(apiconfig['dtconfig']):
+    logger.error("Error: Config file not found: " + apiconfig['dtconfig'])
+    exit(1)
+
+  with open(apiconfig['dtconfig']) as f:
+    logger.info("Reading: " + apiconfig['dtconfig'])
+    content = json.load(f)
+
+  if 'jsondb' in apiconfig['dbconfig'] and 'sqldb' in apiconfig['dbconfig']:
+    logger.error("Error: Both sqldb and jsondb were given. Choose one.")
+    exit(1)
+
+  serverSide = content.get('serverSide', None)
+
+  if serverSide is None:
+    if apiconfig['dbconfig']['sqldb'] is not None:
+      content['serverSide'] = True
+    if apiconfig['dbconfig']['json_body'] is not None:
+      content['serverSide'] = False
+  else:
+    if serverSide not in [True, False]:
+      logger.error("Error: Config file 'serverSide' must be true or false")
+      exit(1)
+    if apiconfig['dbconfig']['sqldb'] is not None and not serverSide:
+      if warn:
+        logger.warning("Warning: Config file specifies serverSide=false but sqldb was given. Overriding to serverSide=true")
+      content['serverSide'] = True
+    if apiconfig['dbconfig']['json_body'] and serverSide:
+      if warn:
+        logger.warning("Warning: Config file specifies serverSide=true but jsondb was given. Overriding to serverSide=false")
+      content['serverSide'] = False
+
+  return content
+
+
+def _api_init(app, apiconfig):
+
+  root_dir = apiconfig['root_dir']
+  dtrender = apiconfig['dtrender']
+  dbconfig = apiconfig['dbconfig']
 
   def cors_headers(response: fastapi.Response):
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -66,6 +111,7 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
 
   @app.route("/", methods=["GET", "HEAD"])
   def indexhtml(request: fastapi.Request):
+    dbinfo = _dbinfo(**dbconfig)
     fname = os.path.join(root_dir,'index.html')
     logger.info("Reading: " + fname)
     with open(fname) as f:
@@ -75,11 +121,8 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
 
   @app.route("/config", methods=["GET", "HEAD"])
   def config(request: fastapi.Request):
-    with open(dtconfig) as f:
-      logger.info("Reading: " + dtconfig)
-      content = json.load(f)
-    if 'sqldb' in dbinfo:
-      content["serverSide"] = True
+    dbinfo = _dbinfo(**dbconfig)
+    content = _read_config(apiconfig, warn=False)
     if "tableUI" not in content:
       content['tableUI'] = {"tableMetadata": {}}
     if 'tableMetadata' in content:
@@ -88,7 +131,6 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
       content['tableUI']['sqldb'] = dbinfo["sqldb"]
     if "jsondb" in dbinfo:
       content['tableUI']['jsondb'] = dbinfo["jsondb"]
-    print(content)
     return fastapi.responses.JSONResponse(content=content)
 
   @app.route("/render.js", methods=["GET", "HEAD"])
@@ -97,28 +139,43 @@ def _api_init(app, root_dir=None, dbinfo=None, dtrender=None, dtconfig=None):
 
   @app.route("/header", methods=["GET", "HEAD"])
   def header(request: fastapi.Request):
+    dbinfo = _dbinfo(**dbconfig)
+    #return fastapi.responses.JSONResponse(content=dbinfo['column_names'][0:3])
     return fastapi.responses.JSONResponse(content=dbinfo['column_names'])
 
   @app.route("/data/", methods=["GET", "HEAD"])
   def data(request: fastapi.Request):
 
+    dbinfo = _dbinfo(**dbconfig)
+
     query_params = dict(request.query_params)
 
-    if "_start" not in query_params:
+    def _data_transform(data, verbose_data):
+      if not verbose_data:
+        return data
+      data_verbose = []
+      for row in data:
+        data_verbose.append({dbinfo['column_names'][i]: row[i] for i in range(0, len(dbinfo['column_names']))})
+        #data_verbose.append({dbinfo['column_names'][i]: row[i] for i in range(0, 3)})
+      return data_verbose
+
+    verbose_data = False
+    if "jsondb" in dbinfo:
       # No server-side processing. Serve entire JSON.
       with open(dbinfo['jsondb']['body']) as f:
         # TODO: Stream
-        logger.info("Reading: " + dbinfo['jsondb']['body'])
+        logger.info("Reading and sending: " + dbinfo['jsondb']['body'])
         data = json.load(f)
-      return fastapi.responses.JSONResponse({"data": data})
-
+        data = _data_transform(data, verbose_data)
+        return fastapi.responses.JSONResponse({"data": data})
 
     result = _query(dbinfo, query_params=query_params)
+    data = _data_transform(result['data'], verbose_data)
     content = {
                 "draw": query_params["_draw"],
                 "recordsTotal": result['recordsTotal'],
                 "recordsFiltered": result['recordsFiltered'],
-                "data": result['data']
+                "data": data
               }
 
     return fastapi.responses.JSONResponse(content=content)
@@ -177,7 +234,7 @@ def _query(dbinfo, query_params=None):
   start = 0
   limit = None
   if query_params is not None and "_start" in query_params:
-    query_params.get("_start", 0)
+    start = query_params.get("_start", 0)
     start = int(start)
     end = start + int(query_params["_length"])
     limit = end - start
