@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>colReorder issue</title>
+  <link href="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.4/cr-2.1.1/cc-1.1.0/fc-5.0.5/fh-4.0.3/rr-1.5.0/sr-1.4.2/datatables.min.css" rel="stylesheet" integrity="sha384-dgzX5TLI69CXeC13LXEjdPjDiPvUE1PZwerPcXG65BoG6lJ/8w0waUP/mE71FGO0" crossorigin="anonymous">
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    #demoTable { width: 100%; }
+  </style>
+</head>
+<body>
+  <table id="demoTable" class="display">
+  </table>
+
+  <script src="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.4/cr-2.1.1/cc-1.1.0/datatables.min.js"></script>
+
+  <script>
+    /*
+    /demo/demo.body2.json
+    returns the following JSON:
+    {
+      "draw": "1",
+      "recordsTotal": 2,
+      "recordsFiltered": [
+          2
+      ],
+      "data": [
+        { "a": "a01", "b": "b01", "c": "c01" },
+        { "a": "a02", "b": "b02", "c": "c02" }
+      ]
+    }
+    */
+    $(document).ready(function() {
+      var table = $('#demoTable')
+      .DataTable({
+        serverSide: true,
+        ajax: {
+          "url": "/demo/demo.body2.json",
+          "type": "get",
+          "data": function ( d ) {
+            // https://datatables.net/forums/discussion/81381/deleting-query-parameters-when-using-columncontrol#latest
+            // With the following line uncommented, I get 
+            // Uncaught TypeError: Cannot read properties of undefined (reading '0')
+            //delete d.columns;
+            // It seems to be due to this line:
+            //n.page.info().serverSide && n.on("preXhr.DT", function(t, e, n) {
+            //n.columns[i._idx].columnControl || (n.columns[i._idx].columnControl = {});
+            d._extraParam = "hello";
+            return d;
+          }
+        },
+        columns: [
+          { data: "a", title: "a" },
+          { data: "b", title: "b" },
+          { data: "c", title: "c" }
+        ],
+        columnControl: [
+          {
+            target: 0,
+            content: ['order']
+          },
+          {
+            target: 1,
+            content: ['search']
+          }
+        ],
+        ordering: {
+            indicators: false,
+            handler: false
+        }
+      });
+    });
+
+  </script>
+</body>
+</html>
