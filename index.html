@@ -15,6 +15,9 @@
       margin: 1em;
       margin-top: 0.5em;
     }
+    h1 {
+      font-size: 1em;
+    }
     button {
       background-color: white;
       border: 1px solid black;
@@ -68,7 +71,10 @@
     .dataTables_wrapper .dataTables_paginate {
       float: left;
       text-align: right;
-  }
+    }
+    .dataTables_wrapper .dataTables_paginate .ellipsis {
+      padding: 0em;
+    }
 
     table.dataTable td {
       text-align: center;
@@ -83,11 +89,13 @@
       padding: 1px;
     }
 
+    /* Move processing indicator to top of page */
     div.dataTables_processing {
       z-index: 101;
       top: 0px;
     }
 
+    /* Scrollbar styling */
     /* https://simurai.com/blog/2011/07/26/webkit-scrollbar */
     .dataTables_scrollBody::-webkit-scrollbar {
       -webkit-appearance: none;
@@ -98,9 +106,7 @@
       background-color: rgba(0,0,0,.5);
       box-shadow: 0 0 1px rgba(255,255,255,.5);
     }
-    h1 {
-      font-size: 1em;
-    }
+
     /* https://stackoverflow.com/a/63507769 */
     #table1 {
       transform: rotateX(180deg);
@@ -160,25 +166,25 @@
         destroy(tableID);
       }
 
-      checkQueryString('values');
       const config = await getConfig();
-      checkQueryString('cols');
+      checkQueryString(config);
 
       const renderTableMetadata = window.renderTableMetadata ? window.renderTableMetadata : null;
       const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : "";
       $('#tableMetadata').html(tableMetadata);
 
-      // Add header names to table. Two rows are added.
-      // The first row is for name and sorting, second row is for filtering.
-      $('#table1').append('<thead><tr></tr><tr></tr></thead>');
-      //$('#table1').append('<thead><tr></tr></thead>');
-      let tr1 = $('#table1 > thead > tr:eq(1)');
-      for (let i = 0; i < config.columns.length; i++) {
-        tr1.append(`<th>${config.columns[i]['name']}</th>`);
-      }
-      let tr2 = $('#table1 > thead > tr:eq(0)');
-      for (let i = 0; i < config.columns.length; i++) {
-        tr2.append(`<th></th>`);
+      if (true) {
+        // Add header names to table. Two rows are added.
+        // The first row is for name and sorting, second row is for filtering.
+        $('#table1').append('<thead><tr></tr><tr></tr></thead>');
+        let tr1 = $('#table1 > thead > tr:eq(1)');
+        for (let i = 0; i < config.columns.length; i++) {
+          tr1.append(`<th>${config.columns[i]['name']}</th>`);
+        }
+        let tr2 = $('#table1 > thead > tr:eq(0)');
+        for (let i = 0; i < config.columns.length; i++) {
+          tr2.append(`<th></th>`);
+        }
       }
 
       // Make the added header search row fixed b/c the fixedColumns plugin
@@ -188,9 +194,6 @@
         .css('left', '0px')
         .css('z-index', '101')
         .css('background-color', 'white');
-
-      // Create table body
-      $('#table1').append('<tbody></tbody>');
 
       // https://datatables.net/reference/option/
       let dataTableOptions =
@@ -283,6 +286,7 @@
       console.log("Set search.")
 
       setEvents('#table1');
+      adjustDOM('#table1');
 
       console.log("dtInitComplete() finished.")
     }
@@ -526,43 +530,10 @@
       })
 
       console.log('setEvents() => Setting draw.dt and triggering it.')
-      const table_paginate = `${tableID}_paginate`;
       _emptyColumns = emptyColumns(tableID);
       $(tableID)
         .on('draw.dt', function () {
           console.log('setEvents() => draw.dt triggered.')
-
-          let qs = parseQueryString();
-          const numSearchKeys = Object.keys(qs).filter(k => !k.startsWith('_')).length;
-          if (numSearchKeys > 0) {
-            console.log(`setEvents() => draw.dt => There are ${numSearchKeys} search terms in the query string. Showing Clear button.`)
-            $('#clearAllSearches').show();
-          } else {
-            console.log("setEvents() => draw.dt => There are no search terms in the query string. Hiding Clear button.")
-            $('#clearAllSearches').hide();
-          }
-
-          // Hide paging if only one page.
-          if ($(tableID).dataTable().api().page.info().pages === 1) {
-            console.log("setEvents() => draw.dt => Hiding pagination b/c only one page.")
-            $(table_paginate).hide();
-          } else {
-            console.log("setEvents() => draw.dt => Showing pagination b/c multiple pages.")
-            $(table_paginate).show();
-          }
-
-          const info = $(tableID).DataTable().page.info();
-          if (info.pages > 0) {
-            const _page = getQueryValue("_page")
-            console.log(`setEvents() => draw.dt =>  _page = ${_page}, info.pages = ${info.pages}`)
-            if (_page) {
-              if (parseInt(_page) > info.pages) {
-                console.log(`setEvents() => draw.dt =>  _page = ${_page} > info.pages = ${info.pages}. Setting _page to ${info.pages} and drawing page ${info.pages-1}.`)
-                updateQueryString('_page', info.pages);
-                $(tableID).DataTable().page(info.pages-1).draw('page');
-              }
-            }
-          }
 
           console.log("setEvents() => draw.dt => Calling adjustDOM()")
           adjustDOM(tableID);
@@ -580,8 +551,6 @@
             init()
           }
         })
-        .trigger('draw.dt');
-        // trigger() above needed for initial load.
 
       console.log("setEvents() => Setting click event for hideEmptyColumns checkbox.")
       $('#hideEmptyColumns').click(function() {
@@ -631,6 +600,14 @@
       txt += `${colInfo}.`
       $(table_info).text(txt);
       $(table_paginate).insertAfter(table_filter);
+      // Hide paging if only one page.
+      if ($(tableID).dataTable().api().page.info().pages === 1) {
+        console.log("setEvents() => draw.dt => Hiding pagination b/c only one page.")
+        $(table_paginate).hide();
+      } else {
+        console.log("setEvents() => draw.dt => Showing pagination b/c multiple pages.")
+        $(table_paginate).show();
+      }
 
       let select = $(`${table_length} select`)
       select.appendTo(table_length)
@@ -652,6 +629,28 @@
         const html = next.html();
         if (html) {
           next.html(html.replace('Next','▶'));
+        }
+      }
+
+      let qs = parseQueryString();
+      const numSearchKeys = Object.keys(qs).filter(k => !k.startsWith('_')).length;
+      if (numSearchKeys > 0) {
+        console.log(`setEvents() => draw.dt => There are ${numSearchKeys} search terms in the query string. Showing Clear button.`)
+        $('#clearAllSearches').show();
+      } else {
+        console.log("setEvents() => draw.dt => There are no search terms in the query string. Hiding Clear button.")
+        $('#clearAllSearches').hide();
+      }
+
+      if (info.pages > 0) {
+        const _page = getQueryValue("_page")
+        console.log(`setEvents() => draw.dt =>  _page = ${_page}, info.pages = ${info.pages}`)
+        if (_page) {
+          if (parseInt(_page) > info.pages) {
+            console.log(`setEvents() => draw.dt =>  _page = ${_page} > info.pages = ${info.pages}. Setting _page to ${info.pages} and drawing page ${info.pages-1}.`)
+            updateQueryString('_page', info.pages);
+            $(tableID).DataTable().page(info.pages-1).draw('page');
+          }
         }
       }
 
@@ -712,22 +711,6 @@
       return columnEmpty;
     }
 
-    function _columnNameMap(config, invert) {
-      // Create a map from column name to index
-      const columnNameMap = {};
-      for (let i = 0; i < config.columns.length; i++) {
-        columnNameMap[config.columns[i].name] = i;
-      }
-      if (!invert) {
-        return columnNameMap;
-      }
-      let invertedColumnNameMap = {};
-      for (const [key, value] of Object.entries(columnNameMap)) {
-        invertedColumnNameMap[value] = key;
-      }
-      return invertedColumnNameMap;
-    }
-
     function destroy(tableID) {
       console.log("destroy() called.")
 
@@ -784,70 +767,82 @@
       return qs[name];
     }
 
-    function checkQueryString(what) {
+    function checkQueryString(config) {
       console.log("checkQueryString() => Checking query string for invalid column names.");
 
-      let config = getConfig.config;
       let qs = parseQueryString();
       console.log("checkQueryString() => Query string:")
       console.log(qs);
-      if (what === 'keys') {
-        console.log("checkQueryString() => what = 'keys'. Checking keys but not values in query string.");
-        let alerted = false;
-        for (const [key, val] of Object.entries(qs)) {
-          if (key.startsWith('_')) {
-            console.log(`  found state parameter '${key}' in query string. Leaving it.`);
-            continue;
+      let columnNameMap = _columnNameMap(config);
+
+      console.log("checkQueryString() => what = 'keys'. Checking keys but not values in query string.");
+      let alerted = false;
+      for (const [key, val] of Object.entries(qs)) {
+        if (key.startsWith('_')) {
+          console.log(`  found state parameter '${key}' in query string. Leaving it.`);
+          continue;
+        }
+        if (key in columnNameMap) {
+          console.log(`checkQueryString() => Found valid key = '${key}' in query string.`);
+        } else {
+          console.log(`checkQueryString() => Found invalid key = '${key}' in query string. Removing it.`);
+          if (alerted === false) {
+            alerted = true;
+            alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
           }
-          if (config.columnNames.includes(key)) {
-            console.log(`checkQueryString() => Found valid key = '${key}' in query string.`);
-          } else {
-            console.log(`checkQueryString() => Found invalid key = '${key}' in query string. Removing it.`);
-            if (alerted === false) {
-              alerted = true;
-              alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`);
-            }
-            updateQueryString(key, null);
-          }
+          updateQueryString(key, null);
         }
       }
 
-      if ('what' === 'cols') {
-        console.log("checkQueryString() => what = 'cols'. Checking only _cols parameter in query string.");
-        let columnNames = getQueryValue('_cols');
-        if (!columnNames) {
-          console.log("checkQueryString() => No _cols in query string. Leaving it.")
-          return;
-        }
-        let columnNameMap = _columnNameMap(config);
-        columnNames = columnNames.split(',');
-        let updateHash = false;
-        for (let i = 0; i < columnNames.length; i++) {
-          let colName = columnNames[i];
-          if (colName in columnNameMap) {
-            continue;
-          } else {
-            console.log(`checkQueryString() => Column name '${colName}' not found in config.columnDefs.`);
-            if (!updateHash) {
-              alert(`checkQueryString() => Column name in query string not found: "${colName}". Removing it and any other invalid column names from query string.`);
-            }
-            updateHash = true;
-            delete columnNames[i];
+      console.log("checkQueryString() => what = 'cols'. Checking only _cols parameter in query string.");
+      let columnNames = getQueryValue('_cols');
+      if (!columnNames) {
+        console.log("checkQueryString() => No _cols in query string. Leaving it.")
+        return;
+      }
+
+      columnNames = columnNames.split(',');
+      let updateHash = false;
+      for (let i = 0; i < columnNames.length; i++) {
+        let colName = columnNames[i];
+        if (colName in columnNameMap) {
+          continue;
+        } else {
+          console.log(`checkQueryString() => Column name '${colName}' not found in config.columnDefs.`);
+          if (!updateHash) {
+            alert(`checkQueryString() => Column name in query string not found: "${colName}". Removing it and any other invalid column names from query string.`);
           }
-        }
-        if (updateHash) {
-          console.log("checkQueryString() => Updating query string to remove invalid column names.")
-          columnNames = columnNames.filter(Boolean); // Remove any null/undefined values
-          console.log(columnNames)
-          updateQueryString('_cols', columnNames.join(','));
+          updateHash = true;
+          delete columnNames[i];
         }
       }
+      if (updateHash) {
+        console.log("checkQueryString() => Updating query string to remove invalid column names.")
+        columnNames = columnNames.filter(Boolean); // Remove any null/undefined values
+        console.log(columnNames)
+        updateQueryString('_cols', columnNames.join(','));
+      }
+
+      function _columnNameMap(config, invert) {
+        // Create a map from column name to index
+        const columnNameMap = {};
+        for (let i = 0; i < config.columns.length; i++) {
+          columnNameMap[config.columns[i].name] = i;
+        }
+        if (!invert) {
+          return columnNameMap;
+        }
+        let invertedColumnNameMap = {};
+        for (const [key, value] of Object.entries(columnNameMap)) {
+          invertedColumnNameMap[value] = key;
+        }
+        return invertedColumnNameMap;
+      }
+
     }
 
     function setQueryStringFromSearch() {
       console.log("setQueryStringFromSearch() called. Stepping through column search inputs.");
-      // Check query string for invalid column names
-      checkQueryString();
       // Step through column search inputs and update query string
       // Highlight inputs with search values and remove highlight for
       // inputs with no search value.

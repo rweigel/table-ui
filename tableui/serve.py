@@ -156,7 +156,6 @@ def _api_init(app, apiconfig):
       data_verbose = []
       for row in data:
         data_verbose.append({dbinfo['column_names'][i]: row[i] for i in range(0, len(dbinfo['column_names']))})
-        #data_verbose.append({dbinfo['column_names'][i]: row[i] for i in range(0, 3)})
       return data_verbose
 
     verbose_data = False
@@ -167,6 +166,7 @@ def _api_init(app, apiconfig):
         logger.info("Reading and sending: " + dbinfo['jsondb']['body'])
         data = json.load(f)
         data = _data_transform(data, verbose_data)
+        print(data)
         return fastapi.responses.JSONResponse({"data": data})
 
     result = _query(dbinfo, query_params=query_params)
