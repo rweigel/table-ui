@@ -4,7 +4,7 @@
 
 <head>
   <meta charset="UTF-8">
-    <title>__TABLENAME__</title>
+    <title></title>
     <link rel="icon" href="img/favicon.svg">
     <link href="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.css" rel="stylesheet"/>
     <script src="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.js"></script>
@@ -232,6 +232,7 @@
 
       console.log("dtInitComplete() => DOM is ready.")
 
+      // Set initial page in page selector
       //$("#table1").DataTable().page(getQueryValue('_page', 1)-1).draw('page');
 
       const table = $('#table1').dataTable();
@@ -283,7 +284,6 @@
           }
           visibleIndex++;
         });
-      console.log("Set search.")
 
       setEvents('#table1');
       adjustDOM('#table1');
@@ -305,15 +305,13 @@
       let resp = await fetch(url);
       const config = await resp.json();
 
-      const tableName = $('title').text();
-      config.tableName = tableName;
+      const tableName = $('title').text(config.tableUI.tableName);
 
       let columnNames = [];
       if (!config['columns']) {
         console.log("getConfig() => Getting header")
         columnNames = await getHeader();
       }
-      config.columnNames = columnNames;
 
       if (!config['columns']) {
         _columns(columnNames);
@@ -322,8 +320,7 @@
       // Update config['pageLength'] and config['lengthMenu'] as needed.
       _pageLength(config);
 
-      config['displayStart'] = config['pageLength'] * getQueryValue('_page', 1);
-
+      config['displayStart'] = config['pageLength'] * (-1 + parseInt(getQueryValue('_page', 1)));
       // Why is this needed when config['serverSide'] = false?
       config['ajax'] = window.location.pathname + "data/";
 
@@ -431,13 +428,22 @@
 
         let renderColumnFunction = window.renderColumn ? window.renderColumn : null;
         config['columns'] = [];
+        const qs = parseQueryString();
+        config['searchCols'] = [];
         for (let i = 0; i < columnNames.length; i++) {
           let visible = columnEmpty ? columnEmpty[i] === false : true;
           config['columns'].push({
             "name": columnNames[i],
+            "title": columnNames[i],
+            //"data": columnNames[i],
             "targets": i,
             "visible": allVisible || _cols.includes(columnNames[i])
           });
+          if (columnNames[i] in qs) {
+            config['searchCols'].push({'search': qs[columnNames[i]]})
+          } else {
+          config['searchCols'].push(null);
+          }
           // ellipsis.js plug-in
           // config['columns'][i]['render'] = DataTable.render.ellipsis( 10 )
           if (renderColumnFunction) {
@@ -452,10 +458,11 @@
       function _ajaxData(dtp) {
         console.log("config['ajax'] callback. Preparing query parameters for AJAX search using dtp object:");
         console.log(dtp);
-
+        const config = getConfig.config;
+        const columnObject = array2object(config.columns, 'name');
         let qs = parseQueryString();
         for (const [key, val] of Object.entries(qs)) {
-          if (!(key in dtp) && config.columnNames.includes(key)) {
+          if (!(key in dtp) && (key in columnObject)) {
             console.log(`_ajaxData() => Adding ${key} = '${val}' from query string to dtp object.`);
             dtp[key] = val;
           }
@@ -500,9 +507,10 @@
       $(tableID).off('search.dt');
       $(tableID).on('search.dt', function (event) {
         console.log('setEvents() => search.dt triggered')
-        //updateQueryString('_page', null);
+        updateQueryString('_page', null);
+        $("#table1").DataTable().page(0);
         setQueryStringFromSearch()
-      });
+      })
 
       $(tableID).on('stateSaveParams.dt', function (e, settings, data) {})
 
@@ -512,7 +520,11 @@
         console.log('setEvents() => page.dt triggered')
         const info = $(tableID).DataTable().page.info();
         $('#pageInfo').html('Showing page: ' + info.page + ' of ' + info.pages);
-        updateQueryString('_page', info.page + 1);
+        if (info.page > 0) {
+          updateQueryString('_page', info.page + 1);
+        } else {
+          updateQueryString('_page', null);
+        }
         pageChanged = true;
       });
 
@@ -773,16 +785,16 @@
       let qs = parseQueryString();
       console.log("checkQueryString() => Query string:")
       console.log(qs);
-      let columnNameMap = _columnNameMap(config);
+      let columnObject = array2object(config.columns, 'name');
 
       console.log("checkQueryString() => what = 'keys'. Checking keys but not values in query string.");
       let alerted = false;
       for (const [key, val] of Object.entries(qs)) {
         if (key.startsWith('_')) {
-          console.log(`  found state parameter '${key}' in query string. Leaving it.`);
+          console.log(`checkQueryString() => found state parameter '${key}' in query string. Leaving it.`);
           continue;
         }
-        if (key in columnNameMap) {
+        if (key in columnObject) {
           console.log(`checkQueryString() => Found valid key = '${key}' in query string.`);
         } else {
           console.log(`checkQueryString() => Found invalid key = '${key}' in query string. Removing it.`);
@@ -795,74 +807,69 @@
       }
 
       console.log("checkQueryString() => what = 'cols'. Checking only _cols parameter in query string.");
-      let columnNames = getQueryValue('_cols');
-      if (!columnNames) {
+      let _cols = getQueryValue('_cols');
+      if (!_cols) {
         console.log("checkQueryString() => No _cols in query string. Leaving it.")
         return;
       }
 
-      columnNames = columnNames.split(',');
+      _cols = _cols.split(',');
       let updateHash = false;
-      for (let i = 0; i < columnNames.length; i++) {
-        let colName = columnNames[i];
-        if (colName in columnNameMap) {
+      for (let i = 0; i < _cols.length; i++) {
+        let columnName = _cols[i];
+        if (columnName in columnObject) {
           continue;
         } else {
-          console.log(`checkQueryString() => Column name '${colName}' not found in config.columnDefs.`);
+          console.log(`checkQueryString() => Column name '${columnName}' not found in config.columnDefs.`);
           if (!updateHash) {
             alert(`checkQueryString() => Column name in query string not found: "${colName}". Removing it and any other invalid column names from query string.`);
           }
           updateHash = true;
-          delete columnNames[i];
+          delete _cols[i];
         }
       }
       if (updateHash) {
         console.log("checkQueryString() => Updating query string to remove invalid column names.")
-        columnNames = columnNames.filter(Boolean); // Remove any null/undefined values
-        console.log(columnNames)
-        updateQueryString('_cols', columnNames.join(','));
+        _cols = columnNames.filter(Boolean); // Remove any null/undefined values
+        console.log(_cols)
+        updateQueryString('_cols', _cols.join(','));
       }
+    }
 
-      function _columnNameMap(config, invert) {
-        // Create a map from column name to index
-        const columnNameMap = {};
-        for (let i = 0; i < config.columns.length; i++) {
-          columnNameMap[config.columns[i].name] = i;
-        }
-        if (!invert) {
-          return columnNameMap;
-        }
-        let invertedColumnNameMap = {};
-        for (const [key, value] of Object.entries(columnNameMap)) {
-          invertedColumnNameMap[value] = key;
-        }
-        return invertedColumnNameMap;
+    function array2object(arr, key) {
+      if (!key) {
+        key = 'name';
       }
-
+      // Create a map from column name to index
+      const obj = {};
+      for (let i = 0; i < arr.length; i++) {
+        obj[arr[i][key]] = arr[i];
+      }
+      return obj;
     }
 
     function setQueryStringFromSearch() {
-      console.log("setQueryStringFromSearch() called. Stepping through column search inputs.");
+      console.log("setQueryStringFromSearch() => Stepping through column search inputs.");
       // Step through column search inputs and update query string
       // Highlight inputs with search values and remove highlight for
       // inputs with no search value.
       let searchValue;
       let inputs = $('.dataTables_scrollHead input.columnSearch');
-      console.log(`Reading ${inputs.length} column search inputs.`);
+      console.log(`setQueryStringFromSearch() => Reading ${inputs.length} column search inputs.`);
       for (let input of inputs) {
         let name = $(input).attr('name');
         searchValue = $(input).val();
         if (searchValue) {
-          console.log(`Found search value for column '${name}'. Updating query string and highlighting input.`);
+          console.log(`setQueryStringFromSearch() => Found search value for column '${name}'. Updating query string and highlighting input.`);
           $(input).css('background-color', 'yellow');
-          console.log(`Updating query string with search value for column '${name}' = '${searchValue}'.`);
+          console.log(`setQueryStringFromSearch() => Updating query string with search value for column '${name}' = '${searchValue}'.`);
           updateQueryString(name, searchValue);
         } else {
           //console.log(`No search value for column '${name}'.`);
           $(input).css('background-color', '');
           let qs = parseQueryString();
           if (qs[name]) {
-            console.log(` Found ${name} in query string. Removing from query string.`);
+            console.log(`setQueryStringFromSearch() => Found ${name} in query string. Removing from query string.`);
             updateQueryString(name, null);
           }
         }

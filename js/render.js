@@ -1,12 +1,11 @@
 function renderColumn (columnName, tableConfig) {
-
   if (columnName === 'datasetID') {
     _renderColumn.columnName = columnName
     _renderColumn.tableConfig = tableConfig
-    if (tableConfig.tableName.startsWith('cdaweb')) {
+    if (tableConfig.tableUI.tableName.startsWith('cdaweb')) {
       return _renderColumn
     }
-    if (tableConfig.tableName.startsWith('spase')) {
+    if (tableConfig.tableUI.tableName.startsWith('spase')) {
       return _renderColumn
     }
   }

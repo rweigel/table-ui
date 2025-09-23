@@ -116,7 +116,7 @@ def _api_init(app, apiconfig):
     logger.info("Reading: " + fname)
     with open(fname) as f:
       indexhtml_ = f.read()
-    indexhtml_ = indexhtml_.replace("__TABLENAME__", dbinfo['table_name'])
+    #indexhtml_ = indexhtml_.replace("__TABLENAME__", dbinfo['table_name'])
     return fastapi.responses.HTMLResponse(indexhtml_)
 
   @app.route("/config", methods=["GET", "HEAD"])
@@ -131,6 +131,8 @@ def _api_init(app, apiconfig):
       content['tableUI']['sqldb'] = dbinfo["sqldb"]
     if "jsondb" in dbinfo:
       content['tableUI']['jsondb'] = dbinfo["jsondb"]
+    if "table_name" in dbinfo:
+      content['tableUI']['tableName'] = dbinfo["table_name"]
     return fastapi.responses.JSONResponse(content=content)
 
   @app.route("/render.js", methods=["GET", "HEAD"])
