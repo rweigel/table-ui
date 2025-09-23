@@ -132,7 +132,7 @@ def _api_init(app, apiconfig):
     if "jsondb" in dbinfo:
       content['tableUI']['jsondb'] = dbinfo["jsondb"]
     if "table_name" in dbinfo:
-      content['tableUI']['tableName'] = dbinfo["table_name"]
+      content['tableUI']['name'] = dbinfo["table_name"]
     return fastapi.responses.JSONResponse(content=content)
 
   @app.route("/render.js", methods=["GET", "HEAD"])

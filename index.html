@@ -305,7 +305,7 @@
       let resp = await fetch(url);
       const config = await resp.json();
 
-      const tableName = $('title').text(config.tableUI.tableName);
+      const tableName = $('title').text(config.tableUI.name);
 
       let columnNames = [];
       if (!config['columns']) {
