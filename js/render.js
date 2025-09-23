@@ -1,4 +1,5 @@
 function renderColumn (columnName, tableConfig) {
+
   if (columnName === 'datasetID') {
     _renderColumn.columnName = columnName
     _renderColumn.tableConfig = tableConfig

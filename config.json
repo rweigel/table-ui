@@ -17,8 +17,6 @@
     "smart": false,
     "return": true
   },
-  "columnDefs": null,
-  "searchCols": null,
   "tableUI": {
     "tableMetadata": {
       "description": "Demo table",
