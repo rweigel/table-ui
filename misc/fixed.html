@@ -8,35 +8,23 @@
   <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/4.0.1/css/fixedHeader.dataTables.min.css"/>
   <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/5.0.0/css/fixedColumns.dataTables.min.css"/>
   <style>
-    body { font-family: sans-serif; margin: 2em; }
     th, td { white-space: nowrap; }
-    div.dataTables_wrapper {
-      width: 800px;
-      margin: 0 auto;
-    }
     .dt-scroll-head::-webkit-scrollbar {
       -webkit-appearance: none;
+      height: 10px;
       width: 1px;
     }
     .dt-scroll-head::-webkit-scrollbar-thumb {
-      border-radius: 1px;
+      border-radius: 10px;
       background-color: rgba(0,0,0,.5);
       box-shadow: 0 0 1px rgba(255,255,255,.5);
     }
-    /* Hide the top scrollbar for the fixed left columns */
-    .dtfc-fixed-left .dt-scroll-head {
-      overflow-x: hidden !important;
-    }
 
-    /* Show the top scrollbar only for the scrollable columns */
-    .dtfc-scroll .dt-scroll-head {
-      overflow-x: scroll !important;
-    }
   </style>
 </head>
 <body>
   <h2>DataTables: FixedHeader &amp; FixedColumns Example (AJAX)</h2>
-  <table id="example" class="display nowrap" style="width:100%">
+    <table id="example" class="display nowrap" style="width:100%">
     <thead>
       <tr>
         <th>First name</th>
@@ -47,6 +35,14 @@
         <th>Salary</th>
         <th>Extn.</th>
         <th>E-mail</th>
+        <th>First name2</th>
+        <th>Last name2</th>
+        <th>Position2</th>
+        <th>Office2</th>
+        <th>Start date2</th>
+        <th>Salary2</th>
+        <th>Extn.2</th>
+        <th>E-mail2</th>
       </tr>
     </thead>
     <!-- No <tbody> needed, DataTables will populate it -->
@@ -65,8 +61,7 @@
         fixedColumns: true,
         ajax: function(data, callback, settings) {
           // Simulate AJAX response
-          callback({
-            data: [
+          data = [
               ["Tiger", "Nixon", "System Architect", "Edinburgh", "2011/04/25", "$320,800", "5421", "t.nixon@datatables.net"],
               ["Garrett", "Winters", "Accountant", "Tokyo", "2011/07/25", "$170,750", "8422", "g.winters@datatables.net"],
               ["Ashton", "Cox", "Junior Technical Author", "San Francisco", "2009/01/12", "$86,000", "1562", "a.cox@datatables.net"],
@@ -78,7 +73,10 @@
               ["Colleen", "Hurst", "Javascript Developer", "San Francisco", "2009/09/15", "$205,500", "2360", "c.hurst@datatables.net"],
               ["Sonya", "Frost", "Software Engineer", "Edinburgh", "2008/12/13", "$103,600", "1667", "s.frost@datatables.net"]
             ]
-          });
+          for (let i=0; i<data.length; i++) {
+            data[i] = data[i].concat(data[i]); // duplicate to make table wider
+          }
+          callback({data: data});
         },
         initComplete: function() {
           $('.dt-scroll-head')
