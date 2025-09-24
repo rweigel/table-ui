@@ -105,7 +105,7 @@ def _api_init(app, apiconfig):
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles
-  for dir in ['js', 'css', 'img', 'demo']:
+  for dir in ['js', 'css', 'img', 'demo', 'misc']:
     directory = os.path.join(root_dir, dir)
     app.mount(f"/{dir}/", StaticFiles(directory=directory))
 

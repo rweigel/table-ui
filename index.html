@@ -15,6 +15,8 @@
       margin: 1em;
       margin-top: 0.5em;
     }
+    /*th, td { white-space: nowrap; }*/
+
     h1 {
       font-size: 1em;
     }
@@ -95,6 +97,7 @@
       top: 0px;
     }
 
+    /*
     /* Scrollbar styling */
     /* https://simurai.com/blog/2011/07/26/webkit-scrollbar */
     .dataTables_scrollBody::-webkit-scrollbar {
@@ -108,6 +111,9 @@
     }
 
     /* https://stackoverflow.com/a/63507769 */
+    /* See also 
+    /* https://datatables.net/forums/discussion/72111/how-can-i-make-the-x-scroller-fixed-sticky*/
+    /* For options that may be better for when the header is stick */
     #table1 {
       transform: rotateX(180deg);
       overflow-x: auto;
@@ -189,11 +195,14 @@
 
       // Make the added header search row fixed b/c the fixedColumns plugin
       // does not seem to "see" the extra row.
-      $(`#table1 thead tr:eq(0) > th:eq(0)`)
-        .css('position', 'sticky')
-        .css('left', '0px')
-        .css('z-index', '101')
-        .css('background-color', 'white');
+      // Needed?
+      if (true) {
+        $(`#table1 thead tr:eq(0) > th:eq(0)`)
+          .css('position', 'sticky')
+          .css('left', '0px')
+          .css('z-index', '101')
+          .css('background-color', 'white');
+      }
 
       // https://datatables.net/reference/option/
       let dataTableOptions =
@@ -257,8 +266,6 @@
         // Create `select` element
         let index = this.index();
         let name = config.columns[index]['name'];
-        //console.log(`  Setting search input for column ${index} named '${name}'. Visible: ${config.columnDefs[index].visible}`);
-
         // Note that the header table does not have an id. It should.
         $("thead tr:eq(0) > th").eq(visibleIndex).html('');
         let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
@@ -435,7 +442,7 @@
           config['columns'].push({
             "name": columnNames[i],
             "title": columnNames[i],
-            //"data": columnNames[i],
+            //"data": columnNames[i], // Needed if verbose data response
             "targets": i,
             "visible": allVisible || _cols.includes(columnNames[i])
           });
@@ -504,7 +511,7 @@
     function setEvents(tableID) {
 
       console.log('setEvents() => Setting search.dt.')
-      $(tableID).off('search.dt');
+      $(tableID).off('search.dt').off('search.dt');
       $(tableID).on('search.dt', function (event) {
         console.log('setEvents() => search.dt triggered')
         updateQueryString('_page', null);
@@ -516,7 +523,7 @@
 
       console.log('setEvents() => Setting page.dt.')
       let pageChanged = false;
-      $(tableID).on('page.dt', function () {
+      $(tableID).off('page.dt').on('page.dt', function () {
         console.log('setEvents() => page.dt triggered')
         const info = $(tableID).DataTable().page.info();
         $('#pageInfo').html('Showing page: ' + info.page + ' of ' + info.pages);
@@ -530,20 +537,21 @@
 
       console.log('setEvents() => Setting length.dt.')
       let lengthChanged = false;
-      $(tableID).on('length.dt', function (e, settings, len) {
+      $(tableID).off('length.dt').on('length.dt', function (e, settings, len) {
         console.log('setEvents() => length.dt triggered')
         updateQueryString('_length', len);
         lengthChanged = true;
       })
 
       console.log('setEvents() => Setting preDraw.dt.')
-      $(tableID).on('preDraw.dt', function () {
+      $(tableID).off('preDraw.dt').on('preDraw.dt', function () {
         console.log('setEvents() => preDraw.dt triggered')
       })
 
       console.log('setEvents() => Setting draw.dt and triggering it.')
       _emptyColumns = emptyColumns(tableID);
       $(tableID)
+        .off('draw.dt')
         .on('draw.dt', function () {
           console.log('setEvents() => draw.dt triggered.')
 
@@ -565,6 +573,7 @@
         })
 
       console.log("setEvents() => Setting click event for hideEmptyColumns checkbox.")
+      $('#hideEmptyColumns').unbind('click');
       $('#hideEmptyColumns').click(function() {
         const table = $(tableID).dataTable();
         if ($(this).is(':checked')) {
@@ -724,24 +733,20 @@
     }
 
     function destroy(tableID) {
-      console.log("destroy() called.")
+      console.log("destroy() => Called.")
 
       let tableWrapper = $(tableID + "_wrapper");
       if (tableWrapper.length > 0) {
-        console.log(`Destroying table ${tableID}`)
-        // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
-        $(tableID).off('page.dt');
-        $(tableID).off('length.dt');
-        $(tableID).off('preDraw.dt')
-        $(tableID).off('draw.dt');
+        console.log(`destroy() => Destroying table ${tableID}`)
         $('#tableMetadata').empty();
         $('#table1_length').remove();
+        // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
         $(tableID).DataTable().state.clear();
         $(tableID).DataTable().destroy();
-        tableWrapper.remove();
-        $(tableID).empty();
-        $('#hideEmptyColumns').unbind();
-        console.log(`Destroyed table ${tableID}`)
+        tableWrapper.remove(); // Needed?
+        $(tableID).empty(); // Needed?
+      } else {
+        console.log(`destroy() => No table ${tableID} to destroy.`)
       }
     }
 

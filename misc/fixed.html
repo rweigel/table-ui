@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- This does not have the problem with the first header having an odd scroll issue, but requires dattables 2, which breaks things. -->
+  <meta charset="UTF-8">
+  <title>DataTables FixedHeader & FixedColumns Example (AJAX)</title>
+  <link rel="stylesheet" href="https://cdn.datatables.net/2.3.4/css/dataTables.dataTables.min.css"/>
+  <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/4.0.1/css/fixedHeader.dataTables.min.css"/>
+  <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/5.0.0/css/fixedColumns.dataTables.min.css"/>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    th, td { white-space: nowrap; }
+    div.dataTables_wrapper {
+      width: 800px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <h2>DataTables: FixedHeader &amp; FixedColumns Example (AJAX)</h2>
+  <table id="example" class="display nowrap" style="width:100%">
+    <thead>
+      <tr>
+        <th>First name</th>
+        <th>Last name</th>
+        <th>Position</th>
+        <th>Office</th>
+        <th>Start date</th>
+        <th>Salary</th>
+        <th>Extn.</th>
+        <th>E-mail</th>
+      </tr>
+    </thead>
+    <!-- No <tbody> needed, DataTables will populate it -->
+  </table>
+
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/2.3.4/js/dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/fixedheader/4.0.1/js/dataTables.fixedHeader.min.js"></script>
+  <script src="https://cdn.datatables.net/fixedcolumns/5.0.0/js/dataTables.fixedColumns.min.js"></script>
+  <script>
+    $(document).ready(function() {
+      $('#example').DataTable({
+        scrollX: true,
+        scrollY: true,
+        fixedHeader: true,
+        fixedColumns: true,
+        ajax: function(data, callback, settings) {
+          // Simulate AJAX response
+          callback({
+            data: [
+              ["Tiger", "Nixon", "System Architect", "Edinburgh", "2011/04/25", "$320,800", "5421", "t.nixon@datatables.net"],
+              ["Garrett", "Winters", "Accountant", "Tokyo", "2011/07/25", "$170,750", "8422", "g.winters@datatables.net"],
+              ["Ashton", "Cox", "Junior Technical Author", "San Francisco", "2009/01/12", "$86,000", "1562", "a.cox@datatables.net"],
+              ["Cedric", "Kelly", "Senior Javascript Developer", "Edinburgh", "2012/03/29", "$433,060", "6224", "c.kelly@datatables.net"],
+              ["Airi", "Satou", "Accountant", "Tokyo", "2008/11/28", "$162,700", "5407", "a.satou@datatables.net"],
+              ["Brielle", "Williamson", "Integration Specialist", "New York", "2012/12/02", "$372,000", "4804", "b.williamson@datatables.net"],
+              ["Herrod", "Chandler", "Sales Assistant", "San Francisco", "2012/08/06", "$137,500", "9608", "h.chandler@datatables.net"],
+              ["Rhona", "Davidson", "Integration Specialist", "Tokyo", "2010/10/14", "$327,900", "6200", "r.davidson@datatables.net"],
+              ["Colleen", "Hurst", "Javascript Developer", "San Francisco", "2009/09/15", "$205,500", "2360", "c.hurst@datatables.net"],
+              ["Sonya", "Frost", "Software Engineer", "Edinburgh", "2008/12/13", "$103,600", "1667", "s.frost@datatables.net"]
+            ]
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
