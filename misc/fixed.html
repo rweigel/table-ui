@@ -19,12 +19,18 @@
       background-color: rgba(0,0,0,.5);
       box-shadow: 0 0 1px rgba(255,255,255,.5);
     }
-
+    /* To add a new scrollbar above table, try
+    /* https://codepen.io/hellokatili/pen/yegxjP */
+    /* and also add margin on left so it does not overlap fixed columns */
   </style>
 </head>
 <body>
   <h2>DataTables: FixedHeader &amp; FixedColumns Example (AJAX)</h2>
-    <table id="example" class="display nowrap" style="width:100%">
+  <div id="container1" class="scroll-container" style="height:3em; overflow-x: auto;background: lightgrey; margin-bottom: 5px;">
+    <div style="width:2022px; height:10px;"></div>
+  </div>
+
+  <table id="example" class="display nowrap" style="width:100%">
     <thead>
       <tr>
         <th>First name</th>
@@ -88,7 +94,17 @@
           });
         }
       });
+
+      const container2 = $('.dt-scroll-head');
+      $('#container1 div').width($('#example').width());
+      container2.on('scroll', () => {
+        console.log('scroll')
+        $('#container1').scrollLeft(container2.scrollLeft());
+      });
     });
+  </script>
+  <script>
+
   </script>
 </body>
 </html>
