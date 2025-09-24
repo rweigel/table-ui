@@ -14,6 +14,24 @@
       width: 800px;
       margin: 0 auto;
     }
+    .dt-scroll-head::-webkit-scrollbar {
+      -webkit-appearance: none;
+      width: 1px;
+    }
+    .dt-scroll-head::-webkit-scrollbar-thumb {
+      border-radius: 1px;
+      background-color: rgba(0,0,0,.5);
+      box-shadow: 0 0 1px rgba(255,255,255,.5);
+    }
+    /* Hide the top scrollbar for the fixed left columns */
+    .dtfc-fixed-left .dt-scroll-head {
+      overflow-x: hidden !important;
+    }
+
+    /* Show the top scrollbar only for the scrollable columns */
+    .dtfc-scroll .dt-scroll-head {
+      overflow-x: scroll !important;
+    }
   </style>
 </head>
 <body>
@@ -60,6 +78,15 @@
               ["Colleen", "Hurst", "Javascript Developer", "San Francisco", "2009/09/15", "$205,500", "2360", "c.hurst@datatables.net"],
               ["Sonya", "Frost", "Software Engineer", "Edinburgh", "2008/12/13", "$103,600", "1667", "s.frost@datatables.net"]
             ]
+          });
+        },
+        initComplete: function() {
+          $('.dt-scroll-head')
+            .css({'overflow-x':'scroll'})
+            .on('scroll', function(e){
+              var scrollBody = $(this).parent().find('.dt-scroll-body').get(0);
+              scrollBody.scrollLeft = this.scrollLeft;
+              $(scrollBody).trigger('scroll');
           });
         }
       });
