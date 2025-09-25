@@ -9,25 +9,32 @@
   <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/5.0.0/css/fixedColumns.dataTables.min.css"/>
   <style>
     th, td { white-space: nowrap; }
-    .dt-scroll-head::-webkit-scrollbar {
+
+    .scroll-container::-webkit-scrollbar, .dt-scroll-head::-webkit-scrollbar {
       -webkit-appearance: none;
       height: 10px;
       width: 1px;
     }
-    .dt-scroll-head::-webkit-scrollbar-thumb {
+    .scroll-container::-webkit-scrollbar-thumb, .dt-scroll-head::-webkit-scrollbar-thumb {
       border-radius: 10px;
       background-color: rgba(0,0,0,.5);
       box-shadow: 0 0 1px rgba(255,255,255,.5);
     }
-    /* To add a new scrollbar above table, try
-    /* https://codepen.io/hellokatili/pen/yegxjP */
-    /* and also add margin on left so it does not overlap fixed columns */
-  </style>
+    .scroll-container {
+      position: sticky;
+      top: 0;
+      z-index: 105; /* above table header */
+      height: 10px;
+      overflow-x: auto;
+      background: lightgrey;
+      margin-bottom: 0px;
+    }
+</style>
 </head>
 <body>
   <h2>DataTables: FixedHeader &amp; FixedColumns Example (AJAX)</h2>
-  <div id="container1" class="scroll-container" style="height:3em; overflow-x: auto;background: lightgrey; margin-bottom: 5px;">
-    <div style="width:2022px; height:10px;"></div>
+  <div id="container1" class="scroll-container">
+    <div style="width:2022px; height:1px;"></div>
   </div>
 
   <table id="example" class="display nowrap" style="width:100%">
@@ -77,6 +84,16 @@
               ["Herrod", "Chandler", "Sales Assistant", "San Francisco", "2012/08/06", "$137,500", "9608", "h.chandler@datatables.net"],
               ["Rhona", "Davidson", "Integration Specialist", "Tokyo", "2010/10/14", "$327,900", "6200", "r.davidson@datatables.net"],
               ["Colleen", "Hurst", "Javascript Developer", "San Francisco", "2009/09/15", "$205,500", "2360", "c.hurst@datatables.net"],
+              ["Sonya", "Frost", "Software Engineer", "Edinburgh", "2008/12/13", "$103,600", "1667", "s.frost@datatables.net"],
+              ["Tiger", "Nixon", "System Architect", "Edinburgh", "2011/04/25", "$320,800", "5421", "t.nixon@datatables.net"],
+              ["Garrett", "Winters", "Accountant", "Tokyo", "2011/07/25", "$170,750", "8422", "g.winters@datatables.net"],
+              ["Ashton", "Cox", "Junior Technical Author", "San Francisco", "2009/01/12", "$86,000", "1562", "a.cox@datatables.net"],
+              ["Cedric", "Kelly", "Senior Javascript Developer", "Edinburgh", "2012/03/29", "$433,060", "6224", "c.kelly@datatables.net"],
+              ["Airi", "Satou", "Accountant", "Tokyo", "2008/11/28", "$162,700", "5407", "a.satou@datatables.net"],
+              ["Brielle", "Williamson", "Integration Specialist", "New York", "2012/12/02", "$372,000", "4804", "b.williamson@datatables.net"],
+              ["Herrod", "Chandler", "Sales Assistant", "San Francisco", "2012/08/06", "$137,500", "9608", "h.chandler@datatables.net"],
+              ["Rhona", "Davidson", "Integration Specialist", "Tokyo", "2010/10/14", "$327,900", "6200", "r.davidson@datatables.net"],
+              ["Colleen", "Hurst", "Javascript Developer", "San Francisco", "2009/09/15", "$205,500", "2360", "c.hurst@datatables.net"],
               ["Sonya", "Frost", "Software Engineer", "Edinburgh", "2008/12/13", "$103,600", "1667", "s.frost@datatables.net"]
             ]
           for (let i=0; i<data.length; i++) {
@@ -85,26 +102,20 @@
           callback({data: data});
         },
         initComplete: function() {
-          $('.dt-scroll-head')
-            .css({'overflow-x':'scroll'})
-            .on('scroll', function(e){
-              var scrollBody = $(this).parent().find('.dt-scroll-body').get(0);
-              scrollBody.scrollLeft = this.scrollLeft;
-              $(scrollBody).trigger('scroll');
+          const container1 = $('#container1');
+          const container2 = $('.dt-scroll-body');
+          const shift = $('#example_wrapper table thead tr th:eq(0)').outerWidth()
+          $('#container1 div').width($('#example').width() - shift);
+          $('#container1').css('margin-left', shift);
+          container1.insertBefore($('.dt-scroll'));
+          container1.on('scroll', () => {
+            console.log('#container1 scrollLeft', container1.scrollLeft());
+            container2.scrollLeft(container1.scrollLeft());
           });
         }
       });
 
-      const container2 = $('.dt-scroll-head');
-      $('#container1 div').width($('#example').width());
-      container2.on('scroll', () => {
-        console.log('scroll')
-        $('#container1').scrollLeft(container2.scrollLeft());
-      });
     });
-  </script>
-  <script>
-
   </script>
 </body>
 </html>
