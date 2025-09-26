@@ -26,6 +26,7 @@
       z-index: 105; /* above table header */
       height: 10px;
       overflow-x: auto;
+      background: white;
       /* Causes problems w/ syntax highlighting in Code
       @-moz-document url-prefix() {
         background: lightgrey;
@@ -62,12 +63,12 @@
         <th>E-mail2</th>
       </tr>
     </thead>
-    <!-- No <tbody> needed, DataTables will populate it -->
   </table>
 
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <link href="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.4/cr-2.1.1/cc-1.1.0/fc-5.0.5/fh-4.0.3/rr-1.5.0/sr-1.4.2/datatables.min.css" rel="stylesheet" integrity="sha384-dgzX5TLI69CXeC13LXEjdPjDiPvUE1PZwerPcXG65BoG6lJ/8w0waUP/mE71FGO0" crossorigin="anonymous">
   <script src="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.4/cr-2.1.1/cc-1.1.0/fc-5.0.5/fh-4.0.3/rr-1.5.0/sr-1.4.2/datatables.min.js" integrity="sha384-6NKnfbP0rfqUFM98vKb1/C+11u0z33ztkrtql0hAQyzk4+Zvg/TQQYRNDVqeyg1p" crossorigin="anonymous"></script>
+
   <script>
     let data = [
           ["Tiger", "Nixon", "System Architect", "Edinburgh", "2011/04/25", "$320,800", "5421", "t.nixon@datatables.net"],
@@ -89,59 +90,43 @@
           ["Herrod", "Chandler", "Sales Assistant", "San Francisco", "2012/08/06", "$137,500", "9608", "h.chandler@datatables.net"],
           ["Rhona", "Davidson", "Integration Specialist", "Tokyo", "2010/10/14", "$327,900", "6200", "r.davidson@datatables.net"],
           ["Colleen", "Hurst", "Javascript Developer", "San Francisco", "2009/09/15", "$205,500", "2360", "c.hurst@datatables.net"],
+          ["Sonya", "Frost", "Software Engineer", "Edinburgh", "2008/12/13", "$103,600", "1667", "s.frost@datatables.net"],
+          ["Colleen", "Hurst", "Javascript Developer", "San Francisco", "2009/09/15", "$205,500", "2360", "c.hurst@datatables.net"],
+          ["Sonya", "Frost", "Software Engineer", "Edinburgh", "2008/12/13", "$103,600", "1667", "s.frost@datatables.net"],
+          ["Tiger", "Nixon", "System Architect", "Edinburgh", "2011/04/25", "$320,800", "5421", "t.nixon@datatables.net"],
+          ["Garrett", "Winters", "Accountant", "Tokyo", "2011/07/25", "$170,750", "8422", "g.winters@datatables.net"],
+          ["Ashton", "Cox", "Junior Technical Author", "San Francisco", "2009/01/12", "$86,000", "1562", "a.cox@datatables.net"],
+          ["Cedric", "Kelly", "Senior Javascript Developer", "Edinburgh", "2012/03/29", "$433,060", "6224", "c.kelly@datatables.net"],
+          ["Airi", "Satou", "Accountant", "Tokyo", "2008/11/28", "$162,700", "5407", "a.satou@datatables.net"],
+          ["Brielle", "Williamson", "Integration Specialist", "New York", "2012/12/02", "$372,000", "4804", "b.williamson@datatables.net"],
+          ["Herrod", "Chandler", "Sales Assistant", "San Francisco", "2012/08/06", "$137,500", "9608", "h.chandler@datatables.net"],
+          ["Rhona", "Davidson", "Integration Specialist", "Tokyo", "2010/10/14", "$327,900", "6200", "r.davidson@datatables.net"],
+          ["Colleen", "Hurst", "Javascript Developer", "San Francisco", "2009/09/15", "$205,500", "2360", "c.hurst@datatables.net"],
           ["Sonya", "Frost", "Software Engineer", "Edinburgh", "2008/12/13", "$103,600", "1667", "s.frost@datatables.net"]
         ]
   </script>
   <script>
     let useColumnControl = false;
-    $(document).ready(function() {
-      let config = {
+    let fixedHeader = false;
+    let fixedColumns = true;
+    let config = {
         serverSide: false,
         scrollX: true,
         scrollY: true,
-        fixedHeader: true,
-        fixedColumns: true,
+        fixedHeader: fixedHeader,
+        fixedColumns: fixedColumns,
+        pageLength: [100],
         colReorder: {order: [0,2,1,3,4,5,6,7,8,9,10,11,12,13,14,15]},
         columnControl: [
               {target: 0, content: ['order']},
               {target: 1, content: ['search']}
         ],
         ordering: {indicators: false, handler: false},
-        ajax: function(_data, callback, settings) {
-          // Simulate AJAX response
-          console.log(data)
-          for (let i=0; i<data.length; i++) {
-            data[i] = data[i].concat(data[i]); // duplicate to make table wider
-          }
-          if (useColumnControl) {
-            data_verbose = [];
-            for (let i=0; i<data.length; i++) {
-              let row = {};
-              for (let j=0; j<config.columns.length; j++) {
-                row[config.columns[j].name] = data[i][j];
-              }
-              data_verbose.push(row)
-            }
-            data = data_verbose;
-          }
-          console.log(JSON.parse(JSON.stringify(data)));
-          callback({data: data});
-        },
+        ajax: ajax,
         initComplete: function() {
-          const container1 = $('#container1');
-          const container2 = $('.dt-scroll-body');
-          let element = '#example_wrapper table thead tr th:eq(0)'
-          if (useColumnControl) {
-            element = '#example_wrapper table thead tr td:eq(0)'
-          }
-          const shift = $(element).outerWidth()
-          $('#container1 div').width($('#example').width() - shift);
-          $('#container1').css('margin-left', shift);
-          container1.insertBefore($('.dt-scroll'));
-          container1.on('scroll', () => {
-            console.log('#container1 scrollLeft', container1.scrollLeft());
-            container2.scrollLeft(container1.scrollLeft());
-          });
+          //scrollI();
+          scrollII();
+          //scrollIII();
         }
       }
       if (useColumnControl) {
@@ -151,9 +136,128 @@
         delete config.columnControl;
         delete config.ordering;
       }
+
+    $(document).ready(function() {
       console.log(JSON.parse(JSON.stringify(config)));
       $('#example').DataTable(config);
     });
+
+    function ajax() {
+      // Simulate AJAX response
+      console.log(data)
+      for (let i=0; i<data.length; i++) {
+        data[i] = data[i].concat(data[i]); // duplicate to make table wider
+      }
+      if (useColumnControl) {
+        data_verbose = [];
+        for (let i=0; i<data.length; i++) {
+          let row = {};
+          for (let j=0; j<config.columns.length; j++) {
+            row[config.columns[j].name] = data[i][j];
+          }
+          data_verbose.push(row)
+        }
+        data = data_verbose;
+      }
+      console.log(JSON.parse(JSON.stringify(data)));
+      callback({data: data});
+    }
+
+    function scrollI() {
+      // Method I. Based on
+      // https://stackoverflow.com/a/56153078
+      // but updated for DataTables 2.x
+      // Two problems:
+      // 1) The top scrollbar is for all columns, including the fixed left columns.
+      // 2) Scrollbar disappears when fixedHeader is active.
+      // 3) Header jumps just after scrollbar disappears.
+      $('#container1').remove();
+      $('.dt-scroll-head')
+      .css({'overflow-x':'scroll'})
+      .on('scroll', function(e) {
+          var scrollBody = $(this).parent().find('.dt-scroll-body').get(0);
+          scrollBody.scrollLeft = this.scrollLeft;
+          $(scrollBody).trigger('scroll');
+      });
+    }
+
+    function scrollII() {
+      // Method II.
+      // Fixes (1) - (3) in Method I.
+      // New problems:
+      //  (1) The top scrollbar is on top of the header instead of the body.
+      //      This may not be desired.
+      //  (2) When the header becomes fixed, the top scrollbar overlaps the header.
+      //      (Scrollbar overlaps header a small amount.)
+      const container1 = $('#container1');
+      const container2 = $('.dt-scroll-body');
+      let element = '#example_wrapper table thead tr th:eq(0)'
+      if (useColumnControl) {
+        element = '#example_wrapper table thead tr td:eq(0)'
+      }
+      let shift = 0;
+      if (fixedColumns) {
+        shift = $(element).outerWidth();
+      }
+      if (!fixedHeader) {
+        $('.scroll-container').css('position', 'relative');
+      }
+      $('#container1 div').width($('#example').width() - shift);
+      $('#container1').css('margin-left', shift);
+      container1.insertBefore($('.dt-scroll'));
+
+      let scrolling = false;
+      container1.on('scroll', () => {
+        //console.log('#container1 scrollLeft', container1.scrollLeft());
+        if (scrolling) return;
+        scrolling = true;
+        container2.scrollLeft(container1.scrollLeft());
+        scrolling = false;
+      });
+      container2.on('scroll', () => {
+        if (scrolling) return;
+        scrolling = true;
+        container1.scrollLeft(container2.scrollLeft());
+        scrolling = false;
+      });
+    }
+
+    function scrollIII() {
+      scrollII();
+      watch();
+
+      function watch() {
+        // Addresses (2) in Method II, but gives jump. To avoid,
+        // would need to trigger mode change when header hits top of page
+        // instead of when table body hits a distance from top as it is
+        // done now in:
+        // https://github.com/DataTables/FixedHeader/blob/2e269d541ee87fd35374e538733fb7cc16751f0b/js/dataTables.fixedHeader.js#L591
+        let stop = false;
+        const observer = new MutationObserver(function(mutations) {
+          console.log('Mutations observed:', mutations);
+          mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+              mutation.addedNodes.forEach(function(node) {
+                console.log('Added node:', node);
+                if ($(node).hasClass('dtfh-floatingparent')) { // Check if the added node matches your criteria
+                  if (stop == true) return;
+                  console.log('A new element with class "dtfh-floatingparent" was added:', node);
+                  //$('.dtfh-floatingparent').css('margin-top', '10px')
+                  stop = true;
+                  // Change font color when transition to fixed header occurs
+                  $('.dtfh-floatingparent, .dtfh-floatingparent-head').css('color', 'green');
+                  //$('.dtfh-floatingparent').first().prepend($('#container1'));
+                  //$('.dtfh-floating-limiter').before($('#container1'));
+                }
+              });
+            }
+          });
+      });
+
+        const config = { childList: true, subtree: true }; // Observe child additions and in subtrees
+        observer.observe(document.body, config); // Start observing from the body
+      }
+    }
   </script>
 </body>
 </html>
