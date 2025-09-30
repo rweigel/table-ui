@@ -1,48 +1,62 @@
-import logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
-def json2sql(json_head, json_body, sqldb=None):
+def json2sql(json_body, json_head=None, out=None):
   import os
   import json
+  import logging
   import sqlite3
 
-  if sqldb is None:
-    if json_body.endswith(".json"):
-      sqldb_path = json_body.replace(".json", ".sqlite")
-    else:
-      sqldb_path = json_body + ".sqlite"
+  logger = logging.getLogger(__name__)
+  logging.basicConfig(level=logging.INFO)
 
-  # Read header and body
-  with open(json_head) as f:
-    columns = json.load(f)
+  if out is None:
+    if json_body.endswith(".json"):
+      out_path = json_body.replace(".json", ".sqlite")
+    else:
+      out_path = json_body + ".sqlite"
+
   with open(json_body) as f:
     rows = json.load(f)
+    if not isinstance(rows, list):
+      raise ValueError(f"{json_body} must contain an array of arrays. Exiting.")
+      exit(1)
+    if len(rows) == 0:
+      raise ValueError(f"{json_body} contains no rows. Exiting.")
+      exit(1)
 
-  # Remove old sqldb if exists
-  if os.path.exists(sqldb_path):
-    os.remove(sqldb_path)
+  if json_head is None:
+    if len(rows) > 0:
+      num_cols = len(rows[0])
+    columns = [f"c{i}" for i in range(num_cols)]
+  else:
+    with open(json_head) as f:
+      columns = json.load(f)
+    if not isinstance(columns, list):
+      raise ValueError(f"{json_head} must contain an array of strings. Exiting.")
+      exit(1)
+    if len(columns) != len(rows[0]):
+      raise ValueError(f"Number of values in {json_head} ({len(columns)}) does not match number elements in first row of {json_body} ({len(rows[0])}). Exiting.")
+      exit(1)
+
+  # Remove old out if exists
+  if os.path.exists(out_path):
+    os.remove(out_path)
 
   # Create table
-  conn = sqlite3.connect(sqldb_path)
+  conn = sqlite3.connect(out_path)
   cursor = conn.cursor()
-  col_defs = ", ".join([f'"{col}" TEXT' for col in columns])
+  col_defs = ", ".join([f'`{col}` TEXT' for col in columns])
   cursor.execute(f'CREATE TABLE demo ({col_defs})')
 
   # Insert rows
-  for row in rows:
-      placeholders = ", ".join(["?"] * len(row))
-      cursor.execute(f'INSERT INTO demo VALUES ({placeholders})', row)
-
+  cursor.executemany(f'INSERT INTO demo VALUES ({", ".join(["?"] * len(columns))})', rows)
   conn.commit()
+  logger.debug(f"Wrote {len(columns)} columns and {len(rows)} rows to {out_path}")
 
   # Verify table creation
   cursor.execute("SELECT * FROM demo")
   all_rows = cursor.fetchall()
 
-  logger.debug(f"Inserted {len(all_rows)} rows into demo table.")
-  logger.debug(f"First row: {all_rows[0]}")
+  assert len(all_rows) == len(rows)
 
   conn.close()
 
-  return sqldb_path
+  return out_path
