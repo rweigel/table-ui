@@ -63,12 +63,12 @@
         <th>E-mail2</th>
       </tr>
     </thead>
+    <!-- No <tbody> needed, DataTables will populate it -->
   </table>
 
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <link href="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.4/cr-2.1.1/cc-1.1.0/fc-5.0.5/fh-4.0.3/rr-1.5.0/sr-1.4.2/datatables.min.css" rel="stylesheet" integrity="sha384-dgzX5TLI69CXeC13LXEjdPjDiPvUE1PZwerPcXG65BoG6lJ/8w0waUP/mE71FGO0" crossorigin="anonymous">
   <script src="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.4/cr-2.1.1/cc-1.1.0/fc-5.0.5/fh-4.0.3/rr-1.5.0/sr-1.4.2/datatables.min.js" integrity="sha384-6NKnfbP0rfqUFM98vKb1/C+11u0z33ztkrtql0hAQyzk4+Zvg/TQQYRNDVqeyg1p" crossorigin="anonymous"></script>
-
   <script>
     let data = [
           ["Tiger", "Nixon", "System Architect", "Edinburgh", "2011/04/25", "$320,800", "5421", "t.nixon@datatables.net"],
@@ -106,43 +106,43 @@
         ]
   </script>
   <script>
-    let useColumnControl = false;
+    let useColumnControl = true;
     let fixedHeader = false;
     let fixedColumns = true;
     let config = {
-        serverSide: false,
-        scrollX: true,
-        scrollY: true,
-        fixedHeader: fixedHeader,
-        fixedColumns: fixedColumns,
-        pageLength: [100],
-        colReorder: {order: [0,2,1,3,4,5,6,7,8,9,10,11,12,13,14,15]},
-        columnControl: [
-              {target: 0, content: ['order']},
-              {target: 1, content: ['search']}
-        ],
-        ordering: {indicators: false, handler: false},
-        ajax: ajax,
-        initComplete: function() {
-          //scrollI();
-          scrollII();
-          //scrollIII();
-        }
+      serverSide: false,
+      scrollX: true,
+      scrollY: true,
+      fixedHeader: fixedHeader,
+      fixedColumns: fixedColumns,
+      pageLength: [100],
+      colReorder: {order: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]},
+      columnControl: [
+            {target: 0, content: ['order']},
+            {target: 1, content: ['search']}
+      ],
+      ordering: {indicators: false, handler: false},
+      ajax: ajax,
+      initComplete: function() {
+        //scrollI();
+        scrollII();
+        //scrollIII();
       }
-      if (useColumnControl) {
-        config.columns = $('#example thead th').map((i, th) => ({name: th.innerText, title: th.innerText, data: th.innerText})).get();
-        $('#example thead').remove();
-      } else {
-        delete config.columnControl;
-        delete config.ordering;
-      }
+    }
+    if (useColumnControl) {
+      config.columns = $('#example thead th').map((i, th) => ({name: th.innerText, title: th.innerText, data: th.innerText, type: "string"})).get();
+      $('#example thead').remove();
+    } else {
+      delete config.columnControl;
+      delete config.ordering;
+    }
 
     $(document).ready(function() {
       console.log(JSON.parse(JSON.stringify(config)));
       $('#example').DataTable(config);
     });
 
-    function ajax() {
+    function ajax(_data, callback, settings) {
       // Simulate AJAX response
       console.log(data)
       for (let i=0; i<data.length; i++) {
@@ -152,7 +152,7 @@
         data_verbose = [];
         for (let i=0; i<data.length; i++) {
           let row = {};
-          for (let j=0; j<config.columns.length; j++) {
+          for (let j=0; j<data[0].length; j++) {
             row[config.columns[j].name] = data[i][j];
           }
           data_verbose.push(row)

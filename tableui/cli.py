@@ -72,7 +72,7 @@ def args():
       "default": kwargs['config']
     },
     "render": {
-      "help": "Javascript file with DataTables rendering functions. Relative paths are relative to root-dir.",
+      "help": "Javascript file with DataTables rendering function. Relative paths are relative to root-dir.",
       "default": kwargs['render']
     },
     "json-head": {
