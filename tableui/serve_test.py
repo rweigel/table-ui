@@ -64,6 +64,14 @@ def _server_test1(port, json_head, json_body, db_type):
   assert 'data' in response.json()
   assert response.json()['data'] == json_body_data
 
+  url = f"{base}/data/?_invalid_key=true"
+  logger.info(40*"-")
+  logger.info(f"Testing {url}")
+  response = requests.get(url)
+  assert response.status_code == 400
+  print(response.json())
+  assert 'error' in response.json()
+
   url = f"{base}/data/?_verbose=true"
   logger.info(40*"-")
   logger.info(f"Testing {url}")

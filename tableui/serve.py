@@ -119,6 +119,7 @@ def _api_init(app, apiconfig):
 
   @app.route("/", methods=["GET", "HEAD"])
   def indexhtml(request: fastapi.Request):
+    # Silently ignore any query parameters
     fname = os.path.join(root_dir,'index.html')
     logger.info("Reading: " + fname)
     with open(fname) as f:
@@ -127,6 +128,7 @@ def _api_init(app, apiconfig):
 
   @app.route("/config", methods=["GET", "HEAD"])
   def config(request: fastapi.Request):
+    # Silently ignore any query parameters
     dbinfo = _dbinfo(**dbconfig)
     content = _read_config(apiconfig, warn=False)
     if "tableUI" not in content:
@@ -143,77 +145,98 @@ def _api_init(app, apiconfig):
 
   @app.route("/render.js", methods=["GET", "HEAD"])
   def render(request: fastapi.Request):
+    # Silently ignore any query parameters
     return fastapi.responses.FileResponse(dtrender)
 
   @app.route("/header", methods=["GET", "HEAD"])
   def header(request: fastapi.Request):
+    # Silently ignore any query parameters
     dbinfo = _dbinfo(**dbconfig)
     return fastapi.responses.JSONResponse(content=dbinfo['column_names'])
 
-  @app.route("/data/", methods=["GET", "HEAD"])
+  @app.route("/data/", methods=["POST", "GET", "HEAD"])
   def data(request: fastapi.Request):
 
     logger.info(f"Received data request with query params: {request.query_params}")
     query_params = dict(request.query_params)
 
-    keys_allowed = ['_', '_draw', '_start', '_length', '_orders', '_return', '_uniques', '_verbose']
-    for key in query_params.keys():
-      if key not in keys_allowed and key not in _dbinfo(**dbconfig)['column_names']:
-        logger.error(f"Error: Unknown query parameter: {key}.")
-        raise HTTPException(status_code=400, detail=f"Error: Unknown query parameter. Allowed: {keys_allowed} and column names: {_dbinfo(**dbconfig)['column_names']}")
-
     dbinfo = _dbinfo(**dbconfig)
 
-    verbose = False
     if "_verbose" in query_params:
+      if query_params["_verbose"] not in ["true", "false"]:
+        emsg = "Error: _verbose must be 'true' or 'false'"
+        return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
       if query_params["_verbose"] == "true":
-        verbose = True
+        query_params["_verbose"] = True
       else:
-        raise HTTPException(status_code=400, detail="Error: _verbose must be 'true' or 'false'")
-
-    _return = None
-    column_names = dbinfo['column_names']
-    if "_return" in query_params and 'jsondb' not in dbinfo:
-      column_names = query_params["_return"].split(",")
-      _return = column_names
-      for col in column_names:
-        if col not in dbinfo['column_names']:
-          raise HTTPException(status_code=400, detail=f"Error: _return column '{col}' not found in column names: {dbinfo['column_names']}")
+        query_params["_verbose"] = False
+    else:
+      query_params["_verbose"] = False
 
     if "jsondb" in dbinfo:
-      # No server-side processing. Serve entire JSON.
+      # No server-side processing. Serve entire JSON and return.
+      for key in query_params.keys():
+        if key not in ["_", "_verbose"]:
+          emsg = f"Error: Unknown query parameter: {key}. Only '_' and '_verbose' allowed when using jsondb (=> serverSide=false)."
+          return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
+
       with open(dbinfo['jsondb']['body']) as f:
         # TODO: Stream
         logger.info("Reading and sending: " + dbinfo['jsondb']['body'])
         data = json.load(f)
-        data = _data_transform(data, column_names, verbose)
+        data = _data_transform(data, dbinfo['column_names'], query_params["_verbose"])
         return fastapi.responses.JSONResponse({"data": data})
 
-    uniques = False
+    # sqldb and server-side processing
+    keys_allowed = [
+      '_',
+      '_draw',
+      '_start',
+      '_length',
+      '_orders',
+      '_return',
+      '_uniques',
+      '_verbose'
+    ]
+
+    for key in query_params.keys():
+      if key not in keys_allowed and key not in _dbinfo(**dbconfig)['column_names']:
+        logger.error(f"Error: Unknown query parameter: {key}.")
+        emsg = f"Error: Unknown query parameter. Allowed: {keys_allowed} and "
+        emsg += f"column names: {_dbinfo(**dbconfig)['column_names']}"
+        return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
+
     if "_uniques" in query_params:
+      if query_params["_uniques"] not in ["true", "false"]:
+        emsg = "Error: _uniques must be 'true' or 'false'"
+        return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
       if query_params["_uniques"] == "true":
-       uniques = True
+        query_params["_uniques"] = True
       else:
-        raise HTTPException(status_code=400, detail="Error: _uniques must be 'true' or 'false'")
+        query_params["_uniques"] = False
+    else:
+      query_params["_uniques"] = False
 
     def is_positive_integer(s):
       return s.isdigit() and int(s) >= 0
 
-    start = 0
     if "_start" in query_params:
-      start = query_params["_start"]
-      if not is_positive_integer(start):
-        raise HTTPException(status_code=400, detail="Error: _start >= 0 required")
-      start = int(start)
+      if not is_positive_integer(query_params["_start"]):
+        emsg = "Error: _start >= 0 required"
+        return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
+      query_params["_start"] = int(query_params["_start"])
+    else:
+      query_params["_start"] = 0
 
-    limit = None
     if "_length" in query_params:
-      limit = query_params["_length"]
-      if not is_positive_integer(limit) or int(limit) == 0:
-        raise HTTPException(status_code=400, detail="Error: _length > 0 required")
-      limit = int(limit)
+      _length = query_params["_length"]
+      if not is_positive_integer(_length) or int(_length) == 0:
+        emsg = "Error: _length > 0 required"
+        return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
+      query_params["_length"] = int(_length)
+    else:
+      query_params["_length"] = None
 
-    orders = None
     if "_orders" in query_params:
       orders = query_params["_orders"].split(",")
       for order in orders:
@@ -221,31 +244,46 @@ def _api_init(app, apiconfig):
         if order.startswith("-"):
           col = order[1:]
         if col not in dbinfo['column_names']:
-          raise HTTPException(status_code=400, detail=f"Error: _orders column '{col}' not found in column names: {dbinfo['column_names']}")
+          emsg = f"Error: _orders column '{col}' not found in column names: "
+          emsg += "{dbinfo['column_names']}"
+          return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
+      query_params["_orders"] = orders
+    else:
+      query_params["_orders"] = None
 
     searches = {}
     if query_params is not None:
       logger.info(f"Query params: {query_params}")
       for key, _ in query_params.items():
         if key in dbinfo['column_names']:
-          searches[key] = urllib.parse.unquote(query_params[key],
-                                               encoding='utf-8', errors='replace')
+          kwargs = {'encoding': 'utf-8', 'errors': 'replace'}
+          searches[key] = urllib.parse.unquote(query_params[key], **kwargs)
+      query_params['searches'] = searches
+    else:
+      query_params['searches'] = None
 
-    result = _dbquery(dbinfo,
-                      orders=orders,
-                      searches=searches,
-                      _return=_return,
-                      uniques=uniques,
-                      offset=start,
-                      limit=limit)
+    return_cols = dbinfo['column_names']
+    if "_return" in query_params:
+      query_params["_return"] = query_params["_return"].split(",")
+      for col in query_params["_return"]:
+        if col not in dbinfo['column_names']:
+          emsg = f"Error: _return column '{col}' not found in column names: "
+          emsg += "{dbinfo['column_names']}"
+          return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
+      return_cols = query_params["_return"]
+    else:
+      query_params["_return"] = None
 
-    if uniques:
-      if limit:
+    result = _dbquery(dbinfo, query_params)
+
+    if query_params['_uniques']:
+      length = query_params['_length']
+      if length:
         for col in result['data'].keys():
-          result['data'][col] = result['data'][col][0:limit]
+          result['data'][col] = result['data'][col][0:length]
       return fastapi.responses.JSONResponse(content=result['data'])
 
-    data = _data_transform(result['data'], column_names, verbose)
+    data = _data_transform(result['data'], return_cols, query_params["_verbose"])
 
     content = {
                 "draw": int(query_params.get("_draw", 1)),
@@ -257,7 +295,7 @@ def _api_init(app, apiconfig):
     return fastapi.responses.JSONResponse(content=content)
 
 
-def _dbquery(dbinfo, orders=None, searches=None, _return=None, uniques=False, limit=None, offset=0):
+def _dbquery(dbinfo, query_params):
 
   def execute(cursor, query):
     start = time.time()
@@ -304,6 +342,13 @@ def _dbquery(dbinfo, orders=None, searches=None, _return=None, uniques=False, li
     if len(where) == 0:
       return ""
     return "WHERE" + " AND ".join(where)
+
+  offset = query_params['_start']
+  limit = query_params['_length']
+  orders = query_params['_orders']
+  searches = query_params['searches']
+  _return = query_params['_return']
+  uniques = query_params['_uniques']
 
   logger.info("Connecting to database file " + dbinfo['sqldb'])
   conn = sqlite3.connect(dbinfo['sqldb'])
@@ -415,6 +460,7 @@ def _dbinfo(sqldb=None, table_name=None, json_head=None, json_body=None):
 
 
 def _data_transform(data, column_names, verbose):
+
   if not verbose:
     return data
   data_verbose = []
@@ -471,4 +517,3 @@ def _table_names(sqldb):
   connection.close()
 
   return table_names
-
