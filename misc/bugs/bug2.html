@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!--https://datatables.net/forums/discussion/81407/columncontrol-with-search-and-colreorder-->
+  <meta charset="UTF-8">
+  <title>colReorder issue</title>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css"/>
+  <link rel="stylesheet" href="https://cdn.datatables.net/colreorder/1.6.2/css/colReorder.dataTables.min.css"/>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    #demoTable { width: 100%; }
+  </style>
+</head>
+<body>
+  <table id="demoTable" class="display">
+    <thead>
+      <tr>
+        <th>a</th>
+        <th>b</th>
+        <th>c</th>
+      </tr>
+    </thead>
+  </table>
+
+  <link href="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.4/cr-2.1.1/cc-1.1.0/fc-5.0.5/fh-4.0.3/rr-1.5.0/sr-1.4.2/datatables.min.css" rel="stylesheet" integrity="sha384-dgzX5TLI69CXeC13LXEjdPjDiPvUE1PZwerPcXG65BoG6lJ/8w0waUP/mE71FGO0" crossorigin="anonymous">
+  <script src="https://cdn.datatables.net/v/dt/jq-3.7.0/dt-2.3.4/cr-2.1.1/cc-1.1.0/fc-5.0.5/fh-4.0.3/rr-1.5.0/sr-1.4.2/datatables.min.js" integrity="sha384-6NKnfbP0rfqUFM98vKb1/C+11u0z33ztkrtql0hAQyzk4+Zvg/TQQYRNDVqeyg1p" crossorigin="anonymous"></script>  <script>
+
+    $(document).ready(function() {
+      const table = $('#demoTable').DataTable(
+        {
+          "displayStart": 0,
+          "pageLength": 10,
+          "ajax": function (data, callback, settings) {
+              const cb1 = {
+                "data": [
+                          {"a": "a01", "b": "b01", "c": "c01"},
+                          {"a": "a02", "b": "b02", "c": "c02"}],
+              }
+              callback(cb1);
+            },
+          "columns": [
+            { data: "a", title: "a" },
+            { data: "b", title: "b" },
+            { data: "c", title: "c" }
+          ],
+          colReorder: {order: [0,2,1]}, // No error if [0, 1, 2]
+          columnControl: [
+                {target: 0, content: ['order']},
+                {target: 1, content: ['search']} // No error if order = [0, 2, 1] and this line removed
+          ],
+        });
+        //table.colReorder.order([0,2,1]); // This alternative works if colReorder above removed
+
+      });
+  </script>
+</body>
+</html>
