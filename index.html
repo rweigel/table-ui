@@ -333,6 +333,7 @@
       config['ajax'] = window.location.pathname + "data/";
 
       if (config['serverSide']) {
+        // Modify to catch 400 errors.
         config['ajax'] = {
           "url": window.location.pathname + "data/",
           "type": "get",

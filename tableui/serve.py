@@ -156,11 +156,11 @@ def _api_init(app, apiconfig):
     logger.info(f"Received data request with query params: {request.query_params}")
     query_params = dict(request.query_params)
 
-    keys_allowed = ['_draw', '_start', '_length', '_orders', '_return', '_uniques', '_verbose']
+    keys_allowed = ['_', '_draw', '_start', '_length', '_orders', '_return', '_uniques', '_verbose']
     for key in query_params.keys():
       if key not in keys_allowed and key not in _dbinfo(**dbconfig)['column_names']:
-        logger.error(f"Error: Unknown query parameter: {key}. Exiting.")
-        return HTTPException(status_code=400, detail=f"Error: Unknown query parameter give. Allowed: {keys_allowed} and column names: {_dbinfo(**dbconfig)['column_names']}")
+        logger.error(f"Error: Unknown query parameter: {key}.")
+        raise HTTPException(status_code=400, detail=f"Error: Unknown query parameter. Allowed: {keys_allowed} and column names: {_dbinfo(**dbconfig)['column_names']}")
 
     dbinfo = _dbinfo(**dbconfig)
 
@@ -169,7 +169,7 @@ def _api_init(app, apiconfig):
       if query_params["_verbose"] == "true":
         verbose = True
       else:
-        return HTTPException(status_code=400, detail="Error: _verbose must be 'true' or 'false'")
+        raise HTTPException(status_code=400, detail="Error: _verbose must be 'true' or 'false'")
 
     _return = None
     column_names = dbinfo['column_names']
@@ -178,7 +178,7 @@ def _api_init(app, apiconfig):
       _return = column_names
       for col in column_names:
         if col not in dbinfo['column_names']:
-          return HTTPException(status_code=400, detail=f"Error: _return column '{col}' not found in column names: {dbinfo['column_names']}")
+          raise HTTPException(status_code=400, detail=f"Error: _return column '{col}' not found in column names: {dbinfo['column_names']}")
 
     if "jsondb" in dbinfo:
       # No server-side processing. Serve entire JSON.
@@ -194,7 +194,7 @@ def _api_init(app, apiconfig):
       if query_params["_uniques"] == "true":
        uniques = True
       else:
-        return HTTPException(status_code=400, detail="Error: _uniques must be 'true' or 'false'")
+        raise HTTPException(status_code=400, detail="Error: _uniques must be 'true' or 'false'")
 
     def is_positive_integer(s):
       return s.isdigit() and int(s) >= 0
@@ -203,14 +203,14 @@ def _api_init(app, apiconfig):
     if "_start" in query_params:
       start = query_params["_start"]
       if not is_positive_integer(start):
-        return HTTPException(status_code=400, detail="Error: _start >= 0 required")
+        raise HTTPException(status_code=400, detail="Error: _start >= 0 required")
       start = int(start)
 
     limit = None
     if "_length" in query_params:
       limit = query_params["_length"]
       if not is_positive_integer(limit) or int(limit) == 0:
-        return HTTPException(status_code=400, detail="Error: _length > 0 required")
+        raise HTTPException(status_code=400, detail="Error: _length > 0 required")
       limit = int(limit)
 
     orders = None
@@ -221,7 +221,7 @@ def _api_init(app, apiconfig):
         if order.startswith("-"):
           col = order[1:]
         if col not in dbinfo['column_names']:
-          return HTTPException(status_code=400, detail=f"Error: _orders column '{col}' not found in column names: {dbinfo['column_names']}")
+          raise HTTPException(status_code=400, detail=f"Error: _orders column '{col}' not found in column names: {dbinfo['column_names']}")
 
     searches = {}
     if query_params is not None:
