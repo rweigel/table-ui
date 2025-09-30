@@ -42,9 +42,14 @@ def serve(table_name=None, sqldb=None,
                 "server_header": False
               }
 
-  # Read and check config. Don't need output here because output is
-  # read as needed for response in case it changes.
-  _read_config(apiconfig, warn=True)
+  for file in [sqldb, json_head, json_body, config, render]:
+    if file is None:
+      continue
+    if not os.path.exists(file):
+      logger.error(f"File not found: {file}. Exiting.")
+      exit(1)
+
+  _dbinfo(**dbconfig)  # Test if dbconfig is valid
 
   logger.info("Initalizing API")
   app = fastapi.FastAPI()
@@ -93,6 +98,11 @@ def _read_config(apiconfig, warn=False):
 
 def _api_init(app, apiconfig):
 
+  from fastapi import HTTPException
+  # Must import StaticFiles from fastapi.staticfiles
+  # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
+  from fastapi.staticfiles import StaticFiles
+
   def cors_headers(response: fastapi.Response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "*"
@@ -103,9 +113,6 @@ def _api_init(app, apiconfig):
   dtrender = apiconfig['dtrender']
   dbconfig = apiconfig['dbconfig']
 
-  # Must import StaticFiles from fastapi.staticfiles
-  # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
-  from fastapi.staticfiles import StaticFiles
   for dir in ['js', 'css', 'img', 'demo', 'misc']:
     directory = os.path.join(root_dir, dir)
     app.mount(f"/{dir}/", StaticFiles(directory=directory))
@@ -147,22 +154,31 @@ def _api_init(app, apiconfig):
   def data(request: fastapi.Request):
 
     logger.info(f"Received data request with query params: {request.query_params}")
-    dbinfo = _dbinfo(**dbconfig)
     query_params = dict(request.query_params)
 
-    verbose_data = False
-    if "_verbose" in query_params:
-      if query_params["_verbose"].lower() == "true":
-        verbose_data = True
-      del query_params["_verbose"]
+    keys_allowed = ['_draw', '_start', '_length', '_orders', '_return', '_uniques', '_verbose']
+    for key in query_params.keys():
+      if key not in keys_allowed and key not in _dbinfo(**dbconfig)['column_names']:
+        logger.error(f"Error: Unknown query parameter: {key}. Exiting.")
+        return HTTPException(status_code=400, detail=f"Error: Unknown query parameter give. Allowed: {keys_allowed} and column names: {_dbinfo(**dbconfig)['column_names']}")
 
+    dbinfo = _dbinfo(**dbconfig)
+
+    verbose = False
+    if "_verbose" in query_params:
+      if query_params["_verbose"] == "true":
+        verbose = True
+      else:
+        return HTTPException(status_code=400, detail="Error: _verbose must be 'true' or 'false'")
+
+    _return = None
     column_names = dbinfo['column_names']
     if "_return" in query_params and 'jsondb' not in dbinfo:
       column_names = query_params["_return"].split(",")
-      # Compute column indices for requested columns
-      query_params["_return"] = column_names
-    else:
-      query_params["_return"] = None
+      _return = column_names
+      for col in column_names:
+        if col not in dbinfo['column_names']:
+          return HTTPException(status_code=400, detail=f"Error: _return column '{col}' not found in column names: {dbinfo['column_names']}")
 
     if "jsondb" in dbinfo:
       # No server-side processing. Serve entire JSON.
@@ -170,22 +186,66 @@ def _api_init(app, apiconfig):
         # TODO: Stream
         logger.info("Reading and sending: " + dbinfo['jsondb']['body'])
         data = json.load(f)
-        data = _data_transform(data, column_names, verbose_data)
+        data = _data_transform(data, column_names, verbose)
         return fastapi.responses.JSONResponse({"data": data})
 
+    uniques = False
     if "_uniques" in query_params:
-      if query_params["_uniques"].lower() == "true":
-        query_params["_uniques"] = True
+      if query_params["_uniques"] == "true":
+       uniques = True
       else:
-        query_params["_uniques"] = False
-    else:
-      query_params["_uniques"] = False
+        return HTTPException(status_code=400, detail="Error: _uniques must be 'true' or 'false'")
 
-    result = _query(dbinfo, query_params=query_params)
-    if query_params["_uniques"]:
+    def is_positive_integer(s):
+      return s.isdigit() and int(s) >= 0
+
+    start = 0
+    if "_start" in query_params:
+      start = query_params["_start"]
+      if not is_positive_integer(start):
+        return HTTPException(status_code=400, detail="Error: _start >= 0 required")
+      start = int(start)
+
+    limit = None
+    if "_length" in query_params:
+      limit = query_params["_length"]
+      if not is_positive_integer(limit) or int(limit) == 0:
+        return HTTPException(status_code=400, detail="Error: _length > 0 required")
+      limit = int(limit)
+
+    orders = None
+    if "_orders" in query_params:
+      orders = query_params["_orders"].split(",")
+      for order in orders:
+        col = order
+        if order.startswith("-"):
+          col = order[1:]
+        if col not in dbinfo['column_names']:
+          return HTTPException(status_code=400, detail=f"Error: _orders column '{col}' not found in column names: {dbinfo['column_names']}")
+
+    searches = {}
+    if query_params is not None:
+      logger.info(f"Query params: {query_params}")
+      for key, _ in query_params.items():
+        if key in dbinfo['column_names']:
+          searches[key] = urllib.parse.unquote(query_params[key],
+                                               encoding='utf-8', errors='replace')
+
+    result = _dbquery(dbinfo,
+                      orders=orders,
+                      searches=searches,
+                      _return=_return,
+                      uniques=uniques,
+                      offset=start,
+                      limit=limit)
+
+    if uniques:
+      if limit:
+        for col in result['data'].keys():
+          result['data'][col] = result['data'][col][0:limit]
       return fastapi.responses.JSONResponse(content=result['data'])
 
-    data = _data_transform(result['data'], column_names, verbose_data)
+    data = _data_transform(result['data'], column_names, verbose)
 
     content = {
                 "draw": int(query_params.get("_draw", 1)),
@@ -195,32 +255,6 @@ def _api_init(app, apiconfig):
               }
 
     return fastapi.responses.JSONResponse(content=content)
-
-
-def _query(dbinfo, query_params=None):
-
-  start = 0
-  limit = None
-  if query_params is not None and "_start" in query_params:
-    start = query_params.get("_start", 0)
-    start = int(start)
-    if "_length" in query_params:
-      end = start + int(query_params["_length"])
-      limit = end - start
-
-  orders = None
-  if "_orders" in query_params:
-    orders = query_params["_orders"].split(",")
-
-  searches = {}
-  if query_params is not None:
-    logger.info(f"Query params: {query_params}")
-    for key, _ in query_params.items():
-      if key in dbinfo['column_names']:
-        searches[key] = urllib.parse.unquote(query_params[key], encoding='utf-8', errors='replace')
-
-  result = _dbquery(dbinfo, orders=orders, searches=searches, _return=query_params['_return'], uniques=query_params['_uniques'], limit=limit, offset=start)
-  return result
 
 
 def _dbquery(dbinfo, orders=None, searches=None, _return=None, uniques=False, limit=None, offset=0):
@@ -348,6 +382,9 @@ def _dbinfo(sqldb=None, table_name=None, json_head=None, json_body=None):
       logger.info(f"No table name given; using table name based on sqldb file name: '{table_name}'")
     else:
       logger.info(f"No table name given; using first table returned from list of table names: '{table_name}'")
+      if len(table_names) == 0:
+        logger.error(f"Error: No tables found in database file {sqldb}. Exiting.")
+        return None
       table_name = table_names[0]
 
     table_metadata = f'{table_name}.metadata'
@@ -377,8 +414,8 @@ def _dbinfo(sqldb=None, table_name=None, json_head=None, json_body=None):
   return dbinfo
 
 
-def _data_transform(data, column_names, verbose_data):
-  if not verbose_data:
+def _data_transform(data, column_names, verbose):
+  if not verbose:
     return data
   data_verbose = []
   logger.debug("Transforming data to verbose format. Column names: {column_names}")
@@ -404,7 +441,7 @@ def _column_names(sqldb=None, table_name=None, json_head=None, json_body=None):
       print(f"Error executing query for column names using '{query_}' on {sqldb}")
       raise e
 
-  if json_body and json_head is None:
+  if json_head is None:
     return list(range(0, len(json_body[0])))
 
   with open(json_head) as f:
@@ -421,12 +458,13 @@ def _table_names(sqldb):
   query_ = "SELECT name FROM sqlite_master WHERE type='table';"
   try:
     cursor = connection.cursor()
+    logger.info(f"Executing {query_}")
     cursor.execute(query_)
     table_names = []
     for row in cursor.fetchall():
       table_names.append(row[0])
   except Exception as e:
-    print(f"Error executing query for table names using '{query_}' on {sqldb}")
+    logger.error(f"Error executing query for table names using '{query_}' on {sqldb}")
     raise e
   logger.info(f"Tables in {sqldb}: {table_names}")
 

@@ -49,26 +49,34 @@ def _server_test1(port, json_head, json_body, db_type):
 
   base = f"http://127.0.0.1:{port}"
 
+  url = f"{base}/config"
   logger.info(40*"-")
-  response = requests.get(f"{base}/config")
+  logger.info(f"Testing {url}")
+  response = requests.get(url)
   assert response.status_code == 200
   assert 'tableUI' in response.json()
 
+  url = f"{base}/data/"
   logger.info(40*"-")
-  response = requests.get(f"{base}/data/")
+  logger.info(f"Testing {url}")
+  response = requests.get(url)
   assert response.status_code == 200
   assert 'data' in response.json()
   assert response.json()['data'] == json_body_data
 
+  url = f"{base}/data/?_verbose=true"
   logger.info(40*"-")
-  response = requests.get(f"{base}/data/?_verbose=true")
+  logger.info(f"Testing {url}")
+  response = requests.get(url)
   assert response.status_code == 200
   assert 'data' in response.json()
   assert list(response.json()['data'][0].keys()) == json_head_data
 
   if db_type == 'sql':
+    url = f"{base}/data/?_start=0&_length=2&_draw=10"
     logger.info(40*"-")
-    response = requests.get(f"{base}/data/?_start=0&_length=2&_draw=10")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
     assert response.json()['draw'] == 10
@@ -80,8 +88,11 @@ def _server_test1(port, json_head, json_body, db_type):
       for j in range(len(json_head_data)):
         assert response.json()['data'][i][j] == json_body_data[i][j]
 
+
+    url = f"{base}/data/?_orders=-{json_head_data[0]}"
     logger.info(40*"-")
-    response = requests.get(f"{base}/data/?_orders=-{json_head_data[0]}")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
     assert response.json()['recordsTotal'] == len(json_body_data)
@@ -92,10 +103,12 @@ def _server_test1(port, json_head, json_body, db_type):
       for j in range(len(json_head_data)):
         assert response.json()['data'][i][j] == json_body_data[len(json_body_data)-1-i][j]
 
-    logger.info(40*"-")
     _start = 2
     _length = 2
-    response = requests.get(f"{base}/data/?_start={_start}&_length={_length}")
+    url = f"{base}/data/?_start={_start}&_length={_length}"
+    logger.info(40*"-")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
     assert response.json()['recordsTotal'] == len(json_body_data)
@@ -106,9 +119,11 @@ def _server_test1(port, json_head, json_body, db_type):
       for j in range(len(json_head_data)):
         assert response.json()['data'][i][j] == json_body_data[i+_start][j]
 
-    logger.info(40*"-")
     cols = f"{json_head_data[0]},{json_head_data[2]}"
-    response = requests.get(f"{base}/data/?_return={cols}")
+    url = f"{base}/data/?_return={cols}"
+    logger.info(40*"-")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
     assert response.json()['recordsTotal'] == len(json_body_data)
@@ -120,7 +135,9 @@ def _server_test1(port, json_head, json_body, db_type):
 
     logger.info(40*"-")
     cols = f"{json_head_data[0]},{json_head_data[2]}"
-    response = requests.get(f"{base}/data/?_verbose=true&_return={cols}")
+    url = f"{base}/data/?_verbose=true&_return={cols}"
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
     assert response.json()['recordsTotal'] == len(json_body_data)
@@ -130,8 +147,10 @@ def _server_test1(port, json_head, json_body, db_type):
     response.json()['data'][0]['a'] == json_body_data[0][0]
     response.json()['data'][0]['c'] == json_body_data[0][2]
 
+    url = f"{base}/data/?a=a01"
     logger.info(40*"-")
-    response = requests.get(f"{base}/data/?a=a01")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
     assert response.json()['recordsTotal'] == len(json_body_data)
@@ -141,8 +160,10 @@ def _server_test1(port, json_head, json_body, db_type):
     for i in range(len(json_head_data)):
       assert response.json()['data'][0][i] == json_body_data[0][i]
 
+    url = f"{base}/data/?_verbose=true&a=a01"
     logger.info(40*"-")
-    response = requests.get(f"{base}/data/?_verbose=true&a=a01")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
     assert response.json()['recordsTotal'] == len(json_body_data)
@@ -152,9 +173,11 @@ def _server_test1(port, json_head, json_body, db_type):
     for i, col in enumerate(json_head_data):
       assert response.json()['data'][0][col] == json_body_data[0][i]
 
-    logger.info(40*"-")
+    url = f"{base}/data/?a=a01&_return={cols}"
     cols = f"{json_head_data[0]},{json_head_data[2]}"
-    response = requests.get(f"{base}/data/?a=a01&_return={cols}")
+    logger.info(40*"-")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
     assert response.json()['recordsTotal'] == len(json_body_data)
@@ -164,9 +187,11 @@ def _server_test1(port, json_head, json_body, db_type):
     response.json()['data'][0][0] == json_body_data[0][0]
     response.json()['data'][0][1] == json_body_data[0][2]
 
-    logger.info(40*"-")
     cols = f"{json_head_data[0]},{json_head_data[2]}"
-    response = requests.get(f"{base}/data/?_verbose=true&a=a01&_return={cols}")
+    url = f"{base}/data/?_verbose=true&a=a01&_return={cols}"
+    logger.info(40*"-")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
     assert response.json()['recordsTotal'] == len(json_body_data)
@@ -189,22 +214,38 @@ def _server_test1(port, json_head, json_body, db_type):
         for row in json_body_data:
           assert row[json_head_data.index(col)] in uniques
 
+    url = f"{base}/data/?_uniques=true"
     logger.info(40*"-")
-    response = requests.get(f"{base}/data/?_uniques=true")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
     assert len(data.keys()) == len(json_head_data)
     check_uniques(data, json_head_data, json_body_data)
 
-    logger.info(40*"-")
     cols = f"{json_head_data[0]},{json_head_data[2]}"
-    response = requests.get(f"{base}/data/?_uniques=true&_return={cols}")
+    url = f"{base}/data/?_uniques=true&_return={cols}"
+    logger.info(40*"-")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
     assert list(data.keys()) == cols.split(",")
     check_uniques(data, json_head_data, json_body_data, cols=cols.split(","))
+
+    cols = f"{json_head_data[0]},{json_head_data[2]}"
+    url = f"{base}/data/?_uniques=true&_return={cols}&_length=3"
+    logger.info(40*"-")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert list(data.keys()) == cols.split(",")
+    for col in data.keys():
+      assert len(data[col]) <= 3
 
   server_process.terminate()
   server_process.join()
