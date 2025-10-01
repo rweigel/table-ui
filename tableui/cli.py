@@ -34,6 +34,7 @@ def defaults(args):
   return args
 
 def args():
+  import argparse
 
   def get_keywords(func):
     import inspect
@@ -45,7 +46,7 @@ def args():
 
   kwargs = get_keywords(tableui.serve)
 
-  return {
+  clargs = {
     "sqldb": {
       "help": "File containing SQL database",
       "default": kwargs['sqldb']
@@ -84,5 +85,21 @@ def args():
       "metavar": "FILE",
       "help": "JSON array with (row) arrays of length header. Ignored if sqldb given. Requires --json-header to be given.",
       "default": kwargs['json_body']
+    },
+    "debug": {
+      "help": "Verbose logging.",
+      "action": "store_true",
+      "default": False
     }
   }
+
+  parser = argparse.ArgumentParser()
+  for k, v in clargs.items():
+    parser.add_argument(f'--{k}', **v)
+
+  args = vars(parser.parse_args())
+
+  # Check and update given args with additional defaults
+  args = tableui.cli.defaults(args)
+
+  return args

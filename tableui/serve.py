@@ -8,18 +8,22 @@ import sqlite3
 import uvicorn
 import fastapi
 
+import tableui
+
 logger = logging.getLogger(__name__)
-#logging.basicConfig(level=logging.INFO)
-logging.basicConfig(level=logging.DEBUG)
 
 root_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
 def serve(table_name=None, sqldb=None,
           json_head=None, json_body=None,
-          host="0.0.0.0", port=5001, root_dir=root_dir,
+          host="0.0.0.0", port=5001, root_dir=root_dir, debug=False,
           config="config.json", render="js/render.js"):
 
+  if debug:
+    logging.basicConfig(level=logging.DEBUG)
+  else:
+    logging.basicConfig(level=logging.INFO)
+
   # Set defaults using kwargs (from locals()) and cli values
-  import tableui
   kwargs = tableui.cli.defaults(locals())
 
   dbconfig = {
@@ -280,6 +284,8 @@ def _api_init(app, apiconfig):
       length = query_params['_length']
       if length:
         for col in result['data'].keys():
+          # Sort by the second element (count) in each (value, count) tuple
+          result['data'][col] = sorted(result['data'][col], key=lambda x: -x[1])
           result['data'][col] = result['data'][col][0:length]
       return fastapi.responses.JSONResponse(content=result['data'])
 
