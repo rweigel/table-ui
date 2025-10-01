@@ -334,17 +334,18 @@ def _dbquery(dbinfo, query_params):
       return ""
     keys = list(searches.keys())
     where = []
+    escape = "\\"
     for key in keys:
       if searches[key] == "''" or searches[key] == '""':
         where.append(f" `{key}` = ''")
       elif searches[key].startswith("'") and searches[key].endswith("'"):
         where.append(f" `{key}` = {searches[key]}")
       elif searches[key].startswith('%') and not searches[key].endswith('%'):
-        where.append(f" `{key}` LIKE '{searches[key]}'")
+        where.append(f" `{key}` LIKE '{searches[key]}' ESCAPE '{escape}'")
       elif not searches[key].startswith('%') and searches[key].endswith('%'):
-        where.append(f" `{key}` LIKE '{searches[key]}'")
+        where.append(f" `{key}` LIKE '{searches[key]}' ESCAPE '{escape}'")
       else:
-        where.append(f" `{key}` LIKE '%{searches[key]}%'")
+        where.append(f" `{key}` LIKE '%{searches[key]}%' ESCAPE '{escape}'")
     if len(where) == 0:
       return ""
     return "WHERE" + " AND ".join(where)

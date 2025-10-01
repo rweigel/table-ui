@@ -168,6 +168,7 @@
     <ul>
       <li>A search string <code>abc</code> on a column results in an SQL <code>LIKE = '%abc%'</code> query. See <a href="https://www.w3schools.com/sql/sql_like.asp">SQL LIKE</a> for more information on the SQL <code>LIKE</code> operator.</li>
       <li>However, if search string starts and/or ends with <code>%</code>, the percentage wildcards are not added automatically.</li>
+      <li>Escape <code>%</code> and <code>_</code> using <code>\</code>. Escape <code>\</code> with <code>\\</code>.</li>
       <li>For an exact match search for <code>abc</code>, use single quotes: <code>'abc'</code>.</li>
       <li>Escape single quotes by repeating, e.g., <code>'''single quoted string'''</code>.</li>
       <li>All entries are stored as strings.</li>
@@ -559,7 +560,7 @@
       let val = qsName || '';
       input
         .val(val)
-        .attr('title','Press enter to search')
+        .attr('title','Enter search string and press enter to search')
         .appendTo($("thead tr:eq(0) > th").eq(visibleIndex))
         .on("keydown", function() {
           if (searchOnKeypress) {
