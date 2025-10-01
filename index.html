@@ -260,21 +260,22 @@
       console.log("dtInitComplete() => Setting column search inputs.")
       const qs = parseQueryString();
       let config = getConfig.config;
-      let visibleIndex = 0;
       table.api().columns(':visible').every(function () {
         let that = this;
         // Create `select` element
         let index = this.index();
         let name = config.columns[index]['name'];
         // Note that the header table does not have an id. It should.
-        $("thead tr:eq(0) > th").eq(visibleIndex).html('');
+        $("thead tr:eq(0) > th").eq(index).html('');
+        //let thWidth = $("thead tr:eq(0) > th").eq(index).outerWidth();
+        //console.log(`Width of th for column '${name}': ${thWidth}px`);
         let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
 
         let val = qs[name] || '';
         input
           .val(val)
           .attr('title','Press enter to search')
-          .appendTo($("thead tr:eq(0) > th").eq(visibleIndex))
+          .appendTo($("thead tr:eq(0) > th").eq(index))
           .on("keydown", function() {
             if (!config["search"]["return"]) {
               that.search($(this).val()).draw('page');
@@ -289,8 +290,43 @@
             input.css('background-color', 'yellow');
             input.attr('title','Remove text and press enter to clear search')
           }
-          visibleIndex++;
+          if (config['serverSide'] && name === 'datasetID') {
+            _createDropdown(index, name);
+          }
         });
+
+        function _createDropdown(index, name) {
+          let dropdown = $(`<br><label for="${name}"></label><select index="${index}" name="${name}" style="display:none;max-width: 6em; overflow: auto;"></select>`)
+          dropdown.appendTo($("thead tr:eq(0) > th").eq(index));
+
+          // Fetch unique values for this column
+          $.ajax({
+            url: `data/?_return=${encodeURIComponent(name)}&_uniques=true`,
+            method: "GET",
+            dataType: "json",
+            success: function (data) {
+              let select = $(`select[name="${name}"]`)
+              select.empty();
+              select.append(`<option value=""></option>`);
+              // Assume data is an array of unique values
+              data[name].forEach(function (val) {
+                select.append(`<option value="${val}">${val[0]} (${val[1]})</option>`);
+              });
+              // Set dropdown value from query string if present
+              const qs = parseQueryString();
+              if (qs[name]) {
+                dropdown.val(qs[name]);
+              }
+              dropdown.show();
+            }
+          });
+
+          // On dropdown change, update input and trigger search
+          dropdown.off("change").on("change", function () {
+            input.val($(this).val());
+            input.trigger({ type: "keydown", which: 13 });
+          });
+      }
 
       setEvents('#table1');
       adjustDOM('#table1');
@@ -332,12 +368,12 @@
       config['ajax'] = window.location.pathname + "data/";
 
       if (config['serverSide']) {
-        // Modify to catch 400 errors.
         config['ajax'] = {
           "url": window.location.pathname + "data/",
           "type": "get",
-          "data": _ajaxData
-        }
+          "data": _ajaxData,
+          "error": _ajaxError
+        };
       }
       console.log("getConfig() => Setting getConfig.config = config.")
       getConfig.config = config;
@@ -507,6 +543,33 @@
         return dtp;
       }
 
+      function _ajaxError(xhr, error, thrown) {
+        console.error("AJAX error.");
+        console.error("xhr:");
+        console.error(xhr);
+        console.error("error:");
+        console.error(error);
+        console.error("thrown:");
+        console.error(thrown);
+        let emsg = `An error occurred while loading data. Status = ${xhr.status} ${xhr.statusText}`;
+        if (xhr && xhr.responseURL) {
+          emsg = `An error occurred while loading data from ${xhr.responseURL}. Status = ${xhr.status} ${xhr.statusText}`;
+        }
+        if (thrown) {
+          emsg += ". Thrown error: " + thrown;
+        }
+        try {
+          let resp = JSON.parse(xhr.responseText);
+          if ('error' in resp) {
+            emsg += ". Server response error message: " + resp['error'];
+          }
+        } catch(e) {
+          console.error("Could not parse xhr.responseText as JSON.");
+          console.error(e);
+        }
+        $('#table1_processing').hide();
+        $('#table1').html(`<div style="color:red;font-weight:bold;padding:1em">${emsg}</div>`);
+      }
     }
 
     function setEvents(tableID) {
