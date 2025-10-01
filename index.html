@@ -23,6 +23,11 @@
       background-color: white;
       border: 1px solid black;
     }
+    select.columnUniques {
+      visibility: hidden;
+      overflow: auto;
+      margin-top: 0.25em;
+    }
     #table1 {
       width:100%;
       padding-top: 1em;
@@ -110,6 +115,27 @@
       box-shadow: 0 0 1px rgba(255,255,255,.5);
     }
 
+    /* Prevent interaction with elements that have aria-hidden="true"
+      The following is needed to prevent the following error (which results
+      in updates to search inputs not being read by code that steps through
+      columns search inputs):
+      Blocked aria-hidden on an element because its descendant retained focus.
+      The focus must not be hidden from assistive technology users. Avoid
+      using aria-hidden on a focused element or its ancestor. Consider using
+      the inert attribute instead, which will also prevent focus. For more
+      details, see the aria-hidden section of the WAI-ARIA specification at
+      https://w3c.github.io/aria/#aria-hidden.
+      Element with focus: <input.columnSearch>
+    */
+
+    [aria-hidden="true"] * {
+      pointer-events: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
     /* https://stackoverflow.com/a/63507769 */
     /* See also 
     /* https://datatables.net/forums/discussion/72111/how-can-i-make-the-x-scroller-fixed-sticky*/
@@ -143,6 +169,7 @@
       <li>A search string <code>abc</code> on a column results in an SQL <code>LIKE = '%abc%'</code> query. See <a href="https://www.w3schools.com/sql/sql_like.asp">SQL LIKE</a> for more information on the SQL <code>LIKE</code> operator.</li>
       <li>However, if search string starts and/or ends with <code>%</code>, the percentage wildcards are not added automatically.</li>
       <li>For an exact match search for <code>abc</code>, use single quotes: <code>'abc'</code>.</li>
+      <li>Escape single quotes by repeating, e.g., <code>'''single quoted string'''</code>.</li>
       <li>All entries are stored as strings.</li>
     </ul>
   </details>
@@ -154,6 +181,7 @@
     </span>
     <span id="clearAllSearches" style="display:none" title="Clear all searches"><button onclick="clearAllSearches('#table1')">Clear</button></span>
   </div>
+  <span id="query"> <a href="">Query</a></span>
 
   <table id="table1" class="display" style="width:100%"></table>
 
@@ -260,73 +288,19 @@
       console.log("dtInitComplete() => Setting column search inputs.")
       const qs = parseQueryString();
       let config = getConfig.config;
+      visibleIndex = 0;
       table.api().columns(':visible').every(function () {
-        let that = this;
-        // Create `select` element
-        let index = this.index();
+        let column = this;
+        let index = column.index();
         let name = config.columns[index]['name'];
-        // Note that the header table does not have an id. It should.
-        $("thead tr:eq(0) > th").eq(index).html('');
-        //let thWidth = $("thead tr:eq(0) > th").eq(index).outerWidth();
-        //console.log(`Width of th for column '${name}': ${thWidth}px`);
-        let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
+        let searchOnKeypress = false == config.columns[index]['return'];
 
-        let val = qs[name] || '';
-        input
-          .val(val)
-          .attr('title','Press enter to search')
-          .appendTo($("thead tr:eq(0) > th").eq(index))
-          .on("keydown", function() {
-            if (!config["search"]["return"]) {
-              that.search($(this).val()).draw('page');
-            } else {
-              let keycode = (event.keyCode ? event.keyCode : event.which);
-              if (keycode == '13'){
-                that.search($(this).val()).draw('page');
-              }
-            }
-          });
-          if (val) {
-            input.css('background-color', 'yellow');
-            input.attr('title','Remove text and press enter to clear search')
-          }
-          if (config['serverSide'] && name === 'datasetID') {
-            _createDropdown(index, name);
-          }
-        });
-
-        function _createDropdown(index, name) {
-          let dropdown = $(`<br><label for="${name}"></label><select index="${index}" name="${name}" style="display:none;max-width: 6em; overflow: auto;"></select>`)
-          dropdown.appendTo($("thead tr:eq(0) > th").eq(index));
-
-          // Fetch unique values for this column
-          $.ajax({
-            url: `data/?_return=${encodeURIComponent(name)}&_uniques=true`,
-            method: "GET",
-            dataType: "json",
-            success: function (data) {
-              let select = $(`select[name="${name}"]`)
-              select.empty();
-              select.append(`<option value=""></option>`);
-              // Assume data is an array of unique values
-              data[name].forEach(function (val) {
-                select.append(`<option value="${val}">${val[0]} (${val[1]})</option>`);
-              });
-              // Set dropdown value from query string if present
-              const qs = parseQueryString();
-              if (qs[name]) {
-                dropdown.val(qs[name]);
-              }
-              dropdown.show();
-            }
-          });
-
-          // On dropdown change, update input and trigger search
-          dropdown.off("change").on("change", function () {
-            input.val($(this).val());
-            input.trigger({ type: "keydown", which: 13 });
-          });
-      }
+        let input = createInput(index, name, column, visibleIndex, qs[name], searchOnKeypress);
+        if (config['serverSide']) {
+          createDropdown(index, name, input, column);
+        }
+        visibleIndex++;
+      });
 
       setEvents('#table1');
       adjustDOM('#table1');
@@ -540,6 +514,10 @@
         console.log("_ajaxData() => Returning updated dtp object:")
         console.log(dtp);
 
+        let url = window.location.pathname + "data/" + "?" + new URLSearchParams(dtp).toString();
+        $('#query > a').attr('href', url);
+        $('#query').show();
+
         return dtp;
       }
 
@@ -571,6 +549,81 @@
         $('#table1').html(`<div style="color:red;font-weight:bold;padding:1em">${emsg}</div>`);
       }
     }
+
+    function createInput(index, name, column, visibleIndex, qsName, searchOnKeypress) {
+      // Create `select` element
+      // Note that the header table does not have an id. It should.
+      $("thead tr:eq(0) > th").eq(visibleIndex).html('');
+      let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
+
+      let val = qsName || '';
+      input
+        .val(val)
+        .attr('title','Press enter to search')
+        .appendTo($("thead tr:eq(0) > th").eq(visibleIndex))
+        .on("keydown", function() {
+          if (searchOnKeypress) {
+            // Do search on each keypress
+            column.search($(this).val()).draw('page');
+          } else {
+            let keycode = (event.keyCode ? event.keyCode : event.which);
+            if (keycode == '13') {
+              column.search($(this).val()).draw('page');
+            }
+          }
+        });
+        if (val) {
+          input.css('background-color', 'yellow');
+          input.attr('title','Remove text and press enter to clear search')
+        }
+        return input;
+    }
+
+    function createDropdown(index, name, input, column) {
+      let maxLen = 100;
+      let width = input.outerWidth();
+      let title = `Most frequent unique values and (count); max of ${maxLen} shown`;
+      let dropdown = `<br><label for="${name}"></label>`
+      let attrs = `class="columnUniques" title="${title}" index="${index}" name="${name}"`
+      dropdown += `<select ${attrs}></select>`
+      dropdown = $(dropdown);
+      dropdown.css('width', width);
+      dropdown.appendTo($("thead tr:eq(0) > th").eq(index));
+
+      // Fetch unique values for this column
+      $.ajax({
+        url: `data/?_return=${encodeURIComponent(name)}&_uniques=true&_length=100`,
+        method: "GET",
+        dataType: "json",
+        success: function (data) {
+          let select = $(`select[name="${name}"]`)
+          select.empty();
+          select.append(`<option value=""></option>`);
+          // Assume data is an array of unique values
+          data[name].forEach(function (val) {
+            select.append(`<option value="${val[0]}">${val[0]} (${val[1]})</option>`);
+          });
+          // Set dropdown value from query string if present
+          const qs = parseQueryString();
+          if (qs[name]) {
+            dropdown.val(qs[name]);
+          }
+          dropdown.css('visibility', 'visible');
+        }
+      });
+
+      // On dropdown change, update input and trigger search
+      dropdown.off("change").on("change", function () {
+        console.log(this)
+        let val = $(this).val().replace(/'/g, "''");
+        input.val(`'${val}'`);
+        if ($(this).val() !== '') {
+          column.search($(this).val()).draw('page');
+        }
+        // Does not work:
+        //input.trigger($.Event("keydown", { which: 13 }));
+      });
+  }
 
     function setEvents(tableID) {
 
@@ -739,23 +792,13 @@
         }
       }
 
+      $(table_info).append($("#query"));
+
       console.log("adjustDOM() => Setting timeout to execute $(window).resize()")
       setTimeout(function() {
 
         console.log("adjustDOM() => Executing $(window).resize() to trigger event that causes left column header width to match the width of the left column body.")
         $(window).resize()
-
-        $('[aria-describedby=table1_info]').removeAttr('aria-hidden')
-        // The above line is needed to prevent the following error (which results
-        // in updates to search inputs not being read by code that steps through
-        // columns search inputs):
-        // Blocked aria-hidden on an element because its descendant retained focus.
-        // The focus must not be hidden from assistive technology users. Avoid
-        // using aria-hidden on a focused element or its ancestor. Consider using
-        // the inert attribute instead, which will also prevent focus. For more
-        // details, see the aria-hidden section of the WAI-ARIA specification at
-        // https://w3c.github.io/aria/#aria-hidden.
-        // Element with focus: <input.columnSearch>
 
       }, 0);
 
