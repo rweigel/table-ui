@@ -101,8 +101,6 @@ def _read_config(apiconfig, warn=False):
 
 
 def _api_init(app, apiconfig):
-
-  from fastapi import HTTPException
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles
@@ -123,38 +121,76 @@ def _api_init(app, apiconfig):
 
   @app.route("/", methods=["GET", "HEAD"])
   def indexhtml(request: fastapi.Request):
-    # Silently ignore any query parameters
+    # Silently ignores any query parameters
     fname = os.path.join(root_dir,'index.html')
     logger.info("Reading: " + fname)
     with open(fname) as f:
       indexhtml_ = f.read()
     return fastapi.responses.HTMLResponse(indexhtml_)
 
+  dbinfo = _dbinfo(**dbconfig)
+  if "jsondb" in dbinfo and dbinfo["jsondb"] is not None:
+    @app.route("/jsondb", methods=["GET", "HEAD"])
+    def jsondb(request: fastapi.Request):
+      # Silently ignores any query parameters other than _verbose
+      query_params = dict(request.query_params)
+      dbinfo = _dbinfo(**dbconfig)
+      with open(dbinfo['jsondb']['body']) as f:
+        # TODO: Stream
+        logger.info("Reading and sending: " + dbinfo['jsondb']['body'])
+        data = json.load(f)
+        # TODO: Use _verbose validation in data()
+        data = _data_transform(data, dbinfo['column_names'], query_params.get("_verbose", None) == "true")
+      data = {
+        "columns": dbinfo['column_names'],
+        "data": data
+      }
+      return fastapi.responses.JSONResponse(data)
+
+  if "sqldb" in dbinfo and dbinfo["sqldb"] is not None:
+    @app.route("/sqldb", methods=["GET", "HEAD"])
+    def sqldb(request: fastapi.Request):
+      # Silently ignores any query parameters
+      filename = os.path.basename(dbinfo['sqldb'])
+      if filename.endswith('.sqlite'):
+        filename = filename[0:-7] + '.sqlite3'
+      if filename.endswith('.sql'):
+        filename = filename[0:-4] + '.sqlite3'
+        kwargs = {
+                    'media_type': 'application/x-sqlite3',
+                    'filename': filename
+                  }
+      return fastapi.responses.FileResponse(dbinfo['sqldb'], **kwargs)
+
   @app.route("/config", methods=["GET", "HEAD"])
   def config(request: fastapi.Request):
-    # Silently ignore any query parameters
+    # Silently ignores any query parameters
     dbinfo = _dbinfo(**dbconfig)
     content = _read_config(apiconfig, warn=False)
     if "tableUI" not in content:
       content['tableUI'] = {"tableMetadata": {}}
-    if 'tableMetadata' in content:
-      content['tableUI']["tableMetadata"] = content['tableMetadata']
     if "sqldb" in dbinfo:
       content['tableUI']['sqldb'] = dbinfo["sqldb"]
     if "jsondb" in dbinfo:
       content['tableUI']['jsondb'] = dbinfo["jsondb"]
-    if "table_name" in dbinfo:
-      content['tableUI']['name'] = dbinfo["table_name"]
+    if "table_name" in dbinfo and 'name' not in content['tableUI']['tableMetadata']:
+      content['tableUI']['tableMetadata']['name'] = dbinfo["table_name"]
+    try:
+      import datetime
+      mtime = os.path.getmtime(dbinfo.get("sqldb", dbinfo.get("jsondb", {}).get("body", "")))
+      content['tableUI']['tableMetadata']['creationDate'] = datetime.datetime.fromtimestamp(mtime).isoformat()
+    except Exception as e:
+      logger.warning(f"Could not get file modification time: {e}")
     return fastapi.responses.JSONResponse(content=content)
 
   @app.route("/render.js", methods=["GET", "HEAD"])
   def render(request: fastapi.Request):
-    # Silently ignore any query parameters
+    # Silently ignores any query parameters
     return fastapi.responses.FileResponse(dtrender)
 
   @app.route("/header", methods=["GET", "HEAD"])
   def header(request: fastapi.Request):
-    # Silently ignore any query parameters
+    # Silently ignores any query parameters
     dbinfo = _dbinfo(**dbconfig)
     return fastapi.responses.JSONResponse(content=dbinfo['column_names'])
 
@@ -500,7 +536,7 @@ def _column_names(sqldb=None, table_name=None, json_head=None, json_body=None):
   with open(json_head) as f:
     try:
       header = json.load(f)
-    except:
+    except Exception:
       header = list(range(0, len(json_body[0])))
     return header
 

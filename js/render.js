@@ -1,11 +1,14 @@
 function renderColumn (columnName, tableConfig) {
+  console.log(tableConfig)
   if (columnName === 'datasetID') {
     _renderColumn.columnName = columnName
     _renderColumn.tableConfig = tableConfig
-    if (tableConfig.tableUI.name.startsWith('cdaweb')) {
-      return _renderColumn
+
+    const tableName = tableConfig.tableUI.tableMetadata.name
+    if (!tableName) {
+      return
     }
-    if (tableConfig.tableUI.name.startsWith('spase')) {
+    if (tableName.startsWith('cdaweb') || tableName.startsWith('spase')) {
       return _renderColumn
     }
   }
@@ -24,7 +27,7 @@ function renderColumn (columnName, tableConfig) {
       columnString += `&nbsp;<a href="${fnameJSON}" title="JSON">J</a>`
       columnString += `&nbsp;<a href="${fnameSKT}" title="Skeleton Table">SK</a>`
 
-      const tableName = _renderColumn.tableConfig.tableName
+      const tableName = _renderColumn.tableConfig.tableUI.tableMetadata.name
       if (tableName === 'spase.dataset') {
         console.log(full[1].replace('spase://', 'https://hpde.io'))
         const fnameSPASE = full[1].replace('spase://', 'https://hpde.io/') + '.json'
@@ -32,7 +35,8 @@ function renderColumn (columnName, tableConfig) {
       }
 
       if (tableName === 'cdaweb.dataset') {
-        const columnNames = _renderColumn.tableConfig.columnNames
+        const columnNames = _renderColumn.tableConfig.columns.map(c => c.name)
+        console.log(columnNames)
         const index = columnNames.indexOf('spase_DatasetResourceID')
         const fnameSPASE = full[index].replace('spase://', 'https://hpde.io/') + '.json'
         columnString += `&nbsp;<a href="${fnameSPASE}" title="SPASE">SP</a>`
@@ -44,21 +48,28 @@ function renderColumn (columnName, tableConfig) {
 }
 
 function renderTableMetadata (config) {
-  console.log("renderTableMetadata(): config:")
+  console.log('renderTableMetadata(): config:')
   console.log(config)
   if (!config.tableUI.tableMetadata) return ''
-  const description = config.tableUI.tableMetadata.description
-  const creationDate = config.tableUI.tableMetadata.creationDate
-  if (!description && !creationDate) return ''
-  let txt = `${description}. Created <code>${creationDate}</code>.`
-  txt += ' Table <a href="/config">config</a>'
-  if (config.tableUI.jsondb) {
-    if (config.tableUI.jsondb.body) {
-      txt += ` | <a href="${config.tableUI.jsondb.body}">body</a>`
-    }
-    if (config.tableUI.jsondb.head) {
-      txt += ` | <a href="${config.tableUI.jsondb.head}">cols</a>`
-    }
+  let description = config.tableUI.tableMetadata.description || ''
+  if (description) {
+    description += ' |'
   }
+  let creationDate = config.tableUI.tableMetadata.creationDate || ''
+  if (creationDate) {
+    creationDate = `Created <code>${creationDate}</code>.`
+  }
+  if (!description && !creationDate) return ''
+  let txt = `${description}${creationDate}`
+  const base = window.location.origin + window.location.pathname.replace(/\/$/, '')
+  txt += ` Table <a href="${base}/config" title="${base}/config" target="_blank">config</a>`
+  let href = ''
+  if (config.tableUI.sqldb) {
+    href = `${base}/sqldb`
+  }
+  if (config.tableUI.jsondb) {
+    href = `${base}/jsondb`
+  }
+  txt += ` | <a href="${href}" title="${href}" target="_blank">data</a>`
   return txt
 }

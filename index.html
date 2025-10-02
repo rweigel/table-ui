@@ -141,18 +141,32 @@
     <div id="tableMetadata"></div>
     <h1>Usage</h1>
     <ul>
-      <li>To execute any search, press enter key after entering text in column text entry area.</li>
-      <li>Shift+click on sort arrows (<span style="font-size:small;opacity:0.25">▼</span> or <span style="font-size:small;opacity:0.25">▲</span>) to sort on multiple columns.</li>
+      <li>To execute any search, press enter key after entering text in
+          column text entry area.</li>
+      <li>Shift+click on sort arrows
+          (<span style="font-size:small;opacity:0.25">▼</span>
+          or <span style="font-size:small;opacity:0.25">▲</span>) 
+          to sort on multiple columns.</li>
       <li>A entry of <code>⎵</code> means value is a single blank space.</li>
-      <li>To show only certain columns, enter, e.g., <code>_cols=a,b,c</code> and reload page to apply changes.</li>
+      <li>To show only certain columns, enter, e.g., <code>_cols=a,b,c</code> 
+          and reload page to apply changes.</li>
     </ul>
     <h1>Search</h1>
     <ul>
-      <li>A search string <code>abc</code> on a column results in an SQL <code>LIKE = '%abc%'</code> query. See <a href="https://www.w3schools.com/sql/sql_like.asp" target="_blank">SQL LIKE</a> for more information on the SQL <code>LIKE</code> operator.</li>
-      <li>However, if search string starts and/or ends with <code>%</code>, the percentage wildcards are not added automatically.</li>
-      <li>Escape <code>%</code> and <code>_</code> using <code>\</code>. Escape <code>\</code> with <code>\\</code>.</li>
-      <li>For an exact match search for <code>abc</code>, use single quotes: <code>'abc'</code>.</li>
-      <li>Escape single quotes by repeating, e.g., <code>'''single quoted string'''</code>.</li>
+      <li>A search string <code>abc</code> on a column results in an SQL 
+          <code>LIKE = '%abc%'</code> query. See 
+          <a href="https://www.w3schools.com/sql/sql_like.asp" target="_blank">
+            SQL LIKE
+          </a>
+          for more information on the SQL <code>LIKE</code> operator.</li>
+      <li>However, if search string starts and/or ends with <code>%</code>,
+          the percentage wildcards are not added automatically.</li>
+      <li>Escape <code>%</code> and <code>_</code> using <code>\</code>. 
+          Escape <code>\</code> with <code>\\</code>.</li>
+      <li>For an exact match search for <code>abc</code>, use single quotes: 
+          <code>'abc'</code>.</li>
+      <li>Escape single quotes by repeating, e.g., 
+          <code>'''single quoted string'''</code>.</li>
       <li>All entries are stored as strings.</li>
     </ul>
     <p>
@@ -209,10 +223,10 @@
         tr1.append(`<th>${config.columns[i]['name']}</th>`);
       }
 
-      stickyHeaderFixes("#table1dataTables_scrollHead", 10);
+      stickyHeaderFixes("#table1", 101);
 
       // https://datatables.net/reference/option/
-      let dataTableOptions =
+      const dataTableOptions =
         {
           ...config,
           "stateSave": true,
@@ -299,7 +313,7 @@
       let resp = await fetch(url);
       const config = await resp.json();
 
-      const tableName = $('title').text(config.tableUI.name);
+      const tableName = $('title').text(config.tableUI.tableMetadata.name);
 
       let columnNames = [];
       if (!config['columns']) {
@@ -588,7 +602,7 @@
     }
 
     function createColumnDropdown(index, name, input, column, parent) {
-      console.log(parent, index)
+
       let dropdown = $(`${parent} thead tr:eq(0) > th`).eq(index).find('select.columnUniques');
       if (dropdown.length > 0) {
         // Don't re-create dropdown if it already exists.
@@ -774,16 +788,18 @@
 
     function adjustDOM(tableID) {
 
-      console.log("adjustDOM() called.")
+      console.log("adjustDOM() => called.")
       const table_info = `${tableID}_info`;
       const table_length = `${tableID}_length`;
       const table_filter = `${tableID}_filter`;
       const table_paginate = `${tableID}_paginate`;
 
+      console.log("adjustDOM() => Moving global search input.")
       let input = $(`${table_filter} input`).attr('placeholder','Global search')
       $(`${table_filter} label`).replaceWith(input[0]);
       $(`${table_info}`).insertAfter(table_filter);
 
+      console.log("adjustDOM() => Moving global search input.")
       let numCols = $(tableID).DataTable().columns().nodes().length;
       let numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length;
       let colInfo = ` and all ${numCols} columns`;
@@ -791,9 +807,9 @@
         colInfo = ` and ${numColsVisible} of ${numCols} columns`;
       }
 
+      console.log("adjustDOM() => Creating 'Showing ...' string.")
       const info = $(tableID).DataTable().page.info();
       const nRows = info.recordsDisplay.toLocaleString('en-US')
-
       let txt = `Showing ${parseInt(info.start)+1}-${parseInt(info.end)} of ${nRows} rows`
       if (info.recordsDisplay === 0) {
         txt = `Showing 0 rows`
@@ -804,6 +820,8 @@
       }
       txt += `${colInfo}.`
       $(table_info).text(txt);
+
+      console.log("adjustDOM() => Moving pagination controls and hiding if only one page.")
       $(table_paginate).insertAfter(table_filter);
       // Hide paging if only one page.
       if ($(tableID).dataTable().api().page.info().pages === 1) {
@@ -814,11 +832,13 @@
         $(table_paginate).show();
       }
 
+      console.log("adjustDOM() => Moving length control.")
       let select = $(`${table_length} select`)
       select.appendTo(table_length)
       $(`${table_length} label`).text('Rows per page: ')
       $('#table1_length').appendTo('#controls');
 
+      console.log("adjustDOM() => Modifying Previous/Next buttons.")
       const prev = $(`${tableID}_previous`);
       prev.attr('title','Previous page');
       if (prev.length > 0) {
@@ -827,7 +847,6 @@
           prev.html(html.replace('Previous','◀'));
         }
       }
-
       const next = $(`${tableID}_next`);
       next.attr('title','Next page');
       if (next.length > 0) {
@@ -837,6 +856,7 @@
         }
       }
 
+      console.log("adjustDOM() => Showing or hiding Clear button based on presence of searches in query string.")
       const qs = parseQueryString();
       const numSearchKeys = Object.keys(qs).filter(k => !k.startsWith('_')).length;
       let msg = `setEvents() => draw.dt => There are `;
@@ -862,6 +882,7 @@
         }
       }
 
+      console.log("adjustDOM() => Moving query link.")
       $(table_info).append($("#query"));
 
       console.log("adjustDOM() => Setting timeout to execute $(window).resize().")
@@ -1066,7 +1087,7 @@
       console.log(`updateQueryString() called with name='${name}' and val='${val}'`);
       let qs = parseQueryString();
       if (val === null) {
-        console.log(`Removing ${name} from query string.`);
+        console.log(`updateQueryString() => Removing ${name} from query string.`);
         delete qs[name];
       } else {
         qs[name] = val;
