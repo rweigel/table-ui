@@ -28,6 +28,9 @@
       overflow: auto;
       margin-top: 0.25em;
     }
+    input.columnSearch {
+      width: 10em;
+    }
     #table1 {
       width:100%;
       padding-top: 1em;
@@ -115,27 +118,6 @@
       box-shadow: 0 0 1px rgba(255,255,255,.5);
     }
 
-    /* Prevent interaction with elements that have aria-hidden="true"
-      The following is needed to prevent the following error (which results
-      in updates to search inputs not being read by code that steps through
-      columns search inputs):
-      Blocked aria-hidden on an element because its descendant retained focus.
-      The focus must not be hidden from assistive technology users. Avoid
-      using aria-hidden on a focused element or its ancestor. Consider using
-      the inert attribute instead, which will also prevent focus. For more
-      details, see the aria-hidden section of the WAI-ARIA specification at
-      https://w3c.github.io/aria/#aria-hidden.
-      Element with focus: <input.columnSearch>
-    */
-
-    [aria-hidden="true"] * {
-      pointer-events: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-
     /* https://stackoverflow.com/a/63507769 */
     /* See also 
     /* https://datatables.net/forums/discussion/72111/how-can-i-make-the-x-scroller-fixed-sticky*/
@@ -166,13 +148,18 @@
     </ul>
     <h1>Search</h1>
     <ul>
-      <li>A search string <code>abc</code> on a column results in an SQL <code>LIKE = '%abc%'</code> query. See <a href="https://www.w3schools.com/sql/sql_like.asp">SQL LIKE</a> for more information on the SQL <code>LIKE</code> operator.</li>
+      <li>A search string <code>abc</code> on a column results in an SQL <code>LIKE = '%abc%'</code> query. See <a href="https://www.w3schools.com/sql/sql_like.asp" target="_blank">SQL LIKE</a> for more information on the SQL <code>LIKE</code> operator.</li>
       <li>However, if search string starts and/or ends with <code>%</code>, the percentage wildcards are not added automatically.</li>
       <li>Escape <code>%</code> and <code>_</code> using <code>\</code>. Escape <code>\</code> with <code>\\</code>.</li>
       <li>For an exact match search for <code>abc</code>, use single quotes: <code>'abc'</code>.</li>
       <li>Escape single quotes by repeating, e.g., <code>'''single quoted string'''</code>.</li>
       <li>All entries are stored as strings.</li>
     </ul>
+    <p>
+      <a href="https://github.com/rweigel/table-ui" title="https://github.com/rweigel/table-ui" style="text-decoration:none" target="_blank">
+        <img src="css/github-mark.svg" alt="GitHub logo" height="24px">
+      </a>
+    </p>
   </details>
 
   <div id="controls" style="padding-bottom:3px">
@@ -182,7 +169,7 @@
     </span>
     <span id="clearAllSearches" style="display:none" title="Clear all searches"><button onclick="clearAllSearches('#table1')">Clear</button></span>
   </div>
-  <span id="query"> <a href="">Query</a></span>
+  <span id="query"> <a href="" target="_blank">Query</a></span>
 
   <table id="table1" class="display" style="width:100%"></table>
 
@@ -208,30 +195,21 @@
       const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : "";
       $('#tableMetadata').html(tableMetadata);
 
-      if (true) {
-        // Add header names to table. Two rows are added.
-        // The first row is for name and sorting, second row is for filtering.
-        $('#table1').append('<thead><tr></tr><tr></tr></thead>');
-        let tr1 = $('#table1 > thead > tr:eq(1)');
-        for (let i = 0; i < config.columns.length; i++) {
-          tr1.append(`<th>${config.columns[i]['name']}</th>`);
-        }
-        let tr2 = $('#table1 > thead > tr:eq(0)');
-        for (let i = 0; i < config.columns.length; i++) {
-          tr2.append(`<th></th>`);
-        }
+      // Add header names to table. Two rows are added.
+      // The first row is for name and sorting, second row is for filtering.
+      // Need to add before table is created so it is included in DataTables
+      // column width calculations.
+      $('#table1').append('<thead><tr></tr><tr></tr></thead>');
+      let tr0 = $('#table1 > thead > tr:eq(0)');
+      for (let i = 0; i < config.columns.length; i++) {
+        tr0.append(`<th></th>`);
+      }
+      let tr1 = $('#table1 > thead > tr:eq(1)');
+      for (let i = 0; i < config.columns.length; i++) {
+        tr1.append(`<th>${config.columns[i]['name']}</th>`);
       }
 
-      // Make the added header search row fixed b/c the fixedColumns plugin
-      // does not seem to "see" the extra row.
-      // Needed?
-      if (true) {
-        $(`#table1 thead tr:eq(0) > th:eq(0)`)
-          .css('position', 'sticky')
-          .css('left', '0px')
-          .css('z-index', '101')
-          .css('background-color', 'white');
-      }
+      stickyHeaderFixes("#table1dataTables_scrollHead", 10);
 
       // https://datatables.net/reference/option/
       let dataTableOptions =
@@ -254,6 +232,13 @@
             delete data.length
             delete data.columns
           },
+          headerCallback: function(thead, data, start, end, display) {
+            // This is needed to prevent DataTables from removing
+            // the second header row that contains the column names.
+            // It does not appear to be documented.
+            //alert('here')
+            return thead;
+          },
           "initComplete": dtInitComplete,
         };
 
@@ -269,42 +254,33 @@
     function dtInitComplete() {
 
       console.log("dtInitComplete() => DOM is ready.")
+      const tableID = '#table1';
 
       // Set initial page in page selector
       //$("#table1").DataTable().page(getQueryValue('_page', 1)-1).draw('page');
 
-      const table = $('#table1').dataTable();
-      console.log("Setting search inputs with initial search values and setting search event.")
+      const table = $(tableID).dataTable();
+      let msg = "dtInitComplete() => Setting search inputs with initial "
+      console.log(`${msg} search values and setting search event.`)
 
       if (getQueryValue('_cols_show') === 'nonempty') {
-        console.log("dtInitComplete() => Setting hideEmptyColumns checkbox to checked because _cols_show=nonempty in query string.")
+        msg = "dtInitComplete() => Setting hideEmptyColumns ";
+        console.log(`${msg}checkbox to checked because _cols_show=nonempty in query string.`)
         $('#hideEmptyColumns').prop('checked', true);
         console.log("dtInitComplete() => Hiding empty columns.")
-        let columnEmpty = emptyColumns('#table1', true);
+        let columnEmpty = emptyColumns(tableID, true);
         table.api().columns(columnEmpty).visible(false, false)
       } else {
         console.log("dtInitComplete() => Showing all columns.")
       }
 
-      console.log("dtInitComplete() => Setting column search inputs.")
-      const qs = parseQueryString();
-      let config = getConfig.config;
-      visibleIndex = 0;
-      table.api().columns(':visible').every(function () {
-        let column = this;
-        let index = column.index();
-        let name = config.columns[index]['name'];
-        let searchOnKeypress = false == config.columns[index]['return'];
+      console.log("dtInitComplete() => Setting column search inputs and dropdowns.")
+      createColumnSelectors(tableID, `${tableID}_wrapper`);
 
-        let input = createInput(index, name, column, visibleIndex, qs[name], searchOnKeypress);
-        if (config['serverSide']) {
-          createDropdown(index, name, input, column);
-        }
-        visibleIndex++;
-      });
+      setEvents(tableID);
+      adjustDOM(tableID);
 
-      setEvents('#table1');
-      adjustDOM('#table1');
+      watchForFloatingHeader();
 
       console.log("dtInitComplete() finished.")
     }
@@ -338,8 +314,9 @@
       // Update config['pageLength'] and config['lengthMenu'] as needed.
       _pageLength(config);
 
-      config['displayStart'] = config['pageLength'] * (-1 + parseInt(getQueryValue('_page', 1)));
-      // Why is this needed when config['serverSide'] = false?
+      let page0based = (-1 + parseInt(getQueryValue('_page', 1)))
+      config['displayStart'] = config['pageLength'] * page0based;
+
       config['ajax'] = window.location.pathname + "data/";
 
       if (config['serverSide']) {
@@ -475,7 +452,7 @@
       }
 
       function _ajaxData(dtp) {
-        console.log("config['ajax'] callback. Preparing query parameters for AJAX search using dtp object:");
+        console.log("_ajaxData() => Preparing query parameters for AJAX search using dtp object:");
         console.log(dtp);
         const config = getConfig.config;
         const columnObject = array2object(config.columns, 'name');
@@ -515,7 +492,8 @@
         console.log("_ajaxData() => Returning updated dtp object:")
         console.log(dtp);
 
-        let url = window.location.pathname + "data/" + "?" + new URLSearchParams(dtp).toString();
+        let url = window.location.pathname + "data/" + "?";
+        url += new URLSearchParams(dtp).toString()
         $('#query > a').attr('href', url);
         $('#query').show();
 
@@ -551,17 +529,40 @@
       }
     }
 
-    function createInput(index, name, column, visibleIndex, qsName, searchOnKeypress) {
+    function createColumnSelectors(tableID, parent) {
+      const table = $(tableID).dataTable();
+      const qs = parseQueryString();
+      let config = getConfig.config;
+      visibleIndex = 0;
+      table.api().columns(':visible').every(function () {
+        let column = this;
+        let index = column.index();
+        let name = config.columns[index]['name'];
+        let searchOnKeypress = false == config.columns[index]['return'];
+
+        let input = createColumnInput(index, name, column, visibleIndex, qs[name], searchOnKeypress, parent);
+        if (config['serverSide']) {
+        //if (config['serverSide'] && name === 'datasetID') {
+          createColumnDropdown(index, name, input, column, parent);
+        }
+        visibleIndex++;
+      });
+    }
+
+    function createColumnInput(index, name, column, visibleIndex, qsName, searchOnKeypress, parent) {
       // Create `select` element
       // Note that the header table does not have an id. It should.
-      $("thead tr:eq(0) > th").eq(visibleIndex).html('');
-      let input = $(`<input class="columnSearch" index="${index}" name="${name}" type="text" placeholder="Search col." style="max-width:5em"/>`);
+      let element = `thead tr:eq(0) > th`
+      let th = $(`${parent} ${element}`).eq(visibleIndex).empty();
+      let attrs = `class="columnSearch" index="${index}" name="${name}"`;
+      let input = $(`<input ${attrs} type="text" placeholder="Search col."/>`);
 
       let val = qsName || '';
       input
         .val(val)
         .attr('title','Enter search string and press enter to search')
-        .appendTo($("thead tr:eq(0) > th").eq(visibleIndex))
+        .appendTo(th)
+        .off("keydown")
         .on("keydown", function() {
           if (searchOnKeypress) {
             // Do search on each keypress
@@ -569,6 +570,12 @@
           } else {
             let keycode = (event.keyCode ? event.keyCode : event.which);
             if (keycode == '13') {
+              if (input.siblings('select.columnUniques').length > 0) {
+                let dropdown = input.siblings('select.columnUniques');
+                if (dropdown.find('option').length > 0) {
+                  dropdown.prop('selectedIndex', 0);
+                }
+              }
               column.search($(this).val()).draw('page');
             }
           }
@@ -580,17 +587,27 @@
         return input;
     }
 
-    function createDropdown(index, name, input, column) {
-      let maxLen = 100;
-      let width = input.outerWidth();
-      let title = `Most frequent unique values and (count); max of ${maxLen} shown`;
-      let dropdown = `<br><label for="${name}"></label>`
-      let attrs = `class="columnUniques" title="${title}" index="${index}" name="${name}"`
+    function createColumnDropdown(index, name, input, column, parent) {
+      console.log(parent, index)
+      let dropdown = $(`${parent} thead tr:eq(0) > th`).eq(index).find('select.columnUniques');
+      if (dropdown.length > 0) {
+        // Don't re-create dropdown if it already exists.
+        // Not working. May need to have mutation look for this element.
+        setChangeEvent(dropdown);
+        return;
+      }
+
+      const maxLen = 100;
+      const width = input.outerWidth();
+      const title = `Most frequent unique values and (count); max of ${maxLen} shown`;
+      const attrs = `class="columnUniques" title="${title}" index="${index}" name="${name}"`
+      dropdown = `<br>`;//<label for="${name}"></label>`
       dropdown += `<select ${attrs}></select>`
       dropdown = $(dropdown);
       dropdown.css('width', width);
-      dropdown.appendTo($("thead tr:eq(0) > th").eq(index));
+      dropdown.appendTo($(`${parent} thead tr:eq(0) > th`).eq(index));
 
+      const qs = parseQueryString();
       // Fetch unique values for this column
       $.ajax({
         url: `data/?_return=${encodeURIComponent(name)}&_uniques=true&_length=100`,
@@ -600,31 +617,60 @@
           let select = $(`select[name="${name}"]`)
           select.empty();
           select.append(`<option value=""></option>`);
-          // Assume data is an array of unique values
           data[name].forEach(function (val) {
             select.append(`<option value="${val[0]}">${val[0]} (${val[1]})</option>`);
           });
           // Set dropdown value from query string if present
-          const qs = parseQueryString();
           if (qs[name]) {
-            dropdown.val(qs[name]);
+            dropdown.val(qs[name].replace(/^'/,'').replace(/'$/,''));
           }
           dropdown.css('visibility', 'visible');
         }
       });
+      setChangeEvent();
 
-      // On dropdown change, update input and trigger search
-      dropdown.off("change").on("change", function () {
-        console.log(this)
-        let val = $(this).val().replace(/'/g, "''");
-        input.val(`'${val}'`);
-        if ($(this).val() !== '') {
+      function setChangeEvent() {
+        // On dropdown change, update input and trigger search
+        dropdown.off("change").on("change", function () {
+          console.log("Dropdown change event triggered.")
+          let val = $(this).val().replace(/'/g, "''");
+          if (val === "") {
+            input.val("");
+          } else {
+            input.val(`'${val}'`);
+          }
           column.search($(this).val()).draw('page');
-        }
-        // Does not work:
-        //input.trigger($.Event("keydown", { which: 13 }));
-      });
+          // Does not work:
+          //input.trigger($.Event("keydown", { which: 13 }));
+        });
+      }
   }
+
+    function watchForFloatingHeader() {
+      if (!watchForFloatingHeader.enabled) {
+        watchForFloatingHeader.enabled = true;
+      } else {
+        return;
+      }
+      let msg = "watchForFloatingHeader() => Setting up MutationObserver ";
+      console.log(`${msg}to watch for addition of dtfh-floatingparent element.`);
+      const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+            mutation.addedNodes.forEach(function(node) {
+              if ($(node).hasClass('dtfh-floatingparent')) { 
+                msg = "watchForFloatingHeader() => dtfh-floatingparent ";
+                console.log(`${msg}was added. Adding column selectors to it.`);
+                createColumnSelectors('#table1', '.dtfh-floatingparent');
+                stickyHeaderFixes(1);
+              }
+            });
+          }
+        });
+      });
+      const config = { childList: true, subtree: true }; // Observe child additions and in subtrees
+      observer.observe(document.body, config); // Start observing from the body
+    }
 
     function setEvents(tableID) {
 
@@ -677,14 +723,15 @@
           adjustDOM(tableID);
 
           if (pageChanged && getQueryValue('_cols_show') === 'nonempty') {
-            console.log("setEvents() => draw.dt => Page was changed and _cols_show=nonempty. Checking for change in empty columns.")
+            let msg = 'setEvents() => draw.dt => ';
+            console.log(`${msg}Page was changed and _cols_show=nonempty. Checking for change in empty columns.`)
             pageChanged = false;
             _emptyColumnsNow = emptyColumns(tableID);
             if (_emptyColumns.length === _emptyColumnsNow.length) {
-              console.log("setEvents() => draw.dt => Number of empty columns has not changed. Not updating column visibility.")
+              console.log(`${msg} Number of empty columns has not changed. Not updating column visibility.`)
               return;
             }
-            console.log("setEvents() => draw.dt => Number of empty columns has changed. Calling init().")
+            console.log(`${msg} Number of empty columns has changed. Calling init().`)
             _emptyColumns = _emptyColumnsNow;
             init()
           }
@@ -704,6 +751,25 @@
           init()
         }
       });
+    }
+
+    function stickyHeaderFixes(index) {
+      if (!index) {
+        index = 10;
+      }
+      let parent = "#table1_wrapper div.dataTables_scrollHead";
+      // Address a bug in DataTables v1 where duplicate header
+      // cells appear temporarily during transition to sticky header.
+      $(`${parent} thead tr:eq(0) > th:eq(0)`)
+        .css('position', 'sticky')
+        .css('left', '0px')
+        .css('z-index', index)
+        .css('background-color', 'white');
+      $(`${parent} thead tr:eq(1) > th:eq(0)`)
+        .css('position', 'sticky')
+        .css('left', '0px')
+        .css('z-index', index)
+        .css('background-color', 'white');
     }
 
     function adjustDOM(tableID) {
@@ -771,22 +837,25 @@
         }
       }
 
-      let qs = parseQueryString();
+      const qs = parseQueryString();
       const numSearchKeys = Object.keys(qs).filter(k => !k.startsWith('_')).length;
+      let msg = `setEvents() => draw.dt => There are `;
       if (numSearchKeys > 0) {
-        console.log(`setEvents() => draw.dt => There are ${numSearchKeys} search terms in the query string. Showing Clear button.`)
+        console.log(`${msg}${numSearchKeys}search terms in the query string. Showing Clear button.`)
         $('#clearAllSearches').show();
       } else {
-        console.log("setEvents() => draw.dt => There are no search terms in the query string. Hiding Clear button.")
+        console.log(`${msg}no search terms in the query string. Hiding Clear button.`)
         $('#clearAllSearches').hide();
       }
 
       if (info.pages > 0) {
         const _page = getQueryValue("_page")
-        console.log(`setEvents() => draw.dt =>  _page = ${_page}, info.pages = ${info.pages}`)
+        let msg = `setEvents() => draw.dt =>  _page = ${_page}, info.pages = ${info.pages}. `
+        console.log(msg)
         if (_page) {
           if (parseInt(_page) > info.pages) {
-            console.log(`setEvents() => draw.dt =>  _page = ${_page} > info.pages = ${info.pages}. Setting _page to ${info.pages} and drawing page ${info.pages-1}.`)
+            msg += `Setting _page to ${info.pages}`
+            console.log(`${msg} and drawing page ${info.pages-1}.`)
             updateQueryString('_page', info.pages);
             $(tableID).DataTable().page(info.pages-1).draw('page');
           }
@@ -795,12 +864,12 @@
 
       $(table_info).append($("#query"));
 
-      console.log("adjustDOM() => Setting timeout to execute $(window).resize()")
+      console.log("adjustDOM() => Setting timeout to execute $(window).resize().")
       setTimeout(function() {
-
-        console.log("adjustDOM() => Executing $(window).resize() to trigger event that causes left column header width to match the width of the left column body.")
+        let msg = "adjustDOM() => Executing $(window).resize() to "
+        msg += "trigger event that causes left column header widths"
+        console.log(`${msg} to match the width of the left column body.`)
         $(window).resize()
-
       }, 0);
 
       console.log("adjustDOM() finished.")
@@ -871,14 +940,14 @@
 
     function parseQueryString() {
       // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
-      var nvpair = {};
-      var qs = window.location.hash.replace('#', '');
+      let nvpair = {};
+      let qs = window.location.hash.replace('#', '');
       if (qs.length === 0) {
         return {};
       }
-      var pairs = qs.split('&');
+      let pairs = qs.split('&');
       $.each(pairs, function(i, v){
-        var pair = v.split('=');
+        let pair = v.split('=');
         nvpair[pair[0]] = pair[1];
       });
       return nvpair;
@@ -949,40 +1018,44 @@
       }
     }
 
-    function array2object(arr, key) {
-      if (!key) {
-        key = 'name';
-      }
-      // Create a map from column name to index
-      const obj = {};
-      for (let i = 0; i < arr.length; i++) {
-        obj[arr[i][key]] = arr[i];
-      }
-      return obj;
-    }
-
     function setQueryStringFromSearch() {
-      console.log("setQueryStringFromSearch() => Stepping through column search inputs.");
+      let msg = "setQueryStringFromSearch() => Stepping through column ";
+      console.log(`${msg}search inputs.`);
       // Step through column search inputs and update query string
       // Highlight inputs with search values and remove highlight for
       // inputs with no search value.
       let searchValue;
-      let inputs = $('.dataTables_scrollHead input.columnSearch');
-      console.log(`setQueryStringFromSearch() => Reading ${inputs.length} column search inputs.`);
+      let inputs;
+      if ($(".dtfh-floatingparent").length > 0) {
+        msg = "setQueryStringFromSearch() => .dtfh-floatingparent found. ";
+        console.log(`${msg}Using inputs under it.`);
+        inputs = $('.dtfh-floatingparent input.columnSearch');
+      } else {
+        msg = "setQueryStringFromSearch() => No .dtfh-floatingparent found. ";
+        console.log(`${msg}Using inputs under .dataTables_scrollHead`);
+        inputs = $('.dataTables_scrollHead input.columnSearch');
+      }
+      msg = "setQueryStringFromSearch() => Reading ";
+      console.log(`${msg}${inputs.length} column search inputs.`);
       for (let input of inputs) {
         let name = $(input).attr('name');
         searchValue = $(input).val();
         if (searchValue) {
-          console.log(`setQueryStringFromSearch() => Found search value for column '${name}'. Updating query string and highlighting input.`);
+          let msg = 'setQueryStringFromSearch() => Found search value for column'
+          msg += ` '${name}'. Updating query string and highlighting input.`
+          console.log();
           $(input).css('background-color', 'yellow');
-          console.log(`setQueryStringFromSearch() => Updating query string with search value for column '${name}' = '${searchValue}'.`);
+          msg = "setQueryStringFromSearch() => Updating query string with ";
+          msg += `search value for column '${name}' = '${searchValue}'.`;
+          console.log(msg)
           updateQueryString(name, searchValue);
         } else {
           //console.log(`No search value for column '${name}'.`);
           $(input).css('background-color', '');
           let qs = parseQueryString();
           if (qs[name]) {
-            console.log(`setQueryStringFromSearch() => Found ${name} in query string. Removing from query string.`);
+            let msg = `setQueryStringFromSearch() => Found ${name} in `
+            console.log(`${msg}query string. Removing it from query string.`);
             updateQueryString(name, null);
           }
         }
@@ -1010,6 +1083,18 @@
         sortedQs[key] = qs[key];
       }
       location.hash = decodeURIComponent($.param(sortedQs));
+    }
+
+    function array2object(arr, key) {
+      if (!key) {
+        key = 'name';
+      }
+      // Create a map from column name to index
+      const obj = {};
+      for (let i = 0; i < arr.length; i++) {
+        obj[arr[i][key]] = arr[i];
+      }
+      return obj;
     }
 
   </script>
