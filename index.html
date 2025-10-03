@@ -67,9 +67,6 @@
       font-size: 1.0em;
       display: none;
     }
-    .clearSearchButton::before {
-      content: "✘";
-    }
 
     table.dataTable thead th {
       font-size: 0.8em;
@@ -603,7 +600,7 @@
       attrs += ` style="padding-right: 1.5em;"`;
       let input = $(`<input ${attrs} type="text" placeholder="Search col."/>`);
 
-      let clearBtn = $(`<span class="clearSearchButton"></span>`);
+      let clearBtn = $(`<span class="clearSearchButton">✘</span>`);
       th.css('position', 'relative');
       th.append(clearBtn);
 
