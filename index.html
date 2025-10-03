@@ -31,7 +31,7 @@
     input.columnSearch {
     }
     #table1 {
-      width:100%;
+      width: 100%;
       padding-top: 1em;
     }
     #table1_filter {
@@ -56,6 +56,7 @@
     .dataTables_wrapper .dataTables_paginate .paginate_button {
       padding: 0em;
     }
+
     .clearSearchButton {
       position: absolute;
       right: 1.1em;
@@ -305,11 +306,13 @@
         console.log("dtInitComplete() => Showing all columns.")
       }
 
-      console.log("dtInitComplete() => Setting column search inputs and selectors.")
-      createColumnConstraints(tableID);
 
       setEvents(tableID);
       adjustDOM(tableID);
+
+      console.log("dtInitComplete() => Setting column search inputs and selectors.")
+      $(window).resize()
+      createColumnConstraints(tableID);
 
       watchForFloatingHeader();
 
@@ -597,13 +600,12 @@
       let element = `thead tr:eq(0) > th`
       let th = $(`${parent} ${element}`).eq(visibleIndex).empty();
       let attrs = `class="columnSearch" name="${name}"`;
-      attrs += ` style="display:inline"`;
+      attrs += ` style=""`;
       let input = $(`<input ${attrs} type="text" placeholder="Search col."/>`);
       const qsName = getQueryValue(name);
 
-      //let clearBtn = $(`<div style="float: left;display:inline; text-align:left;">✘</div>`);
-      //clearBtn.appendTo(th);
 
+      console.log($(`${parent} thead tr:eq(0) > th`).eq(visibleIndex).outerWidth());
       let val = qsName || '';
       input
         .val(val)
@@ -628,51 +630,66 @@
           }
         })
 
+      input.wrap('<div style="white-space: nowrap;"></div>');
+      let clearBtn = $(`<span style="white-space: nowrap;visibility:hidden;cursor:pointer">✘</span>`);
+      clearBtn.appendTo($(input.parent()));
+
+      const width = $(`${parent} thead tr:eq(1) > th`).eq(visibleIndex).outerWidth();
+      console.log(width)
+      console.log($(clearBtn).width())
+      //input.width(width - $(clearBtn).width() - 40);
+
       if (val) {
         input.css('background-color', 'yellow');
         input.attr('title','Remove text and press enter to clear search')
-        //clearBtn.show();
+        clearBtn.css('visibility', 'visible');
       }
 
-      /*
       input
         .off('input')
         .on('input', function() {
           if ($(this).val()) {
-            clearBtn.show();
+            clearBtn.css('visibility', 'visible');
           } else {
-            clearBtn.hide();
+            clearBtn.css('visibility', 'hidden');
           }
         });
 
-      let clearBtn = $(`<span style="display:inline">✘</span>`);
-        //clearBtn.css('position', 'relative');
-        //clearBtn.appendTo(th);
         clearBtn.on('mousedown', function(e) {
           e.preventDefault();
           input.val('');
-          clearBtn.hide();
+          clearBtn.css('visibility', 'hidden');
           input.focus();
           column.search('').draw('page');
         });
-      */
     }
 
     function createColumnSelector(parent, visibleIndex, name, column) {
 
-      let selectOld = $(`${parent} thead tr:eq(0) > th`)
+      let element = `${parent} thead tr:eq(0) > th`
+      let selectOld = $(element)
                         .eq(visibleIndex)
                         .find('select.columnUniques');
 
       selectOld.remove();
+      let th = $(`${parent} ${element}`).eq(visibleIndex);
 
       const maxLen = 100;
       const input = $(`${parent} thead tr:eq(0) > th`).eq(visibleIndex).find('input.columnSearch');
-      const width = input.outerWidth();
+      //const width = th.eq(visibleIndex).width();
+
+      const width = input.innerWidth()
       const title = `Most frequent unique values and (count); max of ${maxLen} shown`;
       const attrs = `class="columnUniques" title="${title}" name="${name}"`
-      select = $(`<select ${attrs} style="width: ${width}px"></select>`);
-      select.wrap('<div></div>').appendTo($(`${parent} thead tr:eq(0) > th`).eq(visibleIndex));
+      select = $(`<select ${attrs} style="width: ${width+4}px;"></select>`);
+      select.appendTo($(`${parent} thead tr:eq(0) > th`).eq(visibleIndex));
+
+      // Calculate the offset needed to align with input
+      const inputOffset = input.offset().left;
+      const selectOffset = select.offset().left;
+      const offsetDifference = inputOffset - selectOffset;
+      // Why -4 here and +4 in select width above?
+      select.css('margin-left', `${offsetDifference-4}px`);
 
       const qs = parseQueryString();
       let searches = {};
@@ -954,7 +971,7 @@
         let msg = "adjustDOM() => Executing $(window).resize() to "
         msg += "trigger event that causes left column header widths"
         console.log(`${msg} to match the width of the left column body.`)
-        $(window).resize()
+        //$(window).resize()
       }, 0);
 
       console.log("adjustDOM() finished.")
