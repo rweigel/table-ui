@@ -29,7 +29,6 @@
       margin-top: 0.25em;
     }
     input.columnSearch {
-      width: 10em;
     }
     #table1 {
       width:100%;
@@ -59,7 +58,8 @@
     }
     .clearSearchButton {
       position: absolute;
-      right: 1.1em; top: 35%;
+      right: 1.1em;
+      top: 35%;
       transform: translateY(-50%);
       cursor: pointer;
       color: black;
@@ -240,8 +240,6 @@
         tr1.append(`<th>${config.columns[i]['name']}</th>`);
       }
 
-      stickyHeaderFixes("#table1", 101);
-
       // https://datatables.net/reference/option/
       const dataTableOptions =
         {
@@ -283,6 +281,8 @@
     }
 
     function dtInitComplete() {
+
+      stickyHeaderFixes("#table1", 101);
 
       console.log("dtInitComplete() => DOM is ready.")
       const tableID = '#table1';
@@ -597,14 +597,13 @@
       let element = `thead tr:eq(0) > th`
       let th = $(`${parent} ${element}`).eq(visibleIndex).empty();
       let attrs = `class="columnSearch" name="${name}"`;
-      attrs += ` style="padding-right: 1.5em;"`;
+      attrs += ` style="display:inline"`;
       let input = $(`<input ${attrs} type="text" placeholder="Search col."/>`);
-
-      let clearBtn = $(`<span class="clearSearchButton">✘</span>`);
-      th.css('position', 'relative');
-      th.append(clearBtn);
-
       const qsName = getQueryValue(name);
+
+      //let clearBtn = $(`<div style="float: left;display:inline; text-align:left;">✘</div>`);
+      //clearBtn.appendTo(th);
+
       let val = qsName || '';
       input
         .val(val)
@@ -628,29 +627,35 @@
             }
           }
         })
-        .off('input')
-        .on('input', function() {
-        if ($(this).val()) {
-          clearBtn.show();
-        } else {
-          clearBtn.hide();
-        }
-      });
 
       if (val) {
         input.css('background-color', 'yellow');
         input.attr('title','Remove text and press enter to clear search')
-        clearBtn.show();
+        //clearBtn.show();
       }
 
-      clearBtn.on('mousedown', function(e) {
-        e.preventDefault();
-        input.val('');
-        clearBtn.hide();
-        input.focus();
-        column.search('').draw('page');
-      });
+      /*
       input
+        .off('input')
+        .on('input', function() {
+          if ($(this).val()) {
+            clearBtn.show();
+          } else {
+            clearBtn.hide();
+          }
+        });
+
+      let clearBtn = $(`<span style="display:inline">✘</span>`);
+        //clearBtn.css('position', 'relative');
+        //clearBtn.appendTo(th);
+        clearBtn.on('mousedown', function(e) {
+          e.preventDefault();
+          input.val('');
+          clearBtn.hide();
+          input.focus();
+          column.search('').draw('page');
+        });
+      */
     }
 
     function createColumnSelector(parent, visibleIndex, name, column) {
