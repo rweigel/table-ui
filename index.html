@@ -297,13 +297,7 @@
       console.log("dtInitComplete() => DOM is ready.")
       const tableID = '#table1';
 
-      // Set initial page in page selector
-      //$("#table1").DataTable().page(getQueryValue('_page', 1)-1).draw('page');
-
       const table = $(tableID).dataTable();
-      let msg = "dtInitComplete() => Setting search inputs with initial "
-      console.log(`${msg} search values and setting search event.`)
-
       if (getQueryValue('_cols_show') === 'nonempty') {
         msg = "dtInitComplete() => Setting hideEmptyColumns ";
         console.log(`${msg}checkbox to checked because _cols_show=nonempty in query string.`)
@@ -315,13 +309,14 @@
         console.log("dtInitComplete() => Showing all columns.")
       }
 
-
       setEvents(tableID);
-      adjustDOM(tableID);
 
-      console.log("dtInitComplete() => Setting column search inputs and selectors.")
-      $(window).resize()
+      // Must be before adjustDOM() b/c calls $(window).resize(), which triggers
+      // widths of columns to be recalculated based on content added in call
+      // to createColumnConstraints().
       createColumnConstraints(tableID);
+
+      adjustDOM(tableID);
 
       watchForFloatingHeader();
 
@@ -495,9 +490,10 @@
       }
 
       function _ajaxData(dtp) {
-        $("#error").hide();
         console.log("_ajaxData() => Preparing query parameters for AJAX search using dtp object:");
-        console.log(dtp);
+        console.log(JSON.parse(JSON.stringify(dtp)));
+
+        $("#error").hide();
         const config = getConfig.config;
         const columnObject = array2object(config.columns, 'name');
         let qs = parseQueryString();
@@ -521,21 +517,19 @@
         dtp._orders = _orders.join(",");
 
         dtp._length = dtp.length;
-        delete dtp.length;
-
         dtp._start = dtp.start;
-        delete dtp.start;
-
         dtp._draw = dtp.draw;
-        delete dtp.draw;
 
-        delete dtp.columns;
-        delete dtp.search;
-        delete dtp.order;
-
+        console.log(`_ajaxData() => Deleting non server API keys from dtp object.`)
+        for (const key in dtp) {
+          if (!key.startsWith('_')) {
+            delete dtp[key];
+          }
+        }
         console.log("_ajaxData() => Returning updated dtp object:")
         console.log(dtp);
 
+        console.log("_ajaxData() => Setting query link in DOM.")
         let url = window.location.pathname + "data/" + "?";
         url += new URLSearchParams(dtp).toString()
         $('#query > a').attr('href', url);
@@ -545,22 +539,21 @@
       }
 
       function _ajaxError(xhr, error, thrown) {
-        console.error("AJAX error.");
-        console.error("xhr:");
-        console.error(xhr);
-        console.error("error:");
-        console.error(error);
-        console.error("thrown:");
-        console.error(thrown);
-        let emsg = "An error occurred while loading data.";
+        console.error("AJAX error");
+        console.error("xhr: ", xhr);
+        console.error("error: ", error);
+        console.error("thrown: ", thrown);
+        let emsgo = "An error occurred while loading data";
         if (xhr) {
-          emsg +=  ` Status = '${xhr.status || ''}'; Status text: '${xhr.statusText || ''}'.`;
+          let stat = xhr.status || ''
+          let text = xhr.statusText || ''
+          emsg =  `${emsgo}. Status: '${stat}' | Status text: '${text}'.`;
           if (xhr.responseURL) {
-            emsg = `An error occurred while loading data from ${xhr.responseURL}. ${emsg}.`;
+            emsg = `${emsgo} from ${xhr.responseURL}. ${emsg}.`;
           }
         }
         if (thrown) {
-          emsg += "Thrown error: " + thrown + ".";
+          emsg += " Thrown error: " + thrown + ".";
         }
         try {
           let resp = JSON.parse(xhr.responseText);
@@ -577,9 +570,13 @@
     }
 
     function createColumnConstraints(tableID, which) {
+      let msg = "createColumnConstraints() => Setting search inputs with initial "
+      console.log(`${msg} search values and setting search event.`)
+
       let parent = `${tableID}_wrapper`;
       if ($('.dtfh-floatingparent').length > 0) {
-        console.log("createColumnConstraints() => Floating header detected. Adding column constraints to floating header.");
+        let msg = "createColumnConstraints() => Floating header detected. "
+        console.log(`${msg}Adding column constraints to floating header.`);
         parent = '.dtfh-floatingparent';
       }
       if (!which) which = 'all';
@@ -615,7 +612,7 @@
       const qsName = getQueryValue(name);
 
 
-      console.log($(`${parent} thead tr:eq(0) > th`).eq(visibleIndex).outerWidth());
+      //console.log($(`${parent} thead tr:eq(0) > th`).eq(visibleIndex).outerWidth());
       let val = qsName || '';
       input
         .val(val)
@@ -645,8 +642,8 @@
       clearBtn.appendTo($(input.parent()));
 
       const width = $(`${parent} thead tr:eq(1) > th`).eq(visibleIndex).outerWidth();
-      console.log(width)
-      console.log($(clearBtn).width())
+      //console.log(width)
+      //console.log($(clearBtn).width())
       //input.width(width - $(clearBtn).width() - 40);
 
       if (val) {
@@ -927,7 +924,7 @@
       let select = $(`${table_length} select`)
       select.appendTo(table_length)
       $(`${table_length} label`).text('Rows per page: ')
-      $('#table1_length').appendTo('#controls');
+      $('#table1_length').insertBefore('#clearAllSearches');
 
       console.log("adjustDOM() => Modifying Previous/Next buttons.")
       const prev = $(`${tableID}_previous`);
