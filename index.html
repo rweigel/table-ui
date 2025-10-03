@@ -41,10 +41,19 @@
     summary {
       cursor: pointer;
     }
+    details code {
+      font-size: small;
+      background-color: rgb(244, 244, 244);
+      border: 1px solid black;
+      border-radius: 4px;
+      padding: 0.1em;
+    }
+
     #error {
       color: red;
       font-weight: bold;
       padding: 0.5em;
+      display: none;
     }
     #showHideColumns {
       margin-right: 1em;
@@ -183,7 +192,7 @@
           <code>'abc'</code>.</li>
       <li>Escape single quotes by repeating, e.g., 
           <code>'''single quoted string'''</code>.</li>
-      <li>All entries are stored as strings.</li>
+      <li>All table entries are strings.</li>
     </ul>
     <p>
       <a href="https://github.com/rweigel/table-ui" title="https://github.com/rweigel/table-ui" style="text-decoration:none" target="_blank">
@@ -486,6 +495,7 @@
       }
 
       function _ajaxData(dtp) {
+        $("#error").hide();
         console.log("_ajaxData() => Preparing query parameters for AJAX search using dtp object:");
         console.log(dtp);
         const config = getConfig.config;
@@ -562,7 +572,7 @@
           console.error(e);
         }
         $('#table1_processing').hide();
-        $('#error').html(emsg + ". See console for details.");
+        $('#error').html(emsg + ". See console for details.").show();
       }
     }
 
