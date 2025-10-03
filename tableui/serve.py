@@ -239,11 +239,12 @@ def _api_init(app, apiconfig):
       '_verbose'
     ]
 
+    column_names = dbinfo['column_names']
     for key in query_params.keys():
-      if key not in keys_allowed and key not in _dbinfo(**dbconfig)['column_names']:
+      if key not in keys_allowed and key not in column_names:
         logger.error(f"Error: Unknown query parameter: {key}.")
-        emsg = f"Error: Unknown query parameter. Allowed: {keys_allowed} and "
-        emsg += f"column names: {_dbinfo(**dbconfig)['column_names']}"
+        emsg = f"Error: Unknown query parameter with first five character of {key[0:5]}. Allowed: {keys_allowed} and "
+        emsg += f"column names: {column_names}"
         return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
 
     if "_uniques" in query_params:

@@ -52,6 +52,19 @@
     .dataTables_wrapper .dataTables_paginate .paginate_button {
       padding: 0em;
     }
+    .clearSearchButton {
+      position: absolute;
+      right: 1.1em; top: 35%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: black;
+      font-weight: bold;
+      font-size: 1.0em;
+      display: none;
+    }
+    .clearSearchButton::before {
+      content: "✘";
+    }
 
     table.dataTable thead th {
       font-size: 0.8em;
@@ -288,8 +301,8 @@
         console.log("dtInitComplete() => Showing all columns.")
       }
 
-      console.log("dtInitComplete() => Setting column search inputs and dropdowns.")
-      createColumnSelectors(tableID, `${tableID}_wrapper`);
+      console.log("dtInitComplete() => Setting column search inputs and selectors.")
+      createColumnConstraints(tableID);
 
       setEvents(tableID);
       adjustDOM(tableID);
@@ -543,7 +556,13 @@
       }
     }
 
-    function createColumnSelectors(tableID, parent) {
+    function createColumnConstraints(tableID, which) {
+      let parent = `${tableID}_wrapper`;
+      if ($('.dtfh-floatingparent').length > 0) {
+        console.log("createColumnConstraints() => Floating header detected. Adding column constraints to floating header.");
+        parent = '.dtfh-floatingparent';
+      }
+      if (!which) which = 'all';
       const table = $(tableID).dataTable();
       const qs = parseQueryString();
       let config = getConfig.config;
@@ -552,25 +571,33 @@
         let column = this;
         let index = column.index();
         let name = config.columns[index]['name'];
-        let searchOnKeypress = false == config.columns[index]['return'];
-
-        let input = createColumnInput(index, name, column, visibleIndex, qs[name], searchOnKeypress, parent);
-        if (config['serverSide']) {
-        //if (config['serverSide'] && name === 'datasetID') {
-          createColumnDropdown(index, name, input, column, parent);
+        if (which === 'all' || which == 'input') {
+          let searchOnKeypress = false == config.columns[index]['return'];
+          let input = createColumnInput(parent, visibleIndex, name, column, searchOnKeypress);
+        }
+        if (which === 'all' || which == 'select') {
+          //if (config['serverSide'] && name === 'datasetID') {
+          if (config['serverSide']) {
+            createColumnSelector(parent, visibleIndex, name, column);
+          }
         }
         visibleIndex++;
       });
     }
 
-    function createColumnInput(index, name, column, visibleIndex, qsName, searchOnKeypress, parent) {
-      // Create `select` element
-      // Note that the header table does not have an id. It should.
+    function createColumnInput(parent, visibleIndex, name, column, searchOnKeypress) {
+      // Create `input` element
       let element = `thead tr:eq(0) > th`
       let th = $(`${parent} ${element}`).eq(visibleIndex).empty();
-      let attrs = `class="columnSearch" index="${index}" name="${name}"`;
+      let attrs = `class="columnSearch" name="${name}"`;
+      attrs += ` style="padding-right: 1.5em;"`;
       let input = $(`<input ${attrs} type="text" placeholder="Search col."/>`);
 
+      let clearBtn = $(`<span class="clearSearchButton"></span>`);
+      th.css('position', 'relative');
+      th.append(clearBtn);
+
+      const qsName = getQueryValue(name);
       let val = qsName || '';
       input
         .val(val)
@@ -585,46 +612,68 @@
             let keycode = (event.keyCode ? event.keyCode : event.which);
             if (keycode == '13') {
               if (input.siblings('select.columnUniques').length > 0) {
-                let dropdown = input.siblings('select.columnUniques');
-                if (dropdown.find('option').length > 0) {
-                  dropdown.prop('selectedIndex', 0);
+                let select = input.siblings('select.columnUniques');
+                if (select.find('option').length > 0) {
+                  select.prop('selectedIndex', 0);
                 }
               }
               column.search($(this).val()).draw('page');
             }
           }
-        });
-        if (val) {
-          input.css('background-color', 'yellow');
-          input.attr('title','Remove text and press enter to clear search')
+        })
+        .off('input')
+        .on('input', function() {
+        if ($(this).val()) {
+          clearBtn.show();
+        } else {
+          clearBtn.hide();
         }
-        return input;
-    }
+      });
 
-    function createColumnDropdown(index, name, input, column, parent) {
-
-      let dropdown = $(`${parent} thead tr:eq(0) > th`).eq(index).find('select.columnUniques');
-      if (dropdown.length > 0) {
-        // Don't re-create dropdown if it already exists.
-        // Not working. May need to have mutation look for this element.
-        setChangeEvent(dropdown);
-        return;
+      if (val) {
+        input.css('background-color', 'yellow');
+        input.attr('title','Remove text and press enter to clear search')
+        clearBtn.show();
       }
 
+      clearBtn.on('mousedown', function(e) {
+        e.preventDefault();
+        input.val('');
+        clearBtn.hide();
+        input.focus();
+        column.search('').draw('page');
+      });
+      input
+    }
+
+    function createColumnSelector(parent, visibleIndex, name, column) {
+
+      let selectOld = $(`${parent} thead tr:eq(0) > th`)
+                        .eq(visibleIndex)
+                        .find('select.columnUniques');
+
+      selectOld.remove();
+
       const maxLen = 100;
+      const input = $(`${parent} thead tr:eq(0) > th`).eq(visibleIndex).find('input.columnSearch');
       const width = input.outerWidth();
       const title = `Most frequent unique values and (count); max of ${maxLen} shown`;
-      const attrs = `class="columnUniques" title="${title}" index="${index}" name="${name}"`
-      dropdown = `<br>`;//<label for="${name}"></label>`
-      dropdown += `<select ${attrs}></select>`
-      dropdown = $(dropdown);
-      dropdown.css('width', width);
-      dropdown.appendTo($(`${parent} thead tr:eq(0) > th`).eq(index));
+      const attrs = `class="columnUniques" title="${title}" name="${name}"`
+      select = $(`<select ${attrs} style="width: ${width}px"></select>`);
+      select.wrap('<div></div>').appendTo($(`${parent} thead tr:eq(0) > th`).eq(visibleIndex));
 
       const qs = parseQueryString();
+      let searches = {};
+      for (const [key, val] of Object.entries(qs)) {
+        if (!key.startsWith('_')) {
+          searches[key] = val;
+        }
+      }
+      searches = new URLSearchParams(searches).toString();
+
       // Fetch unique values for this column
       $.ajax({
-        url: `data/?_return=${encodeURIComponent(name)}&_uniques=true&_length=100`,
+        url: `data/?${searches}&_return=${encodeURIComponent(name)}&_uniques=true&_length=100`,
         method: "GET",
         dataType: "json",
         success: function (data) {
@@ -634,28 +683,31 @@
           data[name].forEach(function (val) {
             select.append(`<option value="${val[0]}">${val[0]} (${val[1]})</option>`);
           });
-          // Set dropdown value from query string if present
+          // Set select value from query string if present
           if (qs[name]) {
-            dropdown.val(qs[name].replace(/^'/,'').replace(/'$/,''));
+            select.val(qs[name].replace(/^'/,'').replace(/'$/,''));
           }
-          dropdown.css('visibility', 'visible');
+          select.css('visibility', 'visible');
         }
       });
+
       setChangeEvent();
 
       function setChangeEvent() {
-        // On dropdown change, update input and trigger search
-        dropdown.off("change").on("change", function () {
-          console.log("Dropdown change event triggered.")
+        // On select change, update input and trigger search
+        select.off("change").on("change", function () {
+          console.log("createColumnSelector => select change event triggered.")
           let val = $(this).val().replace(/'/g, "''");
           if (val === "") {
+            console.log("createColumnSelector => Setting input to empty string.")
             input.val("");
           } else {
-            input.val(`'${val}'`);
+            val = `'${val}'`;
+            console.log(`createColumnSelector => Setting input to ${val}.`)
+            input.val(val);
           }
+          console.log("createColumnSelector => Triggering search and draw('page').")
           column.search($(this).val()).draw('page');
-          // Does not work:
-          //input.trigger($.Event("keydown", { which: 13 }));
         });
       }
   }
@@ -675,7 +727,7 @@
               if ($(node).hasClass('dtfh-floatingparent')) { 
                 msg = "watchForFloatingHeader() => dtfh-floatingparent ";
                 console.log(`${msg}was added. Adding column selectors to it.`);
-                createColumnSelectors('#table1', '.dtfh-floatingparent');
+                createColumnConstraints('#table1');
                 stickyHeaderFixes(1);
               }
             });
@@ -941,8 +993,12 @@
         // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
         $(tableID).DataTable().state.clear();
         $(tableID).DataTable().destroy();
-        tableWrapper.remove(); // Needed?
-        $(tableID).empty(); // Needed?
+        tableWrapper.remove();
+        $(tableID).empty();
+        // Remove event handlers added to table, document, and window
+        $(tableID).off();
+        $(document).off();
+        $(window).off();
       } else {
         console.log(`destroy() => No table ${tableID} to destroy.`)
       }

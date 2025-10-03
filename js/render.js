@@ -1,5 +1,4 @@
 function renderColumn (columnName, tableConfig) {
-  console.log(tableConfig)
   if (columnName === 'datasetID') {
     _renderColumn.columnName = columnName
     _renderColumn.tableConfig = tableConfig
@@ -49,7 +48,6 @@ function renderColumn (columnName, tableConfig) {
 
 function renderTableMetadata (config) {
   console.log('renderTableMetadata(): config:')
-  console.log(config)
   if (!config.tableUI.tableMetadata) return ''
   let description = config.tableUI.tableMetadata.description || ''
   if (description) {
