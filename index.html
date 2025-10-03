@@ -42,6 +42,11 @@
     summary {
       cursor: pointer;
     }
+    #error {
+      color: red;
+      font-weight: bold;
+      padding: 0.5em;
+    }
     #showHideColumns {
       margin-right: 1em;
       padding-bottom: 0.5em;
@@ -190,12 +195,14 @@
   </details>
 
   <div id="controls" style="padding-bottom:3px">
+    <div id="error"></div>
     <span id="showHideColumns">
       <!--These must be one line to avoid newlines in button text-->
       <span title="show/hide columns with no content"><input type="checkbox" id="hideEmptyColumns"><label for="hideEmptyColumns">Hide Empty Columns</label></span>
     </span>
     <span id="clearAllSearches" style="display:none" title="Clear all searches"><button onclick="clearAllSearches('#table1')">Clear</button></span>
   </div>
+
   <span id="query"> <a href="" target="_blank">Query</a></span>
 
   <table id="table1" class="display" style="width:100%"></table>
@@ -535,24 +542,27 @@
         console.error(error);
         console.error("thrown:");
         console.error(thrown);
-        let emsg = `An error occurred while loading data. Status = ${xhr.status} ${xhr.statusText}`;
-        if (xhr && xhr.responseURL) {
-          emsg = `An error occurred while loading data from ${xhr.responseURL}. Status = ${xhr.status} ${xhr.statusText}`;
+        let emsg = "An error occurred while loading data.";
+        if (xhr) {
+          emsg +=  ` Status = '${xhr.status || ''}'; Status text: '${xhr.statusText || ''}'.`;
+          if (xhr.responseURL) {
+            emsg = `An error occurred while loading data from ${xhr.responseURL}. ${emsg}.`;
+          }
         }
         if (thrown) {
-          emsg += ". Thrown error: " + thrown;
+          emsg += "Thrown error: " + thrown + ".";
         }
         try {
           let resp = JSON.parse(xhr.responseText);
           if ('error' in resp) {
-            emsg += ". Server response error message: " + resp['error'];
+            emsg += ` Server response error message: ${resp['error']}.`;
           }
         } catch(e) {
           console.error("Could not parse xhr.responseText as JSON.");
           console.error(e);
         }
         $('#table1_processing').hide();
-        $('#table1').html(`<div style="color:red;font-weight:bold;padding:1em">${emsg}</div>`);
+        $('#error').html(emsg + ". See console for details.");
       }
     }
 
@@ -988,6 +998,7 @@
       let tableWrapper = $(tableID + "_wrapper");
       if (tableWrapper.length > 0) {
         console.log(`destroy() => Destroying table ${tableID}`)
+        $('#error').empty();
         $('#tableMetadata').empty();
         $('#table1_length').remove();
         // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
