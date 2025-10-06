@@ -588,8 +588,8 @@
           let input = createColumnInput(parent, visibleIndex, name, column, searchOnKeypress);
         }
         if (which === 'all' || which == 'select') {
-          //if (config['serverSide'] && name === 'datasetID') {
-          if (config['serverSide']) {
+          if (config['serverSide'] && (name === 'datasetID' || name === 'VariableName')) {
+          //if (config['serverSide']) {
             createColumnSelector(parent, visibleIndex, name, column);
           }
         }
@@ -671,25 +671,25 @@
 
     function createColumnSelector(parent, visibleIndex, name, column) {
 
-      let element = `${parent} thead tr:eq(0) > th`
-      let selectOld = $(element)
-                        .eq(visibleIndex)
-                        .find('select.columnUniques');
+      if (!createColumnSelector.cache) {
+        createColumnSelector.cache = {};
+      }
 
+      let th = $(`${parent} thead tr:eq(0) > th`).eq(visibleIndex)
+
+      let selectOld = th.find('select.columnUniques');
       selectOld.remove();
-      let th = $(`${parent} ${element}`).eq(visibleIndex);
+
+      const input = th.find('input.columnSearch');
 
       const maxLen = 100;
-      const input = $(`${parent} thead tr:eq(0) > th`).eq(visibleIndex).find('input.columnSearch');
-      //const width = th.eq(visibleIndex).width();
-
       const width = input.innerWidth()
       const title = `Most frequent unique values and (count); max of ${maxLen} shown`;
       const attrs = `class="columnUniques" title="${title}" name="${name}"`
       select = $(`<select ${attrs} style="width: ${width+4}px;"></select>`);
-      select.appendTo($(`${parent} thead tr:eq(0) > th`).eq(visibleIndex));
+      select.appendTo(th);
 
-      // Calculate the offset needed to align with input
+      // Calculate the offset needed to align with input.columnSearch
       const inputOffset = input.offset().left;
       const selectOffset = select.offset().left;
       const offsetDifference = inputOffset - selectOffset;
@@ -703,31 +703,48 @@
           searches[key] = val;
         }
       }
+
       searches = new URLSearchParams(searches).toString();
+      let url = `data/?${searches}&_return=${encodeURIComponent(name)}&_uniques=true&_length=100`
 
-      // Fetch unique values for this column
-      $.ajax({
-        url: `data/?${searches}&_return=${encodeURIComponent(name)}&_uniques=true&_length=100`,
-        method: "GET",
-        dataType: "json",
-        success: function (data) {
-          let select = $(`select[name="${name}"]`)
-          select.empty();
-          select.append(`<option value=""></option>`);
-          data[name].forEach(function (val) {
-            select.append(`<option value="${val[0]}">${val[0]} (${val[1]})</option>`);
-          });
-          // Set select value from query string if present
-          if (qs[name]) {
-            select.val(qs[name].replace(/^'/,'').replace(/'$/,''));
-          }
-          select.css('visibility', 'visible');
+      getOptionHTML(url, setOptionHTML)
+
+      function setOptionHTML(html) {
+        if (!html) {
+          select.remove();
+          return;
         }
-      });
+        select = $(`select[name="${name}"]`);
+        select.append(html);
+        if (qs[name]) {
+          select.val(qs[name].replace(/^'/,'').replace(/'$/,''));
+        }
+        createColumnSelector.cache[url] = $(`select[name="${name}"]`).html();
+        select.css('visibility', 'visible');
+        setChangeEvent(select);
+      }
 
-      setChangeEvent();
+      function getOptionHTML(url, cb) {
+        // Fetch unique values for this column
+        $.ajax({
+          url: url,
+          method: "GET",
+          dataType: "json",
+          success: function (data) {
+            if (!data[name]) {
+              cb(null);
+              return;
+            }
+            let html = `<option value="" selected></option>`;
+            data[name].forEach(function (val) {
+              html += `<option value="${val[0]}">${val[0]} (${val[1]})</option>`;
+            });
+            cb(html);
+          }
+        });
+      }
 
-      function setChangeEvent() {
+      function setChangeEvent(select) {
         // On select change, update input and trigger search
         select.off("change").on("change", function () {
           console.log("createColumnSelector => select change event triggered.")
