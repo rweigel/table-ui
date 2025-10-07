@@ -567,7 +567,7 @@
     }
 
     function createColumnConstraints(tableID, which) {
-      let msg = "createColumnConstraints() => Setting search inputs with initial "
+      let msg = "createColumnConstraints() => Setting search inputs with initial"
       console.log(`${msg} search values and setting search event.`)
 
       let parent = `${tableID}_wrapper`;
@@ -638,11 +638,6 @@
       let clearBtn = $(`<span class="clearOneSearch">✘</span>`);
       clearBtn.appendTo($(input.parent()));
 
-      const width = $(`${parent} thead tr:eq(1) > th`).eq(visibleIndex).outerWidth();
-      //console.log(width)
-      //console.log($(clearBtn).width())
-      //input.width(width - $(clearBtn).width() - 40);
-
       if (val) {
         input.css('background-color', 'yellow');
         clearBtn.css('visibility', 'visible');
@@ -688,15 +683,16 @@
       const width = input.innerWidth()
       const title = `Most frequent unique values and (count); max of ${maxLen} shown`;
       const attrs = `class="columnUniques" title="${title}" name="${name}"`
-      select = $(`<select ${attrs} style="width: ${width+4}px;"></select>`);
+      const dw = 4;
+      select = $(`<select ${attrs} style="width: ${width+dw}px;"></select>`);
       select.appendTo(th);
 
       // Calculate the offset needed to align with input.columnSearch
       const inputOffset = input.offset().left;
       const selectOffset = select.offset().left;
       const offsetDifference = inputOffset - selectOffset;
-      // Why -4 here and +4 in select width above?
-      select.css('margin-left', `${offsetDifference-4}px`);
+      // Why is -dw here and +dw in select width above needed for alignment?
+      select.css('margin-left', `${offsetDifference-dw}px`);
 
       const qs = parseQueryString();
       let searches = {};
@@ -714,6 +710,10 @@
       function setOptionHTML(html) {
         if (!html) {
           select.remove();
+          return;
+        }
+        if ($(parent).length === 0) {
+          // Parent has been removed from DOM, so do not add select.
           return;
         }
         select = $(`select[name="${name}"]`);
@@ -781,9 +781,9 @@
             mutation.addedNodes.forEach(function(node) {
               if ($(node).hasClass('dtfh-floatingparent')) { 
                 msg = "watchForFloatingHeader() => dtfh-floatingparent ";
-                console.log(`${msg}was added. Adding column selectors to it.`);
-                createColumnConstraints('#table1');
+                console.log(`${msg}was added.`);
                 stickyHeaderFixes(1);
+                setTimeout(() => {createColumnConstraints('#table1')}, 1);
               }
             });
           }
