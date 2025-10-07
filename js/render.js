@@ -50,17 +50,24 @@ function renderTableMetadata (config) {
   console.log('renderTableMetadata(): config:')
   if (!config.tableUI.tableMetadata) return ''
   let description = config.tableUI.tableMetadata.description || ''
+  let name = config.tableUI.tableMetadata.name || ''
+  if (name) {
+    name = ` <code>${name}</code>`
+  }
   if (description) {
     description += ' |'
   }
   let creationDate = config.tableUI.tableMetadata.creationDate || ''
   if (creationDate) {
-    creationDate = `Created <code>${creationDate}</code>.`
+    creationDate = `Created ${creationDate}.`
   }
   if (!description && !creationDate) return ''
-  let txt = `${description}${creationDate}`
+  let txt = ''
+  if (description) {
+    txt = `<p>${description}<p>`
+  }
   const base = window.location.origin + window.location.pathname.replace(/\/$/, '')
-  txt += ` Table <a href="${base}/config" title="${base}/config" target="_blank">config</a>`
+  txt += ` Table${name}: <a href="${base}/config" title="${base}/config" target="_blank">config</a>`
   let href = ''
   if (config.tableUI.sqldb) {
     href = `${base}/sqldb`
@@ -69,5 +76,6 @@ function renderTableMetadata (config) {
     href = `${base}/jsondb`
   }
   txt += ` | <a href="${href}" title="${href}" target="_blank">data</a>`
+  txt += ` | ${creationDate}`
   return txt
 }
