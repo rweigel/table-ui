@@ -59,23 +59,18 @@
       margin-right: 1em;
       padding-bottom: 0.5em;
     }
-    #clearAllSearches {
+    #clearAllSearches button {
       margin-right: 1em;
+      background-color: yellow;
     }
-    .dataTables_wrapper .dataTables_paginate .paginate_button {
-      padding: 0em;
+    .clearOneSearch {
+      white-space: nowrap;
+      visibility: hidden;
+      cursor: pointer;
     }
 
-    .clearSearchButton {
-      position: absolute;
-      right: 1.1em;
-      top: 35%;
-      transform: translateY(-50%);
-      cursor: pointer;
-      color: black;
-      font-weight: bold;
-      font-size: 1.0em;
-      display: none;
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+      padding: 0em;
     }
 
     table.dataTable thead th {
@@ -626,8 +621,8 @@
           } else {
             let keycode = (event.keyCode ? event.keyCode : event.which);
             if (keycode == '13') {
-              if (input.siblings('select.columnUniques').length > 0) {
-                let select = input.siblings('select.columnUniques');
+              if (th.find('select.columnUniques').length > 0) {
+                let select = th.find('select.columnUniques');
                 if (select.find('option').length > 0) {
                   select.prop('selectedIndex', 0);
                 }
@@ -638,7 +633,7 @@
         })
 
       input.wrap('<div style="white-space: nowrap;"></div>');
-      let clearBtn = $(`<span style="white-space: nowrap;visibility:hidden;cursor:pointer">✘</span>`);
+      let clearBtn = $(`<span class="clearOneSearch">✘</span>`);
       clearBtn.appendTo($(input.parent()));
 
       const width = $(`${parent} thead tr:eq(1) > th`).eq(visibleIndex).outerWidth();
@@ -648,11 +643,14 @@
 
       if (val) {
         input.css('background-color', 'yellow');
-        input.attr('title','Remove text and press enter to clear search')
         clearBtn.css('visibility', 'visible');
       }
 
+      let title = 'Enter search text and enter to search. ';
+      title += 'See documentation for search syntax.'
+
       input
+        .attr('title', title)
         .off('input')
         .on('input', function() {
           if ($(this).val()) {
@@ -754,10 +752,12 @@
           if (val === "") {
             console.log("createColumnSelector => Setting input to empty string.")
             input.val("");
+            select.parent().find('span.clearOneSearch').css('visibility', 'hidden');
           } else {
             val = `'${val}'`;
             console.log(`createColumnSelector => Setting input to ${val}.`)
             input.val(val);
+            select.parent().find('span.clearOneSearch').css('visibility', 'visible');
           }
           console.log("createColumnSelector => Triggering search and draw('page').")
           column.search($(this).val()).draw('page');
