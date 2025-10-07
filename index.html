@@ -489,15 +489,6 @@
         console.log(JSON.parse(JSON.stringify(dtp)));
 
         $("#error").hide();
-        const config = getConfig.config;
-        const columnObject = array2object(config.columns, 'name');
-        let qs = parseQueryString();
-        for (const [key, val] of Object.entries(qs)) {
-          if (!(key in dtp) && (key in columnObject)) {
-            console.log(`_ajaxData() => Adding ${key} = '${val}' from query string to dtp object.`);
-            dtp[key] = val;
-          }
-        }
 
         if (dtp.search.value) {
           dtp._globalsearch = dtp.search.value;
@@ -521,6 +512,17 @@
             delete dtp[key];
           }
         }
+
+        const config = getConfig.config;
+        const columnObject = array2object(config.columns, 'name');
+        let qs = parseQueryString();
+        for (const [key, val] of Object.entries(qs)) {
+          if (!(key in dtp) && (key in columnObject)) {
+            console.log(`_ajaxData() => Adding ${key} = '${val}' from query string to dtp object.`);
+            dtp[key] = val;
+          }
+        }
+
         console.log("_ajaxData() => Returning updated dtp object:")
         console.log(dtp);
 
@@ -588,8 +590,8 @@
           let input = createColumnInput(parent, visibleIndex, name, column, searchOnKeypress);
         }
         if (which === 'all' || which == 'select') {
-          if (config['serverSide'] && (name === 'datasetID' || name === 'VariableName')) {
-          //if (config['serverSide']) {
+          //if (config['serverSide'] && (name === 'datasetID' || name === 'VariableName')) {
+          if (config['serverSide']) {
             createColumnSelector(parent, visibleIndex, name, column);
           }
         }
