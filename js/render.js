@@ -12,34 +12,43 @@ function renderColumn (columnName, tableConfig) {
     }
   }
 
-  function _renderColumn (columnString, type, full, meta) {
+  function _renderColumn (columnString, type, row, meta) {
     if (type === 'display') {
-      //console.log(columnString, type, full, meta)
-      //console.log(renderColumn.tableConfig)
+      //console.log(columnString, type, row, meta)
+      console.log(_renderColumn.tableConfig)
+      const columnNames = _renderColumn.tableConfig.columns.map(c => c.name)
+
       // TODO: Not all have "_v01".
       const base = 'https://cdaweb.gsfc.nasa.gov/pub/software/cdawlib/'
       const fnameCDF = base + '0MASTERS/' + columnString.toLowerCase() + '_00000000_v01.cdf'
       const fnameJSON = base + '0JSONS/' + columnString.toLowerCase() + '_00000000_v01.json'
       const fnameSKT = base + '0SKELTABLES/' + columnString.toLowerCase() + '_00000000_v01.skt'
+      const fnameHAPI1 = `https://cdaweb.gsfc.nasa.gov/hapi/info?id=${columnString}`
+      const fnameHAPI2 = `https://cottagesystems.com/server/cdaweb/hapi/info?id=${columnString}`
+
       columnString = `${columnString}`
-      columnString += `&nbsp;<a href="${fnameCDF}" title="Master CDF" target="_blank">M</a>`
-      columnString += `&nbsp;<a href="${fnameJSON}" title="JSON" target="_blank">J</a>`
-      columnString += `&nbsp;<a href="${fnameSKT}" title="Skeleton Table" target="_blank">SK</a>`
+      columnString += '<span style="font-size:0.75em">'
+      columnString += ` <a href="${fnameCDF}"   title="Master CDF" target="_blank">M</a>`
+      columnString += ` <a href="${fnameJSON}"  title="Master JSON" target="_blank">J</a>`
+      columnString += ` <a href="${fnameSKT}"   title="Master Skeleton Table" target="_blank">SK</a>`
+      columnString += ` <a href="${fnameHAPI1}" title="HAPI Info" target="_blank">H<sub>1</sub></a>`
+      columnString += ` <a href="${fnameHAPI2}" title="HAPI Info Dev Server" target="_blank">H<sub>2</sub></a>`
 
       const tableName = _renderColumn.tableConfig.tableUI.tableMetadata.name
       if (tableName === 'spase.dataset') {
-        console.log(full[1].replace('spase://', 'https://hpde.io'))
-        const fnameSPASE = full[1].replace('spase://', 'https://hpde.io/') + '.json'
-        columnString += `&nbsp;<a href="${fnameSPASE}" title="SPASE" target="_blank">SP</a>`
+        console.log(row[1].replace('spase://', 'https://spase-group.org/'))
+        const fnameSPASE = row[1].replace('spase://', 'https://spase-group.org/') + '.json'
+        columnString += ` <a href="${fnameSPASE}" title="SPASE" target="_blank">SP</a>`
       }
 
       if (tableName === 'cdaweb.dataset') {
-        const columnNames = _renderColumn.tableConfig.columns.map(c => c.name)
-        console.log(columnNames)
         const index = columnNames.indexOf('spase_DatasetResourceID')
-        const fnameSPASE = full[index].replace('spase://', 'https://hpde.io/') + '.json'
+        const fnameSPASE = row[index].replace('spase://', 'https://hpde.io/') + '.json'
         columnString += `&nbsp;<a href="${fnameSPASE}" title="SPASE">SP</a>`
       }
+
+      columnString += '</span>'
+
       return columnString
     }
     return columnString
