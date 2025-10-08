@@ -45,7 +45,6 @@ def serve(table_name=None,
     }
 
   _dbinfo(dbconfig, update=False)
-  print(dbconfig['table_name'])
 
   runconfig = {
                 "host": host,
@@ -73,6 +72,26 @@ def _api_init(app, dbconfig):
     response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
     return response
 
+  def rm_root_dir(path):
+    if path is None:
+      return None
+    return path.replace(dbconfig['root_dir'] + "", "")
+
+  def parse_int(parameter, parameters, min=0, default=None):
+    if parameter in parameters:
+      val = parameters[parameter]
+      try:
+        val = int(val)
+      except Exception:
+        emsg = f"Error: {parameter} must be an integer"
+        return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
+      if not val >= min:
+        emsg = f"Error: {parameter} >= {min} required"
+    else:
+      val = default
+
+    parameters[parameter] = val
+
   for dir in ['js', 'css', 'img', 'demo', 'misc']:
     directory = os.path.join(dbconfig['root_dir'], dir)
     app.mount(f"/{dir}/", StaticFiles(directory=directory))
@@ -94,7 +113,7 @@ def _api_init(app, dbconfig):
 
       err = _dbinfo(dbconfig, update=True)
       if err is not None:
-        return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
+        return fastapi.responses.JSONResponse(content={"error": rm_root_dir(err)}, status_code=500)
 
       with open(dbconfig['jsondb']['body']) as f:
         # TODO: Stream
@@ -115,7 +134,7 @@ def _api_init(app, dbconfig):
 
       err = _dbinfo(dbconfig, update=True)
       if err is not None:
-        return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
+        return fastapi.responses.JSONResponse(content={"error": rm_root_dir(err)}, status_code=500)
 
       filename = os.path.basename(dbconfig['sqldb'])
       if filename.endswith('.sqlite'):
@@ -134,7 +153,7 @@ def _api_init(app, dbconfig):
 
     err = _dbinfo(dbconfig, update=True)
     if err is not None:
-      return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
+      return fastapi.responses.JSONResponse(content={"error": rm_root_dir(err)}, status_code=500)
 
     config = dbconfig['config']
     if dbconfig.get('table_meta', None) is None:
@@ -166,7 +185,7 @@ def _api_init(app, dbconfig):
     # Silently ignores any query parameters
     err = _dbinfo(dbconfig, update=True)
     if err is not None:
-      return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
+      return fastapi.responses.JSONResponse(content={"error": rm_root_dir(err)}, status_code=500)
 
     return fastapi.responses.FileResponse(dbconfig['js_render'], media_type='application/javascript')
 
@@ -176,7 +195,7 @@ def _api_init(app, dbconfig):
 
     err = _dbinfo(dbconfig, update=True)
     if err is not None:
-      return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
+      return fastapi.responses.JSONResponse(content={"error": rm_root_dir(err)}, status_code=500)
 
     return fastapi.responses.JSONResponse(content=dbconfig['column_names'])
 
@@ -197,7 +216,9 @@ def _api_init(app, dbconfig):
     else:
       query_params["_verbose"] = False
 
-    _dbinfo(dbconfig)
+    err = _dbinfo(dbconfig, update=True)
+    if err is not None:
+      return fastapi.responses.JSONResponse(content={"error": rm_root_dir(err)}, status_code=500)
 
     if "jsondb" in dbconfig:
       # No server-side processing. Serve entire JSON and return.
@@ -248,25 +269,8 @@ def _api_init(app, dbconfig):
     else:
       query_params["_uniques"] = False
 
-    def is_positive_integer(s):
-      return s.isdigit() and int(s) >= 0
-
-    if "_start" in query_params:
-      if not is_positive_integer(query_params["_start"]):
-        emsg = "Error: _start >= 0 required"
-        return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
-      query_params["_start"] = int(query_params["_start"])
-    else:
-      query_params["_start"] = 0
-
-    if "_length" in query_params:
-      _length = query_params["_length"]
-      if not is_positive_integer(_length) or int(_length) == 0:
-        emsg = "Error: _length > 0 required"
-        return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
-      query_params["_length"] = int(_length)
-    else:
-      query_params["_length"] = None
+    parse_int("_start", query_params, min=0, default=0)
+    parse_int("_length", query_params, min=1, default=None)
 
     if "_orders" in query_params:
       orders = query_params["_orders"].split(",")
@@ -305,7 +309,11 @@ def _api_init(app, dbconfig):
     else:
       query_params["_return"] = None
 
-    result = _dbquery(dbconfig, query_params)
+    try:
+      result = _dbquery(dbconfig, query_params)
+    except Exception as e:
+      emsg = f"Error querying database: {e}"
+      return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=500)
 
     if query_params['_uniques']:
       length = query_params['_length']
@@ -330,7 +338,7 @@ def _api_init(app, dbconfig):
 
 def _dbquery(dbinfo, query_params):
 
-  def execute(cursor, query):
+  def xexecute(cursor, query):
     start = time.time()
     logger.info(f"Executing {query} and fetching all results")
     result = cursor.execute(query)
@@ -339,10 +347,22 @@ def _dbquery(dbinfo, query_params):
     logger.info(f"Took {dt} to execute query and fetch")
     return data
 
-  def n_rows_filtered(cursor, clause):
+  def execute(cursor, query, params=None):
+    start = time.time()
+    logger.info(f"Executing {query} and fetching all results")
+    if params:
+        result = cursor.execute(query, params)
+    else:
+        result = cursor.execute(query)
+    data = result.fetchall()
+    dt = "{:.4f} [s]".format(time.time() - start)
+    logger.info(f"Took {dt} to execute query and fetch")
+    return data
+
+  def n_rows_filtered(cursor, clause_str, clause_params):
     logger.info("Counting # of rows after applying search filters")
-    query = f"SELECT COUNT(*) FROM `{dbinfo['table_name']}` {clause}"
-    return execute(cursor, query)[0][0]
+    query = f"SELECT COUNT(*) FROM `{dbinfo['table_name']}` {clause_str}"
+    return execute(cursor, query, clause_params)[0][0]
 
   def orderby(orders):
     if orders is None:
@@ -357,6 +377,34 @@ def _dbquery(dbinfo, query_params):
     return orderstr
 
   def clause(searches):
+    if searches is None:
+        return "", []
+    keys = list(searches.keys())
+    where = []
+    params = []
+    escape = "\\"
+    for key in keys:
+        val = searches[key]
+        if val == "''" or val == '""':
+            where.append(f"`{key}` = ?")
+            params.append('')
+        elif val.startswith("'") and val.endswith("'"):
+            where.append(f"`{key}` = ?")
+            params.append(val.strip("'"))
+        elif val.startswith('%') and not val.endswith('%'):
+            where.append(f"`{key}` LIKE ? ESCAPE '{escape}'")
+            params.append(val)
+        elif not val.startswith('%') and val.endswith('%'):
+            where.append(f"`{key}` LIKE ? ESCAPE '{escape}'")
+            params.append(val)
+        else:
+            where.append(f"`{key}` LIKE ? ESCAPE '{escape}'")
+            params.append(f"%{val}%")
+    if len(where) == 0:
+        return "", []
+    return "WHERE " + " AND ".join(where), params
+
+  def xclause(searches):
     if searches is None:
       return ""
     keys = list(searches.keys())
@@ -391,14 +439,16 @@ def _dbquery(dbinfo, query_params):
   recordsTotal = dbinfo['n_rows']
   recordsFiltered = recordsTotal
 
+  clause_str, clause_params = clause(searches)
+
   if uniques:
     uniques = {}
     columns = _return
     if _return is None:
       columns = dbinfo['column_names']
     for col in columns:
-      query = f"SELECT `{col}`, COUNT(*) as count FROM `{dbinfo['table_name']}` {clause(searches)} GROUP BY `{col}`"
-      rows = execute(cursor, query)
+      query = f"SELECT `{col}`, COUNT(*) as count FROM `{dbinfo['table_name']}` {clause_str} GROUP BY `{col}`"
+      rows = execute(cursor, query, clause_params)
       # Each value is a list of (value, count) tuples
       uniques[col] = rows.copy()
     return {"data": uniques}
@@ -408,10 +458,10 @@ def _dbquery(dbinfo, query_params):
   else:
     columns_str = ", ".join([f"`{col}`" for col in _return])
 
-  query = f"SELECT {columns_str} FROM `{dbinfo['table_name']}` {clause(searches)} {orderby(orders)}"
+  query = f"SELECT {columns_str} FROM `{dbinfo['table_name']}` {clause_str} {orderby(orders)}"
   if offset == 0 and limit is None:
     logger.info("Executing query with no limit and offset")
-    data = execute(cursor, query)
+    data = execute(cursor, query, clause_params)
     if searches is not None:
       recordsFiltered = len(data)
     return {
@@ -421,14 +471,25 @@ def _dbquery(dbinfo, query_params):
             }
 
   if searches is not None:
-    recordsFiltered = n_rows_filtered(cursor, clause(searches))
+    recordsFiltered = n_rows_filtered(cursor, clause_str, clause_params)
 
   if limit is None:
     limit = recordsTotal
 
+  warning = None
+  if offset >= recordsFiltered:
+    warning = f"_start={offset} is larger than the number of filtered records ({recordsFiltered})."
+    warning += f" Setting _start to {max(0, recordsFiltered - limit)}"
+    offset = max(0, recordsFiltered - limit)
+
+  if offset + limit > recordsFiltered:
+    warning = f"_start + _length = {offset + limit} is larger than the number of filtered records ({recordsFiltered})."
+    warning += f" Setting _length to {recordsFiltered - offset}"
+    limit = recordsFiltered - offset
+
   logger.info("Executing query with limit and offset")
   query = f"{query} LIMIT {limit} OFFSET {offset}"
-  data = execute(cursor, query)
+  data = execute(cursor, query, clause_params)
   conn.close()
 
   result = {
@@ -436,6 +497,8 @@ def _dbquery(dbinfo, query_params):
               'recordsFiltered': recordsFiltered,
               'data': data
             }
+  if warning is not None:
+    result['warning'] = warning
 
   return result
 
@@ -447,6 +510,8 @@ def _dbinfo(dbconfig, update=True):
       if key in dbconfig and isinstance(dbconfig[key], str):
         if not os.path.isabs(dbconfig[key]):
           dbconfig[key] = os.path.join(dbconfig['root_dir'], dbconfig[key])
+        else:
+          logger.warning(f"'{key}' is an absolute path: {dbconfig[key]} and it will not be removed from error messages.")
 
     if 'jsondb' in dbconfig:
       for key in ['head', 'body']:
