@@ -12,98 +12,63 @@ import tableui
 
 logger = logging.getLogger(__name__)
 
+# Default root_dir is the parent directory of this file's directory
 root_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-def serve(table_name=None, sqldb=None,
-          json_head=None, json_body=None,
-          host="0.0.0.0", port=5001, root_dir=root_dir, debug=False,
-          config="config.json", render="js/render.js"):
+def serve(table_name=None,
+          table_meta=None,
+          sqldb=None,
+          json_head=None,
+          json_body=None,
+          js_render="js/render.js",
+          config="config.json",
+          root_dir=root_dir,
+          host="0.0.0.0",
+          port=5001,
+          debug=False):
 
   if debug:
     logging.basicConfig(level=logging.DEBUG)
   else:
     logging.basicConfig(level=logging.INFO)
 
-  # Set defaults using kwargs (from locals()) and cli values
-  kwargs = tableui.cli.defaults(locals())
-
   dbconfig = {
-    "sqldb": kwargs['sqldb'],
-    "table_name": kwargs['table_name'],
-    "json_head": kwargs['json_head'],
-    "json_body": kwargs['json_body']
+    "root_dir": root_dir,
+    "table_name": table_name,
+    "table_meta": table_meta,
+    "sqldb": sqldb,
+    "js_render": js_render,
+    "config": config
   }
+  if json_body is not None:
+    del dbconfig['sqldb']
+    dbconfig['jsondb'] = {
+      "head": json_head,
+      "body": json_body
+    }
 
-  apiconfig = {
-    "root_dir": kwargs['root_dir'],
-    "dtrender": kwargs['render'],
-    "dtconfig": kwargs['config'],
-    "dbconfig": dbconfig
-  }
+  _dbinfo(dbconfig, update=False)
 
   runconfig = {
-                "host": kwargs['host'],
-                "port": kwargs['port'],
+                "host": host,
+                "port": port,
                 "server_header": False
               }
 
-  for file in [sqldb, json_head, json_body, config, render]:
-    if file is None:
-      continue
-    if not os.path.exists(file):
-      logger.error(f"File not found: {file}. Exiting.")
-      exit(1)
-
-  _dbinfo(**dbconfig)  # Test if dbconfig is valid
+  app = fastapi.FastAPI()
 
   logger.info("Initalizing API")
-  app = fastapi.FastAPI()
-  _api_init(app, apiconfig)
+  _api_init(app, dbconfig)
 
   logger.info("Starting server")
   uvicorn.run(app, **runconfig)
 
 
-def _read_config(apiconfig, warn=False):
-
-  if not os.path.exists(apiconfig['dtconfig']):
-    logger.error("Error: Config file not found: " + apiconfig['dtconfig'])
-    exit(1)
-
-  with open(apiconfig['dtconfig']) as f:
-    logger.info("Reading: " + apiconfig['dtconfig'])
-    content = json.load(f)
-
-  if 'jsondb' in apiconfig['dbconfig'] and 'sqldb' in apiconfig['dbconfig']:
-    logger.error("Error: Both sqldb and jsondb were given. Choose one. Exiting.")
-    exit(1)
-
-  serverSide = content.get('serverSide', None)
-
-  if serverSide is None:
-    if apiconfig['dbconfig']['sqldb'] is not None:
-      content['serverSide'] = True
-    if apiconfig['dbconfig']['json_body'] is not None:
-      content['serverSide'] = False
-  else:
-    if serverSide not in [True, False]:
-      logger.error("Error: Config file 'serverSide' must be true or false")
-      exit(1)
-    if apiconfig['dbconfig']['sqldb'] is not None and not serverSide:
-      if warn:
-        logger.warning("Warning: Config file specifies serverSide=false but input is sqldb. Overriding to serverSide=true")
-      content['serverSide'] = True
-    if apiconfig['dbconfig']['json_body'] and serverSide:
-      if warn:
-        logger.warning("Warning: Config file specifies serverSide=true but jsondb was given. Overriding to serverSide=false")
-      content['serverSide'] = False
-
-  return content
-
-
-def _api_init(app, apiconfig):
+def _api_init(app, dbconfig):
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles
+
+  _dbinfo(dbconfig)
 
   def cors_headers(response: fastapi.Response):
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -111,47 +76,49 @@ def _api_init(app, apiconfig):
     response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
     return response
 
-  root_dir = apiconfig['root_dir']
-  dtrender = apiconfig['dtrender']
-  dbconfig = apiconfig['dbconfig']
-
   for dir in ['js', 'css', 'img', 'demo', 'misc']:
-    directory = os.path.join(root_dir, dir)
+    directory = os.path.join(dbconfig['root_dir'], dir)
     app.mount(f"/{dir}/", StaticFiles(directory=directory))
 
   @app.route("/", methods=["GET", "HEAD"])
   def indexhtml(request: fastapi.Request):
     # Silently ignores any query parameters
-    fname = os.path.join(root_dir,'index.html')
+    fname = os.path.join(dbconfig['root_dir'], 'index.html')
     logger.info("Reading: " + fname)
     with open(fname) as f:
       indexhtml_ = f.read()
     return fastapi.responses.HTMLResponse(indexhtml_)
 
-  dbinfo = _dbinfo(**dbconfig)
-  if "jsondb" in dbinfo and dbinfo["jsondb"] is not None:
+  if "jsondb" in dbconfig:
     @app.route("/jsondb", methods=["GET", "HEAD"])
     def jsondb(request: fastapi.Request):
       # Silently ignores any query parameters other than _verbose
       query_params = dict(request.query_params)
-      dbinfo = _dbinfo(**dbconfig)
-      with open(dbinfo['jsondb']['body']) as f:
+
+      # Update
+      _dbinfo(dbconfig)
+
+      with open(dbconfig['jsondb']['body']) as f:
         # TODO: Stream
-        logger.info("Reading and sending: " + dbinfo['jsondb']['body'])
+        logger.info("Reading and sending: " + dbconfig['jsondb']['body'])
         data = json.load(f)
         # TODO: Use _verbose validation in data()
-        data = _data_transform(data, dbinfo['column_names'], query_params.get("_verbose", None) == "true")
+        data = _data_transform(data, dbconfig['column_names'], query_params.get("_verbose", None) == "true")
       data = {
-        "columns": dbinfo['column_names'],
+        "columns": dbconfig['column_names'],
         "data": data
       }
       return fastapi.responses.JSONResponse(data)
 
-  if "sqldb" in dbinfo and dbinfo["sqldb"] is not None:
+  if "sqldb" in dbconfig and dbconfig["sqldb"] is not None:
     @app.route("/sqldb", methods=["GET", "HEAD"])
     def sqldb(request: fastapi.Request):
       # Silently ignores any query parameters
-      filename = os.path.basename(dbinfo['sqldb'])
+
+      # Update
+      _dbinfo(dbconfig)
+
+      filename = os.path.basename(dbconfig['sqldb'])
       if filename.endswith('.sqlite'):
         filename = filename[0:-7] + '.sqlite3'
       if filename.endswith('.sql'):
@@ -160,47 +127,55 @@ def _api_init(app, apiconfig):
                     'media_type': 'application/x-sqlite3',
                     'filename': filename
                   }
-      return fastapi.responses.FileResponse(dbinfo['sqldb'], **kwargs)
+      return fastapi.responses.FileResponse(dbconfig['sqldb'], **kwargs)
 
   @app.route("/config", methods=["GET", "HEAD"])
   def config(request: fastapi.Request):
     # Silently ignores any query parameters
-    dbinfo = _dbinfo(**dbconfig)
-    content = _read_config(apiconfig, warn=False)
-    if "tableUI" not in content:
-      content['tableUI'] = {"tableMetadata": {}}
-    if "sqldb" in dbinfo:
-      content['tableUI']['sqldb'] = dbinfo["sqldb"]
-    if "jsondb" in dbinfo:
-      content['tableUI']['jsondb'] = dbinfo["jsondb"]
-    if "table_name" in dbinfo and 'name' not in content['tableUI']['tableMetadata']:
-      content['tableUI']['tableMetadata']['name'] = dbinfo["table_name"]
-    try:
-      import datetime
-      mtime = os.path.getmtime(dbinfo.get("sqldb", dbinfo.get("jsondb", {}).get("body", "")))
-      content['tableUI']['tableMetadata']['creationDate'] = datetime.datetime.fromtimestamp(mtime).isoformat()
-    except Exception as e:
-      logger.warning(f"Could not get file modification time: {e}")
-    return fastapi.responses.JSONResponse(content=content)
+
+    # Update
+    _dbinfo(dbconfig)
+
+    config = dbconfig['config']
+    config['tableUI'] = {"tableMetadata": dbconfig.get('table_meta', {})}
+    config['tableUI']['tableMetadata']['name'] = dbconfig["table_name"]
+    if "sqldb" in dbconfig:
+      config['tableUI']['sqldb'] = dbconfig["sqldb"]
+      dbfile = dbconfig["sqldb"]
+    if "jsondb" in dbconfig:
+      config['tableUI']['jsondb'] = dbconfig["jsondb"]
+      dbfile = dbconfig["jsondb"]["body"]
+
+    if config['tableUI']['tableMetadata'].get('creationDate', None) is None:
+      try:
+        import datetime
+        mtime = os.path.getmtime(dbfile)
+        creationDate = datetime.datetime.fromtimestamp(mtime).isoformat()
+        config['tableUI']['tableMetadata']['creationDate'] = creationDate[0:-7] + "Z"
+      except Exception as e:
+        logger.warning(f"Could not get file modification time for {dbfile}: {e}")
+
+    return fastapi.responses.JSONResponse(content=config)
 
   @app.route("/render.js", methods=["GET", "HEAD"])
   def render(request: fastapi.Request):
     # Silently ignores any query parameters
-    return fastapi.responses.FileResponse(dtrender)
+    return fastapi.responses.FileResponse(dbconfig['js_render'], media_type='application/javascript')
 
   @app.route("/header", methods=["GET", "HEAD"])
   def header(request: fastapi.Request):
     # Silently ignores any query parameters
-    dbinfo = _dbinfo(**dbconfig)
-    return fastapi.responses.JSONResponse(content=dbinfo['column_names'])
+
+    # Update
+    _dbinfo(dbconfig)
+
+    return fastapi.responses.JSONResponse(content=dbconfig['column_names'])
 
   @app.route("/data/", methods=["POST", "GET", "HEAD"])
   def data(request: fastapi.Request):
 
     logger.info(f"Received data request with query params: {request.query_params}")
     query_params = dict(request.query_params)
-
-    dbinfo = _dbinfo(**dbconfig)
 
     if "_verbose" in query_params:
       if query_params["_verbose"] not in ["true", "false"]:
@@ -213,19 +188,27 @@ def _api_init(app, apiconfig):
     else:
       query_params["_verbose"] = False
 
-    if "jsondb" in dbinfo:
+    _dbinfo(dbconfig)
+
+    if "jsondb" in dbconfig:
       # No server-side processing. Serve entire JSON and return.
       for key in query_params.keys():
         if key not in ["_", "_verbose"]:
           emsg = f"Error: Unknown query parameter: {key}. Only '_' and '_verbose' allowed when using jsondb (=> serverSide=false)."
           return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
 
-      with open(dbinfo['jsondb']['body']) as f:
-        # TODO: Stream
-        logger.info("Reading and sending: " + dbinfo['jsondb']['body'])
-        data = json.load(f)
-        data = _data_transform(data, dbinfo['column_names'], query_params["_verbose"])
-        return fastapi.responses.JSONResponse({"data": data})
+      print(dbconfig)
+      try:
+        with open(dbconfig['jsondb']['body']) as f:
+          # TODO: Stream
+          logger.info("Reading and sending: " + dbconfig['jsondb']['body'])
+          data = json.load(f)
+      except Exception as e:
+        emsg = f"Error reading jsondb body file {dbconfig['jsondb']['body']}: {e}"
+        return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
+
+      data = _data_transform(data, dbconfig['column_names'], query_params["_verbose"])
+      return fastapi.responses.JSONResponse({"data": data})
 
     # sqldb and server-side processing
     keys_allowed = [
@@ -239,12 +222,11 @@ def _api_init(app, apiconfig):
       '_verbose'
     ]
 
-    column_names = dbinfo['column_names']
     for key in query_params.keys():
-      if key not in keys_allowed and key not in column_names:
+      if key not in keys_allowed and key not in dbconfig['column_names']:
         logger.error(f"Error: Unknown query parameter: {key}.")
         emsg = f"Error: Unknown query parameter with first five character of {key[0:5]}. Allowed: {keys_allowed} and "
-        emsg += f"column names: {column_names}"
+        emsg += f"column names: {dbconfig['column_names']}"
         return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
 
     if "_uniques" in query_params:
@@ -284,9 +266,9 @@ def _api_init(app, apiconfig):
         col = order
         if order.startswith("-"):
           col = order[1:]
-        if col not in dbinfo['column_names']:
+        if col not in dbconfig['column_names']:
           emsg = f"Error: _orders column '{col}' not found in column names: "
-          emsg += "{dbinfo['column_names']}"
+          emsg += "{dbconfig['column_names']}"
           return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
       query_params["_orders"] = orders
     else:
@@ -296,26 +278,26 @@ def _api_init(app, apiconfig):
     if query_params is not None:
       logger.info(f"Query params: {query_params}")
       for key, _ in query_params.items():
-        if key in dbinfo['column_names']:
+        if key in dbconfig['column_names']:
           kwargs = {'encoding': 'utf-8', 'errors': 'replace'}
           searches[key] = urllib.parse.unquote(query_params[key], **kwargs)
       query_params['searches'] = searches
     else:
       query_params['searches'] = None
 
-    return_cols = dbinfo['column_names']
+    return_cols = dbconfig['column_names']
     if "_return" in query_params:
       query_params["_return"] = query_params["_return"].split(",")
       for col in query_params["_return"]:
-        if col not in dbinfo['column_names']:
+        if col not in dbconfig['column_names']:
           emsg = f"Error: _return column '{col}' not found in column names: "
-          emsg += "{dbinfo['column_names']}"
+          emsg += "{dbconfig['column_names']}"
           return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
       return_cols = query_params["_return"]
     else:
       query_params["_return"] = None
 
-    result = _dbquery(dbinfo, query_params)
+    result = _dbquery(dbconfig, query_params)
 
     if query_params['_uniques']:
       length = query_params['_length']
@@ -450,35 +432,107 @@ def _dbquery(dbinfo, query_params):
   return result
 
 
-def _dbinfo(sqldb=None, table_name=None, json_head=None, json_body=None):
+def _dbinfo(dbconfig, update=True):
 
-  dbinfo = {}
+  if not update:
+    for key in ['root_dir', 'table_meta', 'sqldb', 'js_render', 'config']:
+      if key in dbconfig and isinstance(dbconfig[key], str):
+        if not os.path.isabs(dbconfig[key]):
+          dbconfig[key] = os.path.join(dbconfig['root_dir'], dbconfig[key])
 
-  if sqldb is None:
-    if table_name is None:
-      table_name = os.path.basename(json_body).split(".")[0]
-      logger.info(f"No table name given; using '{table_name}'")
-    dbinfo["table_name"] = table_name
-    dbinfo["jsondb"] = {"body": json_body, "head": json_head}
-    dbinfo["column_names"] = _column_names(json_head=json_head, json_body=json_body)
+    if 'jsondb' in dbconfig:
+      for key in ['head', 'body']:
+        if dbconfig['jsondb'][key] is not None and not os.path.isabs(dbconfig['jsondb'][key]):
+          dbconfig['jsondb'][key] = os.path.join(dbconfig['root_dir'], dbconfig['jsondb'][key])
 
-    return dbinfo
+    if 'sqldb' not in dbconfig and 'jsondb' not in dbconfig:
+      logger.error("Must specify at least --sqldb or --json_body. Exiting.")
+      exit(1)
 
-  if table_name is None:
-    table_names = _table_names(sqldb)
-    table_name = ".".join(os.path.basename(sqldb).split(".")[0:-1])
-    if table_name in table_names:
-      logger.info(f"No table name given; using table name based on sqldb file name: '{table_name}'")
+    if 'sqldb' in dbconfig and 'jsondb' in dbconfig:
+      logger.error("Both sqldb and jsondb were given. Choose one. Exiting.")
+      exit(1)
+
+  if dbconfig['table_meta'] is None:
+    if 'jsondb' in dbconfig:
+      if not update:
+        logger.warning("No table_meta file given.")
+  else:
+    if isinstance(dbconfig['table_meta'], str) and os.path.exists(dbconfig['table_meta']):
+      with open(dbconfig['table_meta']) as f:
+        try:
+          dbconfig['table_meta'] = json.load(f)
+        except Exception as e:
+          emsg = f"Error reading table_meta file {dbconfig['table_meta']}"
+          if update:
+            return emsg
+          logger.error(f"{emsg}: {e}. Exiting.")
+          exit(1)
     else:
-      logger.info(f"No table name given; using first table returned from list of table names: '{table_name}'")
-      if len(table_names) == 0:
-        logger.error(f"Error: No tables found in database file {sqldb}. Exiting.")
-        return None
-      table_name = table_names[0]
+      emsg = f"File not found: {dbconfig['table_meta']}"
+      if update:
+        return emsg
+      else:
+        logger.error(f"{emsg}. Exiting.")
+        exit(1)
 
-    table_metadata = f'{table_name}.metadata'
-    if f'{table_metadata}' in table_names:
-      conn = sqlite3.connect(sqldb)
+  _dtconfig(dbconfig, update=update)
+
+  if 'jsondb' in dbconfig:
+
+    if not os.path.exists(dbconfig['jsondb']['body']):
+      emsg = f"File not found: {dbconfig['jsondb']['body']}"
+      if not update:
+        logger.error(f"{emsg}. Exiting.")
+        exit(1)
+      else:
+        return emsg
+
+    if dbconfig['table_name'] is None:
+      dbconfig['table_name'] = os.path.basename(dbconfig['jsondb']['body']).split(".")[0]
+      logger.info(f"No table name given; using '{dbconfig['table_name']}', which is based on file name of json_body")
+
+    if dbconfig['jsondb']['head'] is None:
+      if not update:
+        logger.warning("No json_head file given. Using indices for column names.")
+    else:
+      if not os.path.exists(dbconfig['jsondb']['head']):
+        emsg = f"File not found: {dbconfig['jsondb']['head']}"
+        if not update:
+          logger.error(f"{emsg}. Exiting.")
+          exit(1)
+        else:
+          return emsg
+
+    dbconfig["column_names"] = _column_names(json_head=dbconfig['jsondb']['head'], json_body=dbconfig['jsondb']['body'])
+
+    return dbconfig
+
+  table_names = _table_names(dbconfig['sqldb'])
+  if dbconfig['table_name'] is None:
+    table_name = ".".join(os.path.basename(dbconfig['sqldb']).split(".")[0:-1])
+    if table_name in table_names:
+      logger.info(f"No table_name given; using table name based on sqldb file name: '{table_name}'")
+      dbconfig['table_name'] = table_name
+    else:
+      emsg = f"No table_name given and could not find table named '{table_name}' in {dbconfig['sqldb']}"
+      if not update:
+        logger.error(f"{emsg}. Exiting.")
+        exit(1)
+      else:
+        return emsg
+  else:
+    if dbconfig['table_name'] not in table_names:
+      emsg = f"Could not find table named '{dbconfig['table_name']}' in {dbconfig['sqldb']}. Tables found: {table_names}"
+      if not update:
+        logger.error(f"{emsg}. Exiting.")
+        exit(1)
+      else:
+        return emsg
+
+    table_metadata = f"{dbconfig['table_name']}.metadata"
+    if f'{table_metadata}' in table_names and dbconfig['table_meta'] is None:
+      conn = sqlite3.connect(dbconfig['sqldb'])
       cursor = conn.cursor()
       query = f"SELECT * FROM `{table_metadata}`"
       cursor.execute(query)
@@ -486,29 +540,67 @@ def _dbinfo(sqldb=None, table_name=None, json_head=None, json_body=None):
       if row is not None:
         logger.debug(f"Table metadata: {row[1]}")
       conn.close()
-      dbinfo["tableMetadata"] = json.loads(row[1])
+      dbconfig["table_meta"] = json.loads(row[1])
+    if dbconfig['table_meta'] is None:
+      if not update:
+        logger.warning(f"No table_meta file given and no table metadata '{table_metadata}' found in database.")
 
-  conn = sqlite3.connect(sqldb)
-  cursor = conn.cursor()
-  query = f"SELECT COUNT(*) FROM `{table_name}`"
-  cursor.execute(query)
-  n_rows = cursor.fetchone()[0]
-  dbinfo["n_rows"] = n_rows
-  conn.close()
+  try:
+    conn = sqlite3.connect(dbconfig['sqldb'])
+    cursor = conn.cursor()
+    query = f"SELECT COUNT(*) FROM `{dbconfig['table_name']}`"
+    cursor.execute(query)
+    n_rows = cursor.fetchone()[0]
+    dbconfig["n_rows"] = n_rows
+    conn.close()
+  except Exception as e:
+    emsg = f"Error executing query for number of rows using '{query}' on {dbconfig['sqldb']}"
+    if not update:
+      logger.error(f"{emsg}: {e}. Exiting.")
+      exit(1)
+    else:
+      return emsg
 
-  dbinfo["sqldb"] = sqldb
-  dbinfo["table_name"] = table_name
-  dbinfo["column_names"] = _column_names(sqldb=sqldb, table_name=table_name)
+  dbconfig["column_names"] = _column_names(sqldb=dbconfig['sqldb'], table_name=dbconfig['table_name'])
 
-  return dbinfo
+def _dtconfig(dbconfig, update=False):
 
+  if not isinstance(dbconfig['config'], dict):
+    with open(dbconfig['config']) as f:
+      logger.info("Reading: " + dbconfig['config'])
+      try:
+        dbconfig['config'] = json.load(f)
+      except Exception as e:
+        emsg = f"Error reading config file {dbconfig['config']}"
+        if not update:
+          logger.error(f"{emsg}: {e}. Exiting.")
+          exit(1)
+        else:
+          return emsg
+
+  serverSide = dbconfig['config'].get('serverSide', None)
+
+  if serverSide is None or serverSide not in [True, False]:
+    if 'sqldb' in dbconfig:
+      dbconfig['config']['serverSide'] = True
+    if 'jsondb' in dbconfig:
+      dbconfig['config']['serverSide'] = False
+  else:
+    if 'sqldb' in dbconfig and not serverSide:
+      if update:
+        logger.warning("Warning: Config file specifies serverSide=false but input is sqldb. Overriding to serverSide=true")
+      dbconfig['config']['serverSide'] = True
+    if 'jsondb' in dbconfig and serverSide:
+      if update:
+        logger.warning("Warning: Config file specifies serverSide=true but jsondb was given. Overriding to serverSide=false")
+      dbconfig['config']['serverSide'] = False
 
 def _data_transform(data, column_names, verbose):
 
   if not verbose:
     return data
   data_verbose = []
-  logger.debug("Transforming data to verbose format. Column names: {column_names}")
+  logger.debug(f"Transforming data to verbose format. Column names: {column_names}")
   for row in data:
     data_verbose.append({column_names[i]: row[i] for i in range(len(column_names))})
   return data_verbose
@@ -525,11 +617,11 @@ def _column_names(sqldb=None, table_name=None, json_head=None, json_body=None):
       cursor.execute(query_)
       connection.close()
       column_names = [description[0] for description in cursor.description]
-      logger.info(f"Found {len(column_names)} columns in {sqldb}")
-      return column_names
     except Exception as e:
       print(f"Error executing query for column names using '{query_}' on {sqldb}")
       raise e
+    logger.info(f"Found {len(column_names)} columns in {sqldb}")
+    return column_names
 
   if json_head is None:
     return list(range(0, len(json_body[0])))

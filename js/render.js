@@ -22,15 +22,15 @@ function renderColumn (columnName, tableConfig) {
       const fnameJSON = base + '0JSONS/' + columnString.toLowerCase() + '_00000000_v01.json'
       const fnameSKT = base + '0SKELTABLES/' + columnString.toLowerCase() + '_00000000_v01.skt'
       columnString = `${columnString}`
-      columnString += `&nbsp;<a href="${fnameCDF}" title="Master CDF">M</a>`
-      columnString += `&nbsp;<a href="${fnameJSON}" title="JSON">J</a>`
-      columnString += `&nbsp;<a href="${fnameSKT}" title="Skeleton Table">SK</a>`
+      columnString += `&nbsp;<a href="${fnameCDF}" title="Master CDF" target="_blank">M</a>`
+      columnString += `&nbsp;<a href="${fnameJSON}" title="JSON" target="_blank">J</a>`
+      columnString += `&nbsp;<a href="${fnameSKT}" title="Skeleton Table" target="_blank">SK</a>`
 
       const tableName = _renderColumn.tableConfig.tableUI.tableMetadata.name
       if (tableName === 'spase.dataset') {
         console.log(full[1].replace('spase://', 'https://hpde.io'))
         const fnameSPASE = full[1].replace('spase://', 'https://hpde.io/') + '.json'
-        columnString += `&nbsp;<a href="${fnameSPASE}" title="SPASE">SP</a>`
+        columnString += `&nbsp;<a href="${fnameSPASE}" title="SPASE" target="_blank">SP</a>`
       }
 
       if (tableName === 'cdaweb.dataset') {
@@ -48,26 +48,26 @@ function renderColumn (columnName, tableConfig) {
 
 function renderTableMetadata (config) {
   console.log('renderTableMetadata(): config:')
+
   if (!config.tableUI.tableMetadata) return ''
+
   let description = config.tableUI.tableMetadata.description || ''
+  if (description) {
+    description = `<p>${description}<p>`
+  }
+
   let name = config.tableUI.tableMetadata.name || ''
   if (name) {
-    name = ` <code>${name}</code>`
+    name = `<code>${name}</code>`
   }
-  if (description) {
-    description += ' |'
-  }
+
   let creationDate = config.tableUI.tableMetadata.creationDate || ''
   if (creationDate) {
-    creationDate = `Created ${creationDate}.`
+    creationDate = ` | Created ${creationDate}.`
   }
-  if (!description && !creationDate) return ''
-  let txt = ''
-  if (description) {
-    txt = `<p>${description}<p>`
-  }
+
   const base = window.location.origin + window.location.pathname.replace(/\/$/, '')
-  txt += ` Table${name}: <a href="${base}/config" title="${base}/config" target="_blank">config</a>`
+  let txt = ` Table ${name}: <a href="${base}/config" title="${base}/config" target="_blank">config</a>`
   let href = ''
   if (config.tableUI.sqldb) {
     href = `${base}/sqldb`
@@ -76,6 +76,7 @@ function renderTableMetadata (config) {
     href = `${base}/jsondb`
   }
   txt += ` | <a href="${href}" title="${href}" target="_blank">data</a>`
-  txt += ` | ${creationDate}`
+  txt += creationDate
+  txt += description
   return txt
 }
