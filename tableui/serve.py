@@ -485,13 +485,6 @@ def _dbinfo(dbconfig, update=True):
             return emsg
           logger.error(f"{emsg}: {e}. Exiting.")
           exit(1)
-    else:
-      emsg = f"File not found: {dbconfig['table_meta']}"
-      if update:
-        logger.error(f"{emsg}.")
-        return emsg
-      logger.error(f"{emsg}. Exiting.")
-      exit(1)
 
   emsg = _dtconfig(dbconfig, update=update)
   if emsg is not None:
@@ -584,6 +577,7 @@ def _dbinfo(dbconfig, update=True):
 
   return None
 
+
 def _dtconfig(dbconfig, update=False):
 
   if not isinstance(dbconfig['config'], dict):
@@ -616,6 +610,7 @@ def _dtconfig(dbconfig, update=False):
       if update:
         logger.warning("Warning: Config file specifies serverSide=true but jsondb was given. Overriding to serverSide=false")
       dbconfig['config']['serverSide'] = False
+
 
 def _data_transform(data, column_names, verbose):
 
