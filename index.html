@@ -28,8 +28,19 @@
       overflow: auto;
       margin-top: 0.25em;
     }
-    input.columnSearch {
+
+    /*
+      Fix for Chrome autofill, which has its own background color.
+      When an autofill value is selected, the input gets a class of
+      input:-webkit-autofill.
+    */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus {
+      -webkit-text-fill-color: black;
+      -webkit-box-shadow: 0 0 0px 40rem yellow inset;
     }
+
     #table1 {
       width: 100%;
       padding-top: 1em;
@@ -287,10 +298,11 @@
 
     function dtInitComplete() {
 
-      stickyHeaderFixes("#table1", 101);
-
       console.log("dtInitComplete() => DOM is ready.")
+
       const tableID = '#table1';
+
+      stickyHeaderFixes(tableID, 101);
 
       const table = $(tableID).dataTable();
       if (getQueryValue('_cols_show') === 'nonempty') {
@@ -608,6 +620,9 @@
       let input = $(`<input ${attrs} type="text" placeholder="Search col."/>`);
       const qsName = getQueryValue(name);
 
+      let title = 'Enter search text and enter to search. ';
+      title += 'See documentation for search syntax.'
+
       //console.log($(`${parent} thead tr:eq(0) > th`).eq(visibleIndex).outerWidth());
       let val = qsName || '';
       input
@@ -632,20 +647,6 @@
             }
           }
         })
-
-      input.wrap('<div style="white-space: nowrap;"></div>');
-      let clearBtn = $(`<span class="clearOneSearch">✘</span>`);
-      clearBtn.appendTo($(input.parent()));
-
-      if (val) {
-        input.css('background-color', 'yellow');
-        clearBtn.css('visibility', 'visible');
-      }
-
-      let title = 'Enter search text and enter to search. ';
-      title += 'See documentation for search syntax.'
-
-      input
         .attr('title', title)
         .off('input')
         .on('input', function() {
@@ -654,15 +655,25 @@
           } else {
             clearBtn.css('visibility', 'hidden');
           }
-        });
+        })
+        .wrap('<div style="white-space: nowrap;"></div>');
 
-        clearBtn.on('mousedown', function(e) {
+      let clearBtn = $(`<span class="clearOneSearch">✘</span>`);
+      clearBtn.appendTo($(input.parent()));
+      clearBtn.on('mousedown', function(e) {
           e.preventDefault();
           input.val('');
           clearBtn.css('visibility', 'hidden');
           input.focus();
           column.search('').draw('page');
         });
+
+      if (val) {
+        input.css('background-color', 'yellow');
+        clearBtn.css('visibility', 'visible');
+        $('#clearAllSearches').show();
+      }
+
     }
 
     function createColumnSelector(parent, visibleIndex, name, column) {
@@ -798,6 +809,24 @@
     }
 
     function setEvents(tableID) {
+
+      removeEventListener("input", (event) => {
+        console.log('Removing input event:', event);
+      });
+      addEventListener("input", (event) => {
+        if (event.target && event.target.className === 'columnSearch') {
+          console.log('setEvents() => input event. Autocomplete selection event on columnSearch input. Showing clearAllSearches button.')
+          $('#clearAllSearches').show();
+          return;
+          let backgroundColor = $(event.target).css('background-color')
+          console.log(backgroundColor !== 'rgb(255, 255, 0)')
+          if (backgroundColor !== 'rgb(255, 255, 0)') {
+            console.log('setEvents() input event. => Setting background color of input to yellow.')
+            // This does not work. See input:-webkit-autofill in CSS for fix. 
+            //$(event.target).css('background-color', 'yellow');
+          }
+        }
+      });
 
       console.log('setEvents() => Setting search.dt.')
       $(tableID).off('search.dt').off('search.dt');
@@ -965,18 +994,6 @@
         if (html) {
           next.html(html.replace('Next','▶'));
         }
-      }
-
-      console.log("adjustDOM() => Showing or hiding Clear button based on presence of searches in query string.")
-      const qs = parseQueryString();
-      const numSearchKeys = Object.keys(qs).filter(k => !k.startsWith('_')).length;
-      let msg = `setEvents() => draw.dt => There are `;
-      if (numSearchKeys > 0) {
-        console.log(`${msg}${numSearchKeys}search terms in the query string. Showing Clear button.`)
-        $('#clearAllSearches').show();
-      } else {
-        console.log(`${msg}no search terms in the query string. Hiding Clear button.`)
-        $('#clearAllSearches').hide();
       }
 
       if (info.pages > 0) {
@@ -1180,7 +1197,6 @@
         if (searchValue) {
           let msg = 'setQueryStringFromSearch() => Found search value for column'
           msg += ` '${name}'. Updating query string and highlighting input.`
-          console.log();
           $(input).css('background-color', 'yellow');
           msg = "setQueryStringFromSearch() => Updating query string with ";
           msg += `search value for column '${name}' = '${searchValue}'.`;
@@ -1196,6 +1212,18 @@
             updateQueryString(name, null);
           }
         }
+        console.log("setQueryStringFromSearch() => Showing or hiding Clear button based on presence of searches in query string.")
+        const qs = parseQueryString();
+        const numSearchKeys = Object.keys(qs).filter(k => !k.startsWith('_')).length;
+        let msg = `setQueryStringFromSearch() => There are `;
+        if (numSearchKeys > 0) {
+          console.log(`${msg}${numSearchKeys}search terms in the query string. Showing Clear button.`)
+          $('#clearAllSearches').show();
+        } else {
+          console.log(`${msg}no search terms in the query string. Hiding Clear button.`)
+          $('#clearAllSearches').hide();
+        }
+
       }
     }
 
