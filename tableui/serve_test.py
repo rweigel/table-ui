@@ -170,6 +170,19 @@ def _server_test1(port, json_head, json_body, db_type):
     for i in range(len(json_head_data)):
       assert response.json()['data'][0][i] == json_body_data[0][i]
 
+    url = f"{base}/data/?a=a_1"
+    logger.info(40*"-")
+    logger.info(f"Testing {url}")
+    response = requests.get(url)
+    assert response.status_code == 200
+    assert 'data' in response.json()
+    assert response.json()['recordsTotal'] == len(json_body_data)
+    assert response.json()['recordsFiltered'] == 2
+    assert len(response.json()['data']) == 2
+    assert len(response.json()['data'][0]) == len(json_head_data)
+    assert response.json()['data'][0][0] == 'a01'
+    assert response.json()['data'][1][0] == 'a11'
+
     url = f"{base}/data/?_verbose=true&a=a01"
     logger.info(40*"-")
     logger.info(f"Testing {url}")

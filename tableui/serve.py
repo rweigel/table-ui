@@ -45,6 +45,7 @@ def serve(table_name=None,
     }
 
   _dbinfo(dbconfig, update=False)
+  print(dbconfig['table_name'])
 
   runconfig = {
                 "host": host,
@@ -65,8 +66,6 @@ def _api_init(app, dbconfig):
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles
-
-  _dbinfo(dbconfig)
 
   def cors_headers(response: fastapi.Response):
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -93,8 +92,9 @@ def _api_init(app, dbconfig):
       # Silently ignores any query parameters other than _verbose
       query_params = dict(request.query_params)
 
-      # Update
-      _dbinfo(dbconfig)
+      err = _dbinfo(dbconfig, update=True)
+      if err is not None:
+        return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
 
       with open(dbconfig['jsondb']['body']) as f:
         # TODO: Stream
@@ -113,8 +113,9 @@ def _api_init(app, dbconfig):
     def sqldb(request: fastapi.Request):
       # Silently ignores any query parameters
 
-      # Update
-      _dbinfo(dbconfig)
+      err = _dbinfo(dbconfig, update=True)
+      if err is not None:
+        return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
 
       filename = os.path.basename(dbconfig['sqldb'])
       if filename.endswith('.sqlite'):
@@ -131,11 +132,16 @@ def _api_init(app, dbconfig):
   def config(request: fastapi.Request):
     # Silently ignores any query parameters
 
-    # Update
-    _dbinfo(dbconfig)
+    err = _dbinfo(dbconfig, update=True)
+    if err is not None:
+      return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
 
     config = dbconfig['config']
-    config['tableUI'] = {"tableMetadata": dbconfig.get('table_meta', {})}
+    if dbconfig.get('table_meta', None) is None:
+      config['tableUI'] = {"tableMetadata": {}}
+    else:
+      config['tableUI'] = {"tableMetadata": dbconfig['table_meta']}
+
     config['tableUI']['tableMetadata']['name'] = dbconfig["table_name"]
     if "sqldb" in dbconfig:
       config['tableUI']['sqldb'] = dbconfig["sqldb"]
@@ -158,14 +164,19 @@ def _api_init(app, dbconfig):
   @app.route("/render.js", methods=["GET", "HEAD"])
   def render(request: fastapi.Request):
     # Silently ignores any query parameters
+    err = _dbinfo(dbconfig, update=True)
+    if err is not None:
+      return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
+
     return fastapi.responses.FileResponse(dbconfig['js_render'], media_type='application/javascript')
 
   @app.route("/header", methods=["GET", "HEAD"])
   def header(request: fastapi.Request):
     # Silently ignores any query parameters
 
-    # Update
-    _dbinfo(dbconfig)
+    err = _dbinfo(dbconfig, update=True)
+    if err is not None:
+      return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
 
     return fastapi.responses.JSONResponse(content=dbconfig['column_names'])
 
@@ -195,7 +206,6 @@ def _api_init(app, dbconfig):
           emsg = f"Error: Unknown query parameter: {key}. Only '_' and '_verbose' allowed when using jsondb (=> serverSide=false)."
           return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
 
-      print(dbconfig)
       try:
         with open(dbconfig['jsondb']['body']) as f:
           # TODO: Stream
@@ -451,6 +461,14 @@ def _dbinfo(dbconfig, update=True):
       logger.error("Both sqldb and jsondb were given. Choose one. Exiting.")
       exit(1)
 
+  if not os.path.exists(dbconfig['js_render']):
+    emsg = f"File not found: {dbconfig['js_render']}"
+    if update:
+      logger.error(f"{emsg}.")
+      return emsg
+    logger.error(f"{emsg}. Exiting.")
+    exit(1)
+
   if dbconfig['table_meta'] is None:
     if 'jsondb' in dbconfig:
       if not update:
@@ -463,32 +481,35 @@ def _dbinfo(dbconfig, update=True):
         except Exception as e:
           emsg = f"Error reading table_meta file {dbconfig['table_meta']}"
           if update:
+            logger.error(f"{emsg}.")
             return emsg
           logger.error(f"{emsg}: {e}. Exiting.")
           exit(1)
     else:
       emsg = f"File not found: {dbconfig['table_meta']}"
       if update:
+        logger.error(f"{emsg}.")
         return emsg
-      else:
-        logger.error(f"{emsg}. Exiting.")
-        exit(1)
+      logger.error(f"{emsg}. Exiting.")
+      exit(1)
 
-  _dtconfig(dbconfig, update=update)
+  emsg = _dtconfig(dbconfig, update=update)
+  if emsg is not None:
+    return emsg
 
   if 'jsondb' in dbconfig:
 
     if not os.path.exists(dbconfig['jsondb']['body']):
       emsg = f"File not found: {dbconfig['jsondb']['body']}"
-      if not update:
-        logger.error(f"{emsg}. Exiting.")
-        exit(1)
-      else:
+      if update:
+        logger.error(f"{emsg}.")
         return emsg
+      logger.error(f"{emsg}. Exiting.")
+      exit(1)
 
     if dbconfig['table_name'] is None:
       dbconfig['table_name'] = os.path.basename(dbconfig['jsondb']['body']).split(".")[0]
-      logger.info(f"No table name given; using '{dbconfig['table_name']}', which is based on file name of json_body")
+      logger.warning(f"No table name given; using '{dbconfig['table_name']}', which is based on file name of json_body")
 
     if dbconfig['jsondb']['head'] is None:
       if not update:
@@ -496,15 +517,15 @@ def _dbinfo(dbconfig, update=True):
     else:
       if not os.path.exists(dbconfig['jsondb']['head']):
         emsg = f"File not found: {dbconfig['jsondb']['head']}"
-        if not update:
-          logger.error(f"{emsg}. Exiting.")
-          exit(1)
-        else:
+        if update:
+          logger.error(f"{emsg}.")
           return emsg
+        logger.error(f"{emsg}. Exiting.")
+        exit(1)
 
     dbconfig["column_names"] = _column_names(json_head=dbconfig['jsondb']['head'], json_body=dbconfig['jsondb']['body'])
 
-    return dbconfig
+    return None
 
   table_names = _table_names(dbconfig['sqldb'])
   if dbconfig['table_name'] is None:
@@ -514,19 +535,19 @@ def _dbinfo(dbconfig, update=True):
       dbconfig['table_name'] = table_name
     else:
       emsg = f"No table_name given and could not find table named '{table_name}' in {dbconfig['sqldb']}"
-      if not update:
-        logger.error(f"{emsg}. Exiting.")
-        exit(1)
-      else:
+      if update:
+        logger.error(f"{emsg}.")
         return emsg
+      logger.error(f"{emsg}. Exiting.")
+      exit(1)
   else:
     if dbconfig['table_name'] not in table_names:
       emsg = f"Could not find table named '{dbconfig['table_name']}' in {dbconfig['sqldb']}. Tables found: {table_names}"
-      if not update:
-        logger.error(f"{emsg}. Exiting.")
-        exit(1)
-      else:
+      if update:
+        logger.error(f"{emsg}.")
         return emsg
+      logger.error(f"{emsg}. Exiting.")
+      exit(1)
 
     table_metadata = f"{dbconfig['table_name']}.metadata"
     if f'{table_metadata}' in table_names and dbconfig['table_meta'] is None:
@@ -553,13 +574,15 @@ def _dbinfo(dbconfig, update=True):
     conn.close()
   except Exception as e:
     emsg = f"Error executing query for number of rows using '{query}' on {dbconfig['sqldb']}"
-    if not update:
-      logger.error(f"{emsg}: {e}. Exiting.")
-      exit(1)
-    else:
+    if update:
+      logger.error(f"{emsg}.")
       return emsg
+    logger.error(f"{emsg}: {e}. Exiting.")
+    exit(1)
 
   dbconfig["column_names"] = _column_names(sqldb=dbconfig['sqldb'], table_name=dbconfig['table_name'])
+
+  return None
 
 def _dtconfig(dbconfig, update=False):
 
@@ -574,6 +597,7 @@ def _dtconfig(dbconfig, update=False):
           logger.error(f"{emsg}: {e}. Exiting.")
           exit(1)
         else:
+          logger.error(f"{emsg}.")
           return emsg
 
   serverSide = dbconfig['config'].get('serverSide', None)
