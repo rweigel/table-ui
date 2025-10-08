@@ -590,8 +590,8 @@
           let input = createColumnInput(parent, visibleIndex, name, column, searchOnKeypress);
         }
         if (which === 'all' || which == 'select') {
-          //if (config['serverSide'] && (name === 'datasetID' || name === 'VariableName')) {
-          if (config['serverSide']) {
+          if (config['serverSide'] && (name === 'datasetID' || name === 'VariableName')) {
+          //if (config['serverSide']) {
             createColumnSelector(parent, visibleIndex, name, column);
           }
         }
@@ -607,7 +607,6 @@
       attrs += ` style=""`;
       let input = $(`<input ${attrs} type="text" placeholder="Search col."/>`);
       const qsName = getQueryValue(name);
-
 
       //console.log($(`${parent} thead tr:eq(0) > th`).eq(visibleIndex).outerWidth());
       let val = qsName || '';
@@ -716,17 +715,22 @@
           // Parent has been removed from DOM, so do not add select.
           return;
         }
-        select = $(`select[name="${name}"]`);
+        select = th.find(`select[name="${name}"]`);
         select.append(html);
         if (qs[name]) {
           select.val(qs[name].replace(/^'/,'').replace(/'$/,''));
         }
-        createColumnSelector.cache[url] = $(`select[name="${name}"]`).html();
+        createColumnSelector.cache[url] = select.html();
         select.css('visibility', 'visible');
         setChangeEvent(select);
       }
 
       function getOptionHTML(url, cb) {
+        if (createColumnSelector.cache[url]) {
+          //console.log("createColumnSelector() => Using cached HTML for select options.")
+          cb(createColumnSelector.cache[url]);
+          return;
+        }
         // Fetch unique values for this column
         $.ajax({
           url: url,

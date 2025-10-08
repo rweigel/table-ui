@@ -8,8 +8,6 @@ import sqlite3
 import uvicorn
 import fastapi
 
-import tableui
-
 logger = logging.getLogger(__name__)
 
 # Default root_dir is the parent directory of this file's directory
