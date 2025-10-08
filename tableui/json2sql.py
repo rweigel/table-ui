@@ -1,4 +1,4 @@
-def json2sql(json_body, json_head=None, out=None):
+def json2sql(table_name, json_body, json_head=None, out=None):
   import os
   import json
   import logging
@@ -44,15 +44,15 @@ def json2sql(json_body, json_head=None, out=None):
   conn = sqlite3.connect(out_path)
   cursor = conn.cursor()
   col_defs = ", ".join([f'`{col}` TEXT' for col in columns])
-  cursor.execute(f'CREATE TABLE demo ({col_defs})')
+  cursor.execute(f'CREATE TABLE {table_name} ({col_defs})')
 
   # Insert rows
-  cursor.executemany(f'INSERT INTO demo VALUES ({", ".join(["?"] * len(columns))})', rows)
+  cursor.executemany(f'INSERT INTO {table_name} VALUES ({", ".join(["?"] * len(columns))})', rows)
   conn.commit()
   logger.debug(f"Wrote {len(columns)} columns and {len(rows)} rows to {out_path}")
 
   # Verify table creation
-  cursor.execute("SELECT * FROM demo")
+  cursor.execute(f"SELECT * FROM {table_name}")
   all_rows = cursor.fetchall()
 
   assert len(all_rows) == len(rows)

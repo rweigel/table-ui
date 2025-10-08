@@ -23,11 +23,13 @@ def _server_test1(port, json_head, json_body, db_type):
   }
 
   if db_type == 'json':
-    server_kwargs["json_head"] =  json_head
-    server_kwargs["json_body"] =  json_body
+    server_kwargs["json_head"] = json_head
+    server_kwargs["json_body"] = json_body
   if db_type == 'sql':
     import tableui
-    sqldb_path = tableui.json2sql(json_body, json_head=json_head)
+    table_name = "demo"
+    sqldb_path = tableui.json2sql(table_name, json_body, json_head=json_head)
+    server_kwargs["table_name"] = table_name
     server_kwargs["sqldb"] = sqldb_path
 
   proc_kwargs = {

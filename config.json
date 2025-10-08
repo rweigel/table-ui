@@ -16,9 +16,5 @@
     "regex": true,
     "smart": false,
     "return": true
-  },
-  "tableUI": {
-    "tableMetadata": {
-    }
   }
 }

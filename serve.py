@@ -1,2 +1,2 @@
 import tableui
-tableui.serve(**tableui.cli.args())
+tableui.serve(**tableui.cli())
