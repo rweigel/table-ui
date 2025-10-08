@@ -31,10 +31,17 @@ function renderColumn (columnName, tableConfig) {
       columnString += ` <a href="${fnameCDF}"   title="Master CDF" target="_blank">M</a>`
       columnString += ` <a href="${fnameJSON}"  title="Master JSON" target="_blank">J</a>`
       columnString += ` <a href="${fnameSKT}"   title="Master Skeleton Table" target="_blank">SK</a>`
-      columnString += ` <a href="${fnameHAPI1}" title="HAPI Info" target="_blank">H<sub>1</sub></a>`
-      columnString += ` <a href="${fnameHAPI2}" title="HAPI Info Dev Server" target="_blank">H<sub>2</sub></a>`
 
       const tableName = _renderColumn.tableConfig.tableUI.tableMetadata.name
+
+      if (tableName === 'cdaweb.variable') {
+        const index = columnNames.indexOf('VAR_TYPE')
+        if (row[index] === 'data') {
+          columnString += ` <a href="${fnameHAPI1}" title="HAPI Info" target="_blank">H<sub>1</sub></a>`
+          columnString += ` <a href="${fnameHAPI2}" title="HAPI Info Dev Server" target="_blank">H<sub>2</sub></a>`
+        }
+      }
+
       if (tableName === 'spase.dataset') {
         console.log(row[1].replace('spase://', 'https://spase-group.org/'))
         const fnameSPASE = row[1].replace('spase://', 'https://spase-group.org/') + '.json'
