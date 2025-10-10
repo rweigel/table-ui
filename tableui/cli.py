@@ -16,15 +16,12 @@ def cli():
   clargs = {
     "sqldb": {
       "help": "File containing SQL database",
+      "action": "append",
       "default": kwargs['sqldb']
     },
     "table-name": {
       "help": "Name of table in sqldb. Defaults to SQLDB without extension of sqldb",
       "default": kwargs['table_name']
-    },
-    "table-meta": {
-      "metavar": "FILE",
-      "help": "JSON dict with metadata keys. Passed to render function as config.tableUI.tableMetadata."
     },
     "host": {
       "help": "Serve table as a web page at http://localhost:port. Must specify --table_name",

@@ -1,5 +1,5 @@
 # Usage:
-#    python -m tableui.serve_test
+#   python -m tableui.serve_test
 import os
 import time
 import json
@@ -15,6 +15,12 @@ logging.basicConfig(level=logging.DEBUG)
 
 def _server_test_run_server(kwargs):
   serve(**kwargs)
+
+def _log_test_title(url):
+  line = len(url)*"-"
+  logger.info(line)
+  logger.info(f"Testing {url}")
+  logger.info(line)
 
 def _server_test1(port, json_head, json_body, db_type):
 
@@ -52,31 +58,27 @@ def _server_test1(port, json_head, json_body, db_type):
   base = f"http://127.0.0.1:{port}"
 
   url = f"{base}/config"
-  logger.info(40*"-")
-  logger.info(f"Testing {url}")
+  _log_test_title(url)
   response = requests.get(url)
   assert response.status_code == 200
   assert 'tableUI' in response.json()
 
   url = f"{base}/data/"
-  logger.info(40*"-")
-  logger.info(f"Testing {url}")
+  _log_test_title(url)
   response = requests.get(url)
   assert response.status_code == 200
   assert 'data' in response.json()
   assert response.json()['data'] == json_body_data
 
   url = f"{base}/data/?_invalid_key=true"
-  logger.info(40*"-")
-  logger.info(f"Testing {url}")
+  _log_test_title(url)
   response = requests.get(url)
   assert response.status_code == 400
   print(response.json())
   assert 'error' in response.json()
 
   url = f"{base}/data/?_verbose=true"
-  logger.info(40*"-")
-  logger.info(f"Testing {url}")
+  _log_test_title(url)
   response = requests.get(url)
   assert response.status_code == 200
   assert 'data' in response.json()
@@ -84,8 +86,7 @@ def _server_test1(port, json_head, json_body, db_type):
 
   if db_type == 'sql':
     url = f"{base}/data/?_start=0&_length=2&_draw=10"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
@@ -98,10 +99,8 @@ def _server_test1(port, json_head, json_body, db_type):
       for j in range(len(json_head_data)):
         assert response.json()['data'][i][j] == json_body_data[i][j]
 
-
     url = f"{base}/data/?_orders=-{json_head_data[0]}"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
@@ -116,8 +115,7 @@ def _server_test1(port, json_head, json_body, db_type):
     _start = 2
     _length = 2
     url = f"{base}/data/?_start={_start}&_length={_length}"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
@@ -131,8 +129,7 @@ def _server_test1(port, json_head, json_body, db_type):
 
     cols = f"{json_head_data[0]},{json_head_data[2]}"
     url = f"{base}/data/?_return={cols}"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
@@ -146,7 +143,7 @@ def _server_test1(port, json_head, json_body, db_type):
     logger.info(40*"-")
     cols = f"{json_head_data[0]},{json_head_data[2]}"
     url = f"{base}/data/?_verbose=true&_return={cols}"
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
@@ -158,8 +155,7 @@ def _server_test1(port, json_head, json_body, db_type):
     response.json()['data'][0]['c'] == json_body_data[0][2]
 
     url = f"{base}/data/?a=a01"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
@@ -171,8 +167,7 @@ def _server_test1(port, json_head, json_body, db_type):
       assert response.json()['data'][0][i] == json_body_data[0][i]
 
     url = f"{base}/data/?a=a_1"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
@@ -184,8 +179,7 @@ def _server_test1(port, json_head, json_body, db_type):
     assert response.json()['data'][1][0] == 'a11'
 
     url = f"{base}/data/?_verbose=true&a=a01"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
@@ -198,8 +192,7 @@ def _server_test1(port, json_head, json_body, db_type):
 
     url = f"{base}/data/?a=a01&_return={cols}"
     cols = f"{json_head_data[0]},{json_head_data[2]}"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
@@ -212,8 +205,7 @@ def _server_test1(port, json_head, json_body, db_type):
 
     cols = f"{json_head_data[0]},{json_head_data[2]}"
     url = f"{base}/data/?_verbose=true&a=a01&_return={cols}"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     assert 'data' in response.json()
@@ -238,8 +230,7 @@ def _server_test1(port, json_head, json_body, db_type):
           assert row[json_head_data.index(col)] in uniques
 
     url = f"{base}/data/?_uniques=true"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     data = response.json()
@@ -249,8 +240,7 @@ def _server_test1(port, json_head, json_body, db_type):
 
     cols = f"{json_head_data[0]},{json_head_data[2]}"
     url = f"{base}/data/?_uniques=true&_return={cols}"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     data = response.json()
@@ -260,8 +250,7 @@ def _server_test1(port, json_head, json_body, db_type):
 
     cols = f"{json_head_data[0]},{json_head_data[2]}"
     url = f"{base}/data/?_uniques=true&_return={cols}&_length=3"
-    logger.info(40*"-")
-    logger.info(f"Testing {url}")
+    _log_test_title(url)
     response = requests.get(url)
     assert response.status_code == 200
     data = response.json()

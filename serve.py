@@ -1,2 +1,5 @@
+import os
 import tableui
-tableui.serve(**tableui.cli())
+
+args = tableui.cli()
+tableui.serve(**args)

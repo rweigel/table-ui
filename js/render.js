@@ -15,7 +15,7 @@ function renderColumn (columnName, tableConfig) {
   function _renderColumn (columnString, type, row, meta) {
     if (type === 'display') {
       //console.log(columnString, type, row, meta)
-      console.log(_renderColumn.tableConfig)
+      //console.log(_renderColumn.tableConfig)
       const columnNames = _renderColumn.tableConfig.columns.map(c => c.name)
 
       // TODO: Not all have "_v01".
@@ -82,14 +82,14 @@ function renderTableMetadata (config) {
     creationDate = ` | Created ${creationDate}.`
   }
 
-  const base = window.location.origin + window.location.pathname.replace(/\/$/, '')
-  let txt = ` Table ${name}: <a href="${base}/config" title="${base}/config" target="_blank">config</a>`
+  //const base = window.location.origin + window.location.pathname.replace(/\/$/, '')
+  let txt = ` Table ${name}: <a href="config" title="config" target="_blank">config</a>`
   let href = ''
   if (config.tableUI.sqldb) {
-    href = `${base}/sqldb`
+    href = "sqldb"
   }
   if (config.tableUI.jsondb) {
-    href = `${base}/jsondb`
+    href = "jsondb"
   }
   txt += ` | <a href="${href}" title="${href}" target="_blank">data</a>`
   txt += creationDate

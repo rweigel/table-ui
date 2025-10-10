@@ -209,6 +209,10 @@
 
   <div id="controls" style="padding-bottom:3px">
     <div id="error"></div>
+    <span id="relatedTables" style="float:left;display:none">
+      <select id="relatedTablesSelect" style="margin-right:1em;">
+        <option value="">- Related Tables -</option></select>
+    </span>
     <span id="showHideColumns">
       <!--These must be one line to avoid newlines in button text-->
       <span title="show/hide columns with no content"><input type="checkbox" id="hideEmptyColumns"><label for="hideEmptyColumns">Hide Empty Columns</label></span>
@@ -237,6 +241,8 @@
 
       const config = await getConfig();
       checkQueryString(config);
+
+      createRelatedTables(config);
 
       const renderTableMetadata = window.renderTableMetadata ? window.renderTableMetadata : null;
       const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : "";
@@ -346,15 +352,8 @@
 
       const tableName = $('title').text(config.tableUI.tableMetadata.name);
 
-      let columnNames = [];
-      if (!config['columns']) {
-        console.log("getConfig() => Getting header")
-        columnNames = await getHeader();
-      }
-
-      if (!config['columns']) {
-        _columns(columnNames);
-      }
+      // Update entries in config.columns as needed.
+      _columns(config);
 
       // Update config['pageLength'] and config['lengthMenu'] as needed.
       _pageLength(config);
@@ -449,14 +448,8 @@
         }
       }
 
-      function _columns(columnNames, columnEmpty) {
-        console.log("_columns() => Creating columnDefs")
-        if (!columnEmpty) {
-          console.log("_columns() => Passed a columnEmpty array. Setting visibility of all columns to true.")
-        } else {
-          console.log("_columns() => Setting visibility using passed columnEmpty:")
-          console.log(columnEmpty)
-        }
+      function _columns(config) {
+        console.log("_columns() => Creating config['columns']")
 
         let _cols = getQueryValue('_cols');
         console.log("_columns() => _cols from query string:", _cols)
@@ -468,29 +461,35 @@
         }
 
         let renderColumnFunction = window.renderColumn ? window.renderColumn : null;
-        config['columns'] = [];
         const qs = parseQueryString();
         config['searchCols'] = [];
-        for (let i = 0; i < columnNames.length; i++) {
-          let visible = columnEmpty ? columnEmpty[i] === false : true;
-          config['columns'].push({
-            "name": columnNames[i],
-            "title": columnNames[i],
-            //"data": columnNames[i], // Needed if verbose data response
-            "targets": i,
-            "visible": allVisible || _cols.includes(columnNames[i])
-          });
-          if (columnNames[i] in qs) {
-            config['searchCols'].push({'search': qs[columnNames[i]]})
-          } else {
-          config['searchCols'].push(null);
+        let columns = config['columns'];
+        for (let i = 0; i < columns.length; i++) {
+
+          columns[i]['title'] = columns[i]['title'] || columns[i]['name'];
+          // Needed for _verbose server response?
+          //columns[i]['data'] = columns[i]['data'] || columns[i]['name'];
+          columns[i]["target"] = columns[i]["target"] || i;
+
+          let visible = allVisible || _cols.includes(columnNames[i])
+          if ([null, undefined].includes(columns[i]["visible"])) {
+            columns[i]["visible"] = visible;
           }
+
+          // Set initial search values from query string
+          if (columns[i]['name'] in qs) {
+            config['searchCols'].push({'search': qs[columns[i]['name']]})
+          } else {
+            config['searchCols'].push(null);
+          }
+
           // ellipsis.js plug-in
           // config['columns'][i]['render'] = DataTable.render.ellipsis( 10 )
+
           if (renderColumnFunction) {
-            const render = renderColumnFunction(columnNames[i], config)
+            const render = renderColumnFunction(columns[i]['name'], config)
             if (render) {
-              config['columns'][i]['render'] = render
+              columns[i]['render'] = render
             }
           }
         }
@@ -575,6 +574,22 @@
         }
         $('#table1_processing').hide();
         $('#error').html(emsg + ". See console for details.").show();
+      }
+    }
+
+    function createRelatedTables(config) {
+      let relatedTables = config.tableUI.relatedTables ? config.tableUI.relatedTables : null;
+      if (relatedTables && Array.isArray(relatedTables) && relatedTables.length > 0) {
+        let options = [];
+        for (rt of relatedTables) {
+          options.push(`<option value="${rt.path}">${rt.name}</option>`);
+        }
+        $("#relatedTablesSelect").append(options).prop('selectedIndex', 1);
+        $("#relatedTables").show();
+        $("#relatedTablesSelect").on("change", function() {
+          const url = $(this).val();
+          if (url) window.location.href = url;
+        });
       }
     }
 
