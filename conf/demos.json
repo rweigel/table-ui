@@ -1,0 +1,24 @@
+[
+  {
+    "path": "demo1",
+    "table_name": "demo1",
+    "jsondb": {
+      "body": "demo/demo.body.json"
+    },
+    "config": "conf/default.json",
+    "tableUI": {
+      "columnDropdowns": false
+    }
+  },
+  {
+    "path": "demo2",
+    "table_name": "demo2",
+    "jsondb": {
+      "body": "demo/demo.body.json"
+    },
+    "config": "conf/default.json",
+    "tableUI": {
+      "columnDropdowns": false
+    }
+  }
+]

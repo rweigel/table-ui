@@ -1,0 +1,10 @@
+{
+  "path": "",
+  "jsondb": {
+    "body": "demo/demo.body.json"
+  },
+  "config": "conf/default.json",
+  "tableUI": {
+    "columnDropdowns": false
+  }
+}

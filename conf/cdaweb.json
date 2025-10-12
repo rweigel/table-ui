@@ -1,0 +1,18 @@
+[
+  {
+    "path": "cdaweb.dataset",
+    "sqldb": "../../data/table/cdaweb.dataset.sql",
+    "config": "conf/default.json",
+    "tableUI": {
+      "columnDropdowns": false
+    }
+  },
+  {
+    "path": "cdaweb.variable",
+    "sqldb": "../../data/table/cdaweb.variable.sql",
+    "config": "conf/default.json",
+    "tableUI": {
+      "columnDropdowns": ["datasetID", "VariableName"]
+    }
+  }
+]

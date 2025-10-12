@@ -1,8 +1,9 @@
 import os
+import copy
 import json
-import logging
 import time
 import urllib
+import logging
 
 import sqlite3
 import uvicorn
@@ -10,15 +11,8 @@ import fastapi
 
 logger = logging.getLogger(__name__)
 
-# Default root_dir is the parent directory of this file's directory
-root_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-def serve(table_name=None,
-          sqldb=None,
-          json_head=None,
-          json_body=None,
-          js_render="js/render.js",
-          config="conf/default.json",
-          root_dir=root_dir,
+ROOT_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+def serve(config=os.path.join(ROOT_DIR, "conf", "default.json"),
           host="0.0.0.0",
           port=5001,
           debug=False):
@@ -28,23 +22,6 @@ def serve(table_name=None,
   else:
     logging.basicConfig(level=logging.INFO)
 
-  if isinstance(sqldb, list) and len(sqldb) == 1:
-    sqldb = sqldb[0]
-
-  dbconfig = {
-    "root_dir": root_dir,
-    "table_name": table_name,
-    "sqldb": sqldb,
-    "js_render": js_render,
-    "config": config
-  }
-  if json_body is not None:
-    del dbconfig['sqldb']
-    dbconfig['jsondb'] = {
-      "head": json_head,
-      "body": json_body
-    }
-
   runconfig = {
                 "host": host,
                 "port": port,
@@ -53,31 +30,34 @@ def serve(table_name=None,
 
   app = fastapi.FastAPI()
 
-  if isinstance(sqldb, (str, None.__class__)):
-    # Serve single sql or json db
-    _dbinfo(dbconfig, update=False)
-    logger.info("Initalizing API")
-    _api_init(app, dbconfig)
-    logger.info("Starting server")
-    uvicorn.run(app, **runconfig)
-    return
+  if isinstance(config, str):
+    with open(config) as f:
+      logger.info(f"Reading: {config}")
+      try:
+        configs = json.load(f)
+      except Exception as e:
+        emsg = f"Error executing json.load('{config}')"
+        logger.error(f"{emsg}: {e}. Exiting.")
+        exit(1)
+  else:
+    configs = config
 
-  # Serve multiple sqldbs (experimental)
-  root_paths = []
+  if isinstance(configs, dict):
+    configs = [configs]
+
+  paths = []
   dbconfigs = []
-  for idx, db in enumerate(dbconfig['sqldb']):
-    dbconfigs.append(dbconfig.copy())
-    root_path = os.path.splitext(os.path.basename(db))[0]
-    dbconfigs[-1]['root_path'] = root_path
-    dbconfigs[-1]['sqldb'] = db
-    # Get table name
-    _dbinfo(dbconfigs[-1], update=False)
-    root_paths.append({"path": root_path, "name": dbconfigs[-1]['table_name']})
-    print(dbconfigs[-1]['root_path'])
+  for config in configs:
+    logger.info("")
+    logger.info(f"Adding database with config: {config}")
+    _dbinfo(config, update=False)
+    dbconfigs.append(config)
+    paths.append({"path": config['path'], "name": config['table_name']})
 
   for dbconfig in dbconfigs:
-    dbconfig['root_paths'] = root_paths
-    logger.info(f"Initalizing API for {db} with root_path = '{dbconfig['root_path']}'")
+    if len(dbconfigs) > 1:
+      dbconfig['tableUI']['relatedTables'] = paths
+    logger.info(f"Initalizing API for with path = '{dbconfig['path']}'")
     _api_init(app, dbconfig)
 
   logger.info("Starting server")
@@ -95,13 +75,6 @@ def _api_init(app, dbconfig):
     response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
     return response
 
-  def rm_root_dir(path):
-    if path is None:
-      return None
-    path = path.replace(dbconfig['root_dir'] + "/", "")
-    path = path.replace(os.path.expanduser('~') + "/", "~/")
-    return path
-
   def parse_int(parameter, parameters, min=0, default=None):
     if parameter in parameters:
       val = parameters[parameter]
@@ -117,36 +90,35 @@ def _api_init(app, dbconfig):
 
     parameters[parameter] = val
 
-  root_path = ""
-  if "root_path" in dbconfig:
-    root_path = "/" + dbconfig['root_path']
+  path = ""
+  if "path" in dbconfig and dbconfig['path']:
+    path = "/" + dbconfig['path']
 
-  for dir in ['js', 'css', 'img', 'demo', 'misc']:
-    directory = os.path.join(dbconfig['root_dir'], dir)
-    app.mount(f"{root_path}/{dir}/", StaticFiles(directory=directory))
+  for dir in ['js', 'css', 'demo', 'misc']:
+    directory = os.path.join(ROOT_DIR, dir)
+    app.mount(f"{path}/{dir}/", StaticFiles(directory=directory))
 
-  #print(dbconfig['root_dir'])
-  #print(dbconfig['root_paths'])
-
-  logger.info(f"Initalizing {root_path}/")
-  @app.route(f"{root_path}/", methods=["GET", "HEAD"])
+  logger.info(f"Initalizing endpoint {path}/")
+  @app.route(f"{path}/", methods=["GET", "HEAD"])
   def indexhtml(request: fastapi.Request):
     # Silently ignores any query parameters
-    fname = os.path.join(dbconfig['root_dir'], 'index.html')
+    fname = os.path.join(ROOT_DIR, 'index.html')
     logger.info("Reading: " + fname)
     with open(fname) as f:
       indexhtml_ = f.read()
     return fastapi.responses.HTMLResponse(indexhtml_)
 
   if "jsondb" in dbconfig:
-    @app.route(f"/{root_path}/jsondb", methods=["GET", "HEAD"])
+    endpoint = f"{path}/jsondb"
+    logger.info(f"Initalizing endpoint '{endpoint}'")
+    @app.route(endpoint, methods=["GET", "HEAD"])
     def jsondb(request: fastapi.Request):
       # Silently ignores any query parameters other than _verbose
       query_params = dict(request.query_params)
 
       err = _dbinfo(dbconfig, update=True)
       if err is not None:
-        return fastapi.responses.JSONResponse(content={"error": rm_root_dir(err)}, status_code=500)
+        return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
 
       with open(dbconfig['jsondb']['body']) as f:
         # TODO: Stream
@@ -161,13 +133,15 @@ def _api_init(app, dbconfig):
       return fastapi.responses.JSONResponse(data)
 
   if "sqldb" in dbconfig and dbconfig["sqldb"] is not None:
-    @app.route(f"{root_path}/sqldb", methods=["GET", "HEAD"])
+    endpoint = f"{path}/sqldb"
+    logger.info(f"Initalizing endpoint '{endpoint}'")
+    @app.route(f"{path}/sqldb", methods=["GET", "HEAD"])
     def sqldb(request: fastapi.Request):
       # Silently ignores any query parameters
 
       err = _dbinfo(dbconfig, update=True)
       if err is not None:
-        return fastapi.responses.JSONResponse(content={"error": rm_root_dir(err)}, status_code=500)
+        return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
 
       filename = os.path.basename(dbconfig['sqldb'])
       if filename.endswith('.sqlite'):
@@ -180,30 +154,35 @@ def _api_init(app, dbconfig):
                   }
       return fastapi.responses.FileResponse(dbconfig['sqldb'], **kwargs)
 
-  @app.route(f"{root_path}/config", methods=["GET", "HEAD"])
+  endpoint = f"{path}/config"
+  logger.info(f"Initalizing endpoint '{endpoint}'")
+  @app.route(f"{path}/config", methods=["GET", "HEAD"])
   def config(request: fastapi.Request):
     # Silently ignores any query parameters
 
     err = _dbinfo(dbconfig, update=True)
     if err is not None:
-      content = {"error": rm_root_dir(err)}
+      content = {"error": err}
       return fastapi.responses.JSONResponse(content=content, status_code=500)
 
-    config = dbconfig['config']
-    config['tableUI'] = _tableUI(dbconfig)
+    config = {**dbconfig['config'], "tableUI": dbconfig['tableUI']}
 
     return fastapi.responses.JSONResponse(content=config)
 
-  @app.route(f"{root_path}/render.js", methods=["GET", "HEAD"])
+  endpoint = f"{path}/render.js"
+  logger.info(f"Initalizing endpoint '{endpoint}'")
+  @app.route(f"{path}/render.js", methods=["GET", "HEAD"])
   def render(request: fastapi.Request):
     # Silently ignores any query parameters
     err = _dbinfo(dbconfig, update=True)
     if err is not None:
-      return fastapi.responses.JSONResponse(content={"error": rm_root_dir(err)}, status_code=500)
+      return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
 
     return fastapi.responses.FileResponse(dbconfig['js_render'], media_type='application/javascript')
 
-  @app.route(f"{root_path}/data/", methods=["POST", "GET", "HEAD"])
+  endpoint = f"{path}/data/"
+  logger.info(f"Initalizing endpoint '{endpoint}'")
+  @app.route(f"{path}/data/", methods=["POST", "GET", "HEAD"])
   def data(request: fastapi.Request):
 
     logger.info(f"Received data request with query params: {request.query_params}")
@@ -222,7 +201,7 @@ def _api_init(app, dbconfig):
 
     err = _dbinfo(dbconfig, update=True)
     if err is not None:
-      return fastapi.responses.JSONResponse(content={"error": rm_root_dir(err)}, status_code=500)
+      return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
 
     if "jsondb" in dbconfig:
       # No server-side processing. Serve entire JSON and return.
@@ -335,83 +314,60 @@ def _api_init(app, dbconfig):
 def _dbinfo(dbconfig, update=True):
 
   if not update:
-    for key in ['root_dir', 'sqldb', 'js_render', 'config']:
-      if key in dbconfig and isinstance(dbconfig[key], str):
-        if not os.path.isabs(dbconfig[key]):
-          logger.info(f"Converting {key} = '{dbconfig[key]}' to absolute path")
-          dbconfig[key] = os.path.normpath(os.path.join(dbconfig['root_dir'], dbconfig[key]))
-        if not dbconfig[key].startswith(os.path.expanduser('~')):
-          logger.warning(f"Path = '{dbconfig[key]}' starts with home directory")
-          logger.warning("  and will not be converted to a path relative to root")
-          logger.warning("  in server error messages.")
-        if not dbconfig[key].startswith(dbconfig['root_dir']):
-          logger.warning(f"Path = '{dbconfig[key]}' does not start with")
-          logger.warning(f"  root_dir = '{dbconfig['root_dir']}'")
-          logger.warning("  and will not be converted to a path relative to root")
-          logger.warning("  in server error messages.")
-
-    if 'jsondb' in dbconfig:
-      for key in ['head', 'body']:
-        if dbconfig['jsondb'][key] is not None and not os.path.isabs(dbconfig['jsondb'][key]):
-          dbconfig['jsondb'][key] = os.path.join(dbconfig['root_dir'], dbconfig['jsondb'][key])
-
     if 'sqldb' not in dbconfig and 'jsondb' not in dbconfig:
-      logger.error("Must specify at least --sqldb or --json_body. Exiting.")
+      logger.error("Must specify at least sqldb or jsondb. Exiting.")
       exit(1)
 
     if 'sqldb' in dbconfig and 'jsondb' in dbconfig:
       logger.error("Both sqldb and jsondb were given. Choose one. Exiting.")
       exit(1)
 
+  if 'js_render' not in dbconfig:
+    dbconfig['js_render'] = os.path.join(ROOT_DIR, 'js', 'render.js')
+
   if not os.path.exists(dbconfig['js_render']):
     emsg = f"File not found: {dbconfig['js_render']}"
-    if update:
-      logger.error(f"{emsg}.")
-      return emsg
-    logger.error(f"{emsg}. Exiting.")
-    exit(1)
+    return _error(emsg, "", update)
 
-  # Adds 'table_meta' to dbconfig
+  # Add 'table_meta' to dbconfig
   emsg = _table_meta(dbconfig, update=update)
   if emsg is not None:
     return emsg
 
+  # Add (or updates) and checks 'config' in dbconfig
   emsg = _dtconfig(dbconfig, update=update)
   if emsg is not None:
     return emsg
-
 
   if 'jsondb' in dbconfig:
 
     if not os.path.exists(dbconfig['jsondb']['body']):
       emsg = f"File not found: {dbconfig['jsondb']['body']}"
-      if update:
-        logger.error(f"{emsg}.")
-        return emsg
-      logger.error(f"{emsg}. Exiting.")
-      exit(1)
+      return _error(emsg, "", update)
 
     try:
       with open(dbconfig['jsondb']['body']) as f:
-        # TODO: Stream
         logger.info(f"Reading: {dbconfig['jsondb']['body']}")
         dbconfig['jsondb']['data'] = json.load(f)
     except Exception as e:
       emsg = f"Error reading jsondb body file {dbconfig['jsondb']['body']}"
-      if update:
-        logger.error(f"{emsg}.")
-        return emsg
-      logger.error(f"{emsg}: {e}. Exiting.")
-      exit(1)
+      return _error(emsg, e, update)
 
-    if dbconfig['table_name'] is None:
+    if dbconfig.get('table_name', None) is None:
       dbconfig['table_name'] = os.path.basename(dbconfig['jsondb']['body']).split(".")[0]
       wmsg = f"No table name given; using '{dbconfig['table_name']}', "
       wmsg += "which is based on file name of json_body"
       logger.warning(wmsg)
 
+    dbconfig['path'] = dbconfig.get('path', dbconfig['table_name'])
+
     # Adds 'column_names' to dbconfig and 'columns' to dbconfig['config']
     emsg = _column_names(dbconfig, update=update)
+    if emsg is not None:
+      return emsg
+
+    # Adds or updates 'tableUI' in dbconfig
+    emsg = _tableUI(dbconfig, update=update)
     if emsg is not None:
       return emsg
 
@@ -423,29 +379,28 @@ def _dbinfo(dbconfig, update=True):
   if emsg is not None:
     return emsg
 
-  if dbconfig['table_name'] is None:
+  if dbconfig.get('table_name', None) is None:
     table_name = ".".join(os.path.basename(dbconfig['sqldb']).split(".")[0:-1])
     if table_name in dbconfig['sqldb_tables']:
       logger.info(f"No table_name given; Found table with name based on sqldb file name: '{table_name}'")
       dbconfig['table_name'] = table_name
     else:
       emsg = f"No table_name given and could not find table named '{table_name}' in {dbconfig['sqldb']}"
-      if update:
-        logger.error(f"{emsg}.")
-        return emsg
-      logger.error(f"{emsg}. Exiting.")
-      exit(1)
+      return _error(emsg, "", update)
   else:
     if dbconfig['table_name'] not in dbconfig['sqldb_tables']:
       emsg = f"Could not find table named '{dbconfig['table_name']}' in {dbconfig['sqldb']}. Tables found: {dbconfig['sqldb_tables']}"
-      if update:
-        logger.error(f"{emsg}.")
-        return emsg
-      logger.error(f"{emsg}. Exiting.")
-      exit(1)
+      return _error(emsg, "", update)
+
+  dbconfig['path'] = dbconfig.get('path', dbconfig['table_name'])
 
   # Adds 'column_names' to dbconfig and 'columns' to dbconfig['config']
   emsg = _column_names(dbconfig, update=update)
+  if emsg is not None:
+    return emsg
+
+  # Adds or updates 'tableUI' in dbconfig
+  emsg = _tableUI(dbconfig, update=update)
   if emsg is not None:
     return emsg
 
@@ -454,7 +409,7 @@ def _dbinfo(dbconfig, update=True):
   if emsg is not None:
     return emsg
 
-  # Adds or updates 'table_meta'
+  # Adds or updates 'tableUI' in dbconfig
   emsg = _sql_table_meta(dbconfig, update=update)
   if emsg is not None:
     return emsg
@@ -462,22 +417,40 @@ def _dbinfo(dbconfig, update=True):
   return None
 
 
-def _tableUI(dbconfig):
+def _tableUI(dbconfig, update=True):
 
-  tableUI = {"tableMetadata": {}}
-  if dbconfig.get('table_meta', None) is not None:
-    tableUI = {"tableMetadata": dbconfig['table_meta']}
-
-  tableUI['tableMetadata']['name'] = dbconfig["table_name"]
-  if "root_paths" in dbconfig:
-    tableUI['relatedTables'] = dbconfig['root_paths']
+  tableUI = dbconfig.get("tableUI", {})
+  if "paths" in dbconfig:
+    tableUI['relatedTables'] = dbconfig['paths']
 
   if "sqldb" in dbconfig:
     dbfile = dbconfig["sqldb"]
     tableUI['sqldb'] = os.path.basename(dbfile)
+
   if "jsondb" in dbconfig:
     dbfile = dbconfig["jsondb"]["body"]
     tableUI['jsondb'] = os.path.basename(dbfile)
+
+  # Merge table_meta from dbconfig and tableUI
+  table_meta = copy.deepcopy(dbconfig.get('table_meta', None))
+  if table_meta is not None:
+    # Overwrite any existing keys in dbconfig['table_meta'] with those in tableMetadata
+    table_meta = {**table_meta, **tableUI.get('tableMetadata', {})}
+    tableUI["tableMetadata"] = table_meta
+
+  if tableUI.get('tableMetadata', None) is None:
+    tableUI['tableMetadata'] = {}
+
+  if 'tableName' not in tableUI['tableMetadata']:
+    tableUI['tableMetadata']['tableName'] = dbconfig['table_name']
+  else:
+    if tableUI['tableMetadata']['tableName'] != dbconfig['table_name']:
+      tableUI['tableMetadata']['tableName'] = dbconfig['table_name']
+      if not update:
+        wmsg = "tableMetadata.tableName does not match config.table_name. "
+        wmsg += f"Overriding to config.table_name = {dbconfig['table_name']}"
+        logger.warning(wmsg)
+
   if tableUI['tableMetadata'].get('creationDate', None) is None:
     try:
       import datetime
@@ -487,32 +460,36 @@ def _tableUI(dbconfig):
     except Exception as e:
       logger.warning(f"Could not get file modification time for {dbfile}: {e}")
 
-  return tableUI
+  dbconfig['tableUI'] = tableUI
 
+
+def _error(emsg, err, update):
+  if update:
+    logger.error(f"{emsg}.")
+    return emsg
+  logger.error(f"{emsg}: {err}. Exiting.")
+  exit(1)
 
 def _dtconfig(dbconfig, update=False):
+
+  if 'config' not in dbconfig:
+    default = os.path.join(ROOT_DIR, 'conf', 'default.json')
+    with open(default) as f:
+      logger.info(f"Reading: {default}")
+      try:
+        dbconfig['config'] = json.load(f)
+      except Exception as e:
+        emsg = f"Error executing json.load('{default}')"
+        return _error(emsg, e, update)
 
   if isinstance(dbconfig['config'], str):
     with open(dbconfig['config']) as f:
       logger.info("Reading: " + dbconfig['config'])
       try:
-        config = json.load(f)
-        dbconfig.update(config) # Over-writes any existing keys in dbconfig
+        dbconfig['config'] = json.load(f)
       except Exception as e:
         emsg = f"Error executing json.load('{dbconfig['config']}')"
-        if not update:
-          logger.error(f"{emsg}: {e}. Exiting.")
-          exit(1)
-        else:
-          logger.error(f"{emsg}.")
-          return emsg
-
-  if 'config' not in dbconfig['config']:
-    default = os.path.join(dbconfig['root_dir'], 'conf', 'default.json')
-    with open(default) as f:
-      logger.info(f"Reading: {default}")
-      default = json.load(f)
-      dbconfig['config'] = default
+        return _error(emsg, e, update)
 
   serverSide = dbconfig['config'].get('serverSide', None)
 
@@ -559,18 +536,14 @@ def _column_names(dbconfig, update=False):
       dbconfig['column_names'] = [row[1] for row in data]
     except Exception as e:
       emsg = "Error getting column names"
-      if update:
-        logger.error(f"{emsg}.")
-        return emsg
-      logger.error(f"{emsg}: {e}. Exiting.")
-      exit(1)
+      return _error(emsg, e, update)
 
     set_config_columns(dbconfig['column_names'])
     return None
 
   n_rows = len(dbconfig['jsondb']['data'][0])
   column_names = [str(c) for c in range(0, n_rows)]
-  if dbconfig['jsondb']['head'] is None:
+  if dbconfig['jsondb'].get('head', None) is None:
     if not update:
       logger.warning("No json_head file given. Using indices for column names.")
     set_config_columns(column_names)
@@ -579,11 +552,7 @@ def _column_names(dbconfig, update=False):
 
   if not os.path.exists(dbconfig['jsondb']['head']):
     emsg = f"File not found: {dbconfig['jsondb']['head']}"
-    if update:
-      logger.error(f"{emsg}.")
-      return emsg
-    logger.error(f"{emsg}. Exiting.")
-    exit(1)
+    _error(emsg, "", update)
 
   with open(dbconfig['jsondb']['head']) as f:
     try:
@@ -593,11 +562,7 @@ def _column_names(dbconfig, update=False):
       return None
     except Exception as e:
       emsg = f"Error executing json.load('{dbconfig['jsondb']['head']}')"
-      if update:
-        logger.error(f"{emsg}.")
-        return emsg
-      logger.error(f"{emsg}: {e}. Exiting.")
-      exit(1)
+      return _error(emsg, e, update)
 
 
 def _table_meta(dbconfig, update=False):
@@ -613,11 +578,7 @@ def _table_meta(dbconfig, update=False):
           dbconfig['table_meta'] = json.load(f)
         except Exception as e:
           emsg = f"Error executing json.load('{dbconfig['table_meta']}')"
-          if update:
-            logger.error(f"{emsg}.")
-            return emsg
-          logger.error(f"{emsg}: {e}. Exiting.")
-          exit(1)
+          return _error(emsg, e, update)
 
   return None
 
@@ -786,12 +747,7 @@ def _sql_table_meta(dbconfig, update=False):
         return None
     except Exception as e:
       emsg = "Error getting table metadata"
-      if update:
-        logger.error(f"{emsg}.")
-        return emsg
-      logger.error(f"{emsg}: {e}. Exiting.")
-      exit(1)
-
+      return _error(emsg, e, update)
 
 def _sql_n_rows(dbconfig, update=False):
   try:
@@ -800,12 +756,8 @@ def _sql_n_rows(dbconfig, update=False):
     dbconfig["n_rows"] = _sql_execute(query, sqldb=dbconfig['sqldb'])[0][0]
     logger.info(f"Got number of rows = {dbconfig['n_rows']}\n")
   except Exception as e:
-    emsg = "Error getting number of rows"
-    if update:
-      logger.error(f"{emsg}.")
-      return emsg
-    logger.error(f"{emsg}: {e}. Exiting.")
-    exit(1)
+    emsg = f"Error getting number of rows in {dbconfig['table_name']}"
+    return _error(emsg, e, update)
 
   return None
 
@@ -823,11 +775,7 @@ def _sql_table_names(dbconfig, update=False):
     logger.info(f"  {table_names}\n")
   except Exception as e:
     emsg = "Error getting table names"
-    if update:
-      logger.error(f"{emsg}.")
-      return emsg
-    logger.error(f"{emsg}: {e}. Exiting.")
-    exit(1)
+    return _error(emsg, e, update)
 
   dbconfig['sqldb_tables'] = table_names
 

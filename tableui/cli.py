@@ -14,45 +14,18 @@ def cli():
   kwargs = get_keywords(tableui.serve)
 
   clargs = {
-    "sqldb": {
-      "help": "File containing SQL database",
-      "action": "append",
-      "default": kwargs['sqldb']
-    },
-    "table-name": {
-      "help": "Name of table in sqldb. Defaults to SQLDB without extension of sqldb",
-      "default": kwargs['table_name']
+    "config": {
+      "help": "Path to JSON configuration file. Relative paths are interpreted as relative to current working directory server.py executed from.",
+      "default": kwargs['config']
     },
     "host": {
-      "help": "Serve table as a web page at http://localhost:port. Must specify --table_name",
+      "help": "Serve table as a web page at http://host:port.",
       "default": kwargs['host']
     },
     "port": {
-      "help": "Serve table as a web page at http://localhost:port. Must specify --table_name",
+      "help": "Serve table as a web page at http://host:port.",
       "type": int,
       "default": kwargs['port']
-    },
-    "root-dir": {
-      "help": "Root directory with subdirs of js, css, and img",
-      "default": kwargs['root_dir']
-    },
-    "config": {
-      "help": "JSON file containing configuration. See https://datatables.net/reference/option/ for options. Relative paths are relative to root-dir.",
-      "default": kwargs['config']
-    },
-    "js-render": {
-      "help": "Javascript file with DataTables metadata and column rendering functions. Path is relative to root-dir.",
-      "default": kwargs['js_render']
-    },
-    "json-head": {
-      "metavar": "FILE",
-      "help": "JSON file containing array of header names. Ignored if sqldb given. Requires --json-body to be given.",
-      "default": kwargs['json_head']
-    },
-    "json-body": {
-      "metavar": "FILE",
-      "help": "JSON array with (row) arrays of length header. Ignored if sqldb given. Requires --json-header to be given.",
-      "default": kwargs['json_body']
     },
     "debug": {
       "help": "Verbose logging.",

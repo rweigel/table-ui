@@ -3,8 +3,8 @@
 
 <head>
   <meta charset="UTF-8">
-    <title></title>
-    <link rel="icon" href="img/favicon.svg">
+    <title>...</title>
+    <link rel="icon" href="css/favicon.svg">
     <link href="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.css" rel="stylesheet"/>
     <script src="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.js"></script>
     <script src="//cdn.datatables.net/plug-ins/1.13.4/dataRender/ellipsis.js"></script>
@@ -14,8 +14,6 @@
       margin: 1em;
       margin-top: 0.5em;
     }
-    /*th, td { white-space: nowrap; }*/
-
     h1 {
       font-size: 1em;
     }
@@ -23,10 +21,29 @@
       background-color: white;
       border: 1px solid black;
     }
+    summary {
+      cursor: pointer;
+    }
+    details {
+      background-color: white;
+      float:right;
+    }
+    details code {
+      font-size: small;
+      background-color: rgb(244, 244, 244);
+      border: 1px solid black;
+      border-radius: 4px;
+      padding: 0.1em;
+    }
     select.columnUniques {
       visibility: hidden;
       overflow: auto;
       margin-top: 0.25em;
+    }
+    span.clearOneSearch {
+      white-space: nowrap;
+      visibility: hidden;
+      cursor: pointer;
     }
 
     /*
@@ -45,59 +62,47 @@
       width: 100%;
       padding-top: 1em;
     }
-    #table1_filter {
-      float: left;
-      display: none;
-    }
-    summary {
-      cursor: pointer;
-    }
-    details code {
-      font-size: small;
-      background-color: rgb(244, 244, 244);
-      border: 1px solid black;
-      border-radius: 4px;
-      padding: 0.1em;
-    }
-
     #error {
       color: red;
       font-weight: bold;
       padding: 0.5em;
       display: none;
     }
+    #controls {
+      padding-bottom: 3px;
+    }
     #showHideColumns {
       margin-right: 1em;
       padding-bottom: 0.5em;
+    }
+    #clearAllSearches {
+      display: none;
     }
     #clearAllSearches button {
       margin-right: 1em;
       background-color: yellow;
     }
-    .clearOneSearch {
-      white-space: nowrap;
-      visibility: hidden;
-      cursor: pointer;
+    #relatedTables {
+      float: left;
+      display: none;
     }
-
-    .dataTables_wrapper .dataTables_paginate .paginate_button {
-      padding: 0em;
+    #relatedTablesSelect {
+      margin-right: 1em;
     }
 
     table.dataTable thead th {
       font-size: 0.8em;
+      text-align: center;
     }
-    tfoot {
-      display: table-header-group;
-    }
-    tfoot input {
-      width: 100%;
-      padding: 3px;
-      box-sizing: border-box;
-    }
-    table tbody {
+    table.dataTable tbody {
       font-family: monospace;
-      font-size: 10pt;
+      text-align: center;
+      font-size: 9pt;
+    }
+
+    .dataTables_filter {
+      float: left;
+      display: none;
     }
     .dataTables_length {
       display: inline-block;
@@ -112,21 +117,11 @@
       float: left;
       text-align: right;
     }
-    .dataTables_wrapper .dataTables_paginate .ellipsis {
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
       padding: 0em;
     }
-
-    table.dataTable td {
-      text-align: center;
-    }
-    table.dataTable thead th {
-      text-align: center;
-    }
-    table.dataTable tfoot tr th p {
-      margin: 1px;
-    }
-    table.dataTable tfoot th, table.dataTable tfoot td {
-      padding: 1px;
+    .dataTables_wrapper .dataTables_paginate .ellipsis {
+      padding: 0em;
     }
 
     /* Move processing indicator to top of page */
@@ -135,7 +130,6 @@
       top: 0px;
     }
 
-    /*
     /* Scrollbar styling */
     /* https://simurai.com/blog/2011/07/26/webkit-scrollbar */
     .dataTables_scrollBody::-webkit-scrollbar {
@@ -166,7 +160,7 @@
 
 <body>
 
-  <details style="background-color: white; float:right">
+  <details>
     <summary>Documentation</summary>
     <h1>Table Description</h1>
     <div id="tableMetadata"></div>
@@ -201,30 +195,38 @@
       <li>All table entries are strings.</li>
     </ul>
     <p>
-      <a href="https://github.com/rweigel/table-ui" title="https://github.com/rweigel/table-ui" style="text-decoration:none" target="_blank">
-        <img src="css/github-mark.svg" alt="GitHub logo" height="24px">
+      <a
+          href="https://github.com/rweigel/table-ui"
+          title="https://github.com/rweigel/table-ui"
+          style="text-decoration:none"
+          target="_blank">
+            <img src="css/github-mark.svg" alt="GitHub logo" height="24px">
       </a>
     </p>
   </details>
 
-  <div id="controls" style="padding-bottom:3px">
+  <div id="controls">
     <div id="error"></div>
-    <span id="relatedTables" style="float:left;display:none">
-      <select id="relatedTablesSelect" style="margin-right:1em;">
+    <span id="relatedTables">
+      <select id="relatedTablesSelect">
         <option value="">- Related Tables -</option></select>
     </span>
     <span id="showHideColumns">
       <!--These must be one line to avoid newlines in button text-->
       <span title="show/hide columns with no content"><input type="checkbox" id="hideEmptyColumns"><label for="hideEmptyColumns">Hide Empty Columns</label></span>
     </span>
-    <span id="clearAllSearches" style="display:none" title="Clear all searches"><button onclick="clearAllSearches('#table1')">Clear</button></span>
+    <span id="clearAllSearches" title="Clear all searches"><button onclick="clearAllSearches('#table1')">Clear</button></span>
   </div>
 
-  <span id="query"> <a href="" target="_blank">Query</a></span>
+  <span id="query">
+    <a href="" target="_blank">Query</a>
+  </span>
 
-  <table id="table1" class="display" style="width:100%"></table>
+  <table id="table1" class="display">
+  </table>
 
   <script>
+
     console.log("Document ready. Calling init()")
     $(document).ready(() =>init());
 
@@ -248,10 +250,10 @@
       const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : "";
       $('#tableMetadata').html(tableMetadata);
 
-      // Add header names to table. Two rows are added.
-      // The first row is for name and sorting, second row is for filtering.
-      // Need to add before table is created so it is included in DataTables
-      // column width calculations.
+      // Add header names to table. Two rows are added. The first row is for
+      // name and sorting, second row is for filtering. Need to add before
+      // table is created so it is included in DataTables column width
+      // calculations.
       $('#table1').append('<thead><tr></tr><tr></tr></thead>');
       let tr0 = $('#table1 > thead > tr:eq(0)');
       for (let i = 0; i < config.columns.length; i++) {
@@ -271,23 +273,24 @@
             alert('stateSaveCallBack called.');
           },
           "stateLoadParams": function(settings, data) {
-            // displayStart and pageLength in top-level config above are ignored if
-            // stateSave is true because saved state has precedence over this setting.
-            // Setting the state above is needed because after init()
-            // is called a second time, stateLoadParams is not triggered.
-            // destroy() must delete state because its column visibility
-            // will be used instead of the new column visibility.
-            console.log("stateLoadParams() called. Deleting start, length, and columns from saved state data:") 
-            console.log(data)
+            // displayStart and pageLength in top-level config above are
+            // ignored if stateSave is true because saved state has
+            // precedence over this setting. Setting the state above
+            // is needed because after init() is called a second time,
+            // stateLoadParams is not triggered. destroy() must delete
+            // state because its column visibility will be used instead
+            // of the new column visibility.
+            msg = "stateLoadParams() called. Deleting start, length, and "
+            msg += `columns from saved state data: {data}`
+            console.log(msg)
             delete data.start
             delete data.length
             delete data.columns
           },
           headerCallback: function(thead, data, start, end, display) {
-            // This is needed to prevent DataTables from removing
-            // the second header row that contains the column names.
-            // It does not appear to be documented.
-            //alert('here')
+            // This is needed to prevent DataTables from removing the
+            // second header row that contains the column names. It does
+            // not appear to be documented.
             return thead;
           },
           "initComplete": dtInitComplete,
@@ -298,8 +301,7 @@
       // and console.log() shows the modified version.
       console.log(JSON.parse(JSON.stringify(dataTableOptions)));
       let table = $('#table1').DataTable(dataTableOptions);
-      console.log("DataTable() returned:")
-      console.log(table);
+      console.log(`DataTable() returned: {table}`);
     }
 
     function dtInitComplete() {
@@ -350,7 +352,7 @@
       let resp = await fetch(url);
       const config = await resp.json();
 
-      const tableName = $('title').text(config.tableUI.tableMetadata.name);
+      const tableName = $('title').text(config.tableUI.tableMetadata.tableName);
 
       // Update entries in config.columns as needed.
       _columns(config);
@@ -584,10 +586,21 @@
         for (rt of relatedTables) {
           options.push(`<option value="${rt.path}">${rt.name}</option>`);
         }
-        $("#relatedTablesSelect").append(options).prop('selectedIndex', 1);
-        $("#relatedTables").show();
+        // Determine selected option based on current path
+        for (let i = 0; i < relatedTables.length; i++) {
+          // Remove trailing slash from path
+          let w = window.location.pathname.replace(/\/$/,'');
+          if (w.endsWith(relatedTables[i].path)) {
+            $("#relatedTablesSelect").append(options).prop('selectedIndex', i+1);
+            $("#relatedTablesSelect").attr("lastSelected", relatedTables[i].path);
+            $("#relatedTables").show();
+            break;
+          }
+        }
         $("#relatedTablesSelect").on("change", function() {
-          const url = $(this).val();
+          const lastSelected = $("#relatedTablesSelect").attr("lastSelected");
+          $("#relatedTablesSelect").attr("lastSelected", $(this).val());
+          const url = window.location.href.replace(lastSelected, $(this).val());
           if (url) window.location.href = url;
         });
       }
@@ -607,7 +620,7 @@
       const table = $(tableID).dataTable();
       const qs = parseQueryString();
       let config = getConfig.config;
-      visibleIndex = 0;
+      let visibleIndex = 0;
       table.api().columns(':visible').every(function () {
         let column = this;
         let index = column.index();
@@ -617,9 +630,18 @@
           let input = createColumnInput(parent, visibleIndex, name, column, searchOnKeypress);
         }
         if (which === 'all' || which == 'select') {
-          //if (config['serverSide'] && (name === 'datasetID' || name === 'VariableName')) {
-          if (config['serverSide']) {
-            createColumnSelector(parent, visibleIndex, name, column);
+          let showDropdown = true;
+          if (Array.isArray(config.tableUI.columnDropdowns)) {
+            showDropdown = config.tableUI.columnDropdowns.includes(name);
+          } else if (config.tableUI.columnDropdowns === true) {
+            showDropdown = true;
+          } else {
+            // No need to call createColumnDropdown() to create hidden select
+            // to get spacing correct.
+            showDropdown = null;
+          }
+          if (config['serverSide'] && showDropdown !== null) {
+            createColumnDropdown(parent, visibleIndex, name, column, showDropdown);
           }
         }
         visibleIndex++;
@@ -627,6 +649,9 @@
     }
 
     function createColumnInput(parent, visibleIndex, name, column, searchOnKeypress) {
+
+      $('#clearAllSearches').hide();
+
       // Create `input` element
       let element = `thead tr:eq(0) > th`
       let th = $(`${parent} ${element}`).eq(visibleIndex).empty();
@@ -638,7 +663,6 @@
       let title = 'Enter search text and enter to search. ';
       title += 'See documentation for search syntax.'
 
-      //console.log($(`${parent} thead tr:eq(0) > th`).eq(visibleIndex).outerWidth());
       let val = qsName || '';
       input
         .val(val)
@@ -666,35 +690,42 @@
         .off('input')
         .on('input', function() {
           if ($(this).val()) {
-            clearBtn.css('visibility', 'visible');
+            clearOneSearch.css('visibility', 'visible');
           } else {
-            clearBtn.css('visibility', 'hidden');
+            clearOneSearch.css('visibility', 'hidden');
           }
         })
         .wrap('<div style="white-space: nowrap;"></div>');
 
-      let clearBtn = $(`<span class="clearOneSearch">✘</span>`);
-      clearBtn.appendTo($(input.parent()));
-      clearBtn.on('mousedown', function(e) {
+      let clearOneSearch = $(`<span class="clearOneSearch">✘</span>`);
+      clearOneSearch.appendTo($(input.parent()));
+      clearOneSearch.on('mousedown', function(e) {
           e.preventDefault();
           input.val('');
-          clearBtn.css('visibility', 'hidden');
+          clearOneSearch.css('visibility', 'hidden');
           input.focus();
           column.search('').draw('page');
+          let thParent = $(this).closest('th');
+          let select = thParent.find('select.columnUniques');
+          if (select.length > 0) {
+            if (select.find('option').length > 0) {
+              select.prop('selectedIndex', 0);
+            }
+          }
         });
 
       if (val) {
         input.css('background-color', 'yellow');
-        clearBtn.css('visibility', 'visible');
+        clearOneSearch.css('visibility', 'visible');
         $('#clearAllSearches').show();
       }
 
     }
 
-    function createColumnSelector(parent, visibleIndex, name, column) {
+    function createColumnDropdown(parent, visibleIndex, name, column, show) {
 
-      if (!createColumnSelector.cache) {
-        createColumnSelector.cache = {};
+      if (!createColumnDropdown.cache) {
+        createColumnDropdown.cache = {};
       }
 
       let th = $(`${parent} thead tr:eq(0) > th`).eq(visibleIndex)
@@ -718,6 +749,12 @@
       const offsetDifference = inputOffset - selectOffset;
       // Why is -dw here and +dw in select width above needed for alignment?
       select.css('margin-left', `${offsetDifference-dw}px`);
+
+      if (show === false) {
+        // Here we place the dropdown in the DOM but do not show it in order
+        // for spacing to be correct.
+        return;
+      }
 
       const qs = parseQueryString();
       let searches = {};
@@ -746,15 +783,15 @@
         if (qs[name]) {
           select.val(qs[name].replace(/^'/,'').replace(/'$/,''));
         }
-        createColumnSelector.cache[url] = select.html();
+        createColumnDropdown.cache[url] = select.html();
         select.css('visibility', 'visible');
         setChangeEvent(select);
       }
 
       function getOptionHTML(url, cb) {
-        if (createColumnSelector.cache[url]) {
-          //console.log("createColumnSelector() => Using cached HTML for select options.")
-          cb(createColumnSelector.cache[url]);
+        if (createColumnDropdown.cache[url]) {
+          //console.log("createColumnDropdown() => Using cached HTML for select options.")
+          cb(createColumnDropdown.cache[url]);
           return;
         }
         // Fetch unique values for this column
@@ -779,19 +816,19 @@
       function setChangeEvent(select) {
         // On select change, update input and trigger search
         select.off("change").on("change", function () {
-          console.log("createColumnSelector => select change event triggered.")
+          console.log("createColumnDropdown => select change event triggered.")
           let val = $(this).val().replace(/'/g, "''");
           if (val === "") {
-            console.log("createColumnSelector => Setting input to empty string.")
+            console.log("createColumnDropdown => Setting input to empty string.")
             input.val("");
             select.parent().find('span.clearOneSearch').css('visibility', 'hidden');
           } else {
             val = `'${val}'`;
-            console.log(`createColumnSelector => Setting input to ${val}.`)
+            console.log(`createColumnDropdown => Setting input to ${val}.`)
             input.val(val);
             select.parent().find('span.clearOneSearch').css('visibility', 'visible');
           }
-          console.log("createColumnSelector => Triggering search and draw('page').")
+          console.log("createColumnDropdown => Triggering search and draw('page').")
           column.search($(this).val()).draw('page');
         });
       }
@@ -1227,7 +1264,7 @@
             updateQueryString(name, null);
           }
         }
-        console.log("setQueryStringFromSearch() => Showing or hiding Clear button based on presence of searches in query string.")
+        //console.log("setQueryStringFromSearch() => Showing or hiding Clear button based on presence of searches in query string.")
         const qs = parseQueryString();
         const numSearchKeys = Object.keys(qs).filter(k => !k.startsWith('_')).length;
         let msg = `setQueryStringFromSearch() => There are `;
