@@ -6,10 +6,9 @@ async function init () {
   if (DataTable.isDataTable(tableID)) {
     let msg = `init() => isDataTable('${tableID}') is true. Destroying `
     msg += 'existing table before re-creating it.'
-    console.log()
+    console.log(msg)
     const state = $(tableID).DataTable().state()
     console.log('init() => Current DataTable state:', state)
-    const table = $(tableID).DataTable()
     destroy(tableID)
   }
 
@@ -277,7 +276,8 @@ async function getConfig () {
 
   function _ajaxData (dtp) {
     let msg = '_ajaxData() => Preparing query parameters for AJAX search'
-    console.log(`using dtp object: ${JSON.parse(JSON.stringify(dtp))}`)
+    console.log(`${msg}using dtp object:`)
+    console.log(JSON.parse(JSON.stringify(dtp)))
 
     $('#error').hide()
 
