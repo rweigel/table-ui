@@ -1,37 +1,37 @@
-function renderColumn (columnName, tableConfig) {
-  let columnOptions = tableConfig.tableUI.columnOptions || {}
-  columnOptions = array2object(columnOptions, 'name')
+function renderColumn (columnName, config) {
+  const columnOptionsArray = config.dataTablesAdditions.columnOptions || null
+  if (!columnOptionsArray) return null
+
+  // Create a map from column name to index
+  const columnOptions = {}
+  for (let i = 0; i < columnOptionsArray.length; i++) {
+    columnOptions[columnOptionsArray[i].name] = columnOptionsArray[i]
+  }
 
   let functionName = columnOptions[columnName]?.render
+
   if (typeof functionName === 'string') {
-    // typeof window[columnOptions[columnName]?.render] === 'function'
-    console.log('renderColumn(): columnName:', columnName)
-    functions[functionName].columnName = columnName
-    functions[functionName].tableConfig = tableConfig
-    return functions[functionName]()
+    return functions[functionName](columnName, config)
   } else if (typeof functionName === 'object') {
     functionName = functionName.function
-    functions[functionName].columnName = columnName
-    functions[functionName].tableConfig = tableConfig
     const args = columnOptions[columnName].render?.args || []
-    return functions[functionName](...args)
+    return functions[functionName](columnName, config, ...args)
   }
 }
 
 const functions = {}
 
-functions.ellipsis = function (n) {
-  return DataTable.render.ellipsis(n || 10)
+functions.ellipsis = function (columnName, config, n) {
+  return DataTable.render.ellipsis(n || 30)
 }
 
-functions.renderDatasetID = function () {
+functions.renderDatasetID = function (columnName, config) {
   return (columnString, type, row, meta) => {
     if (type !== 'display') {
       return columnString
     }
-    //return DataTable.render.ellipsis( 10 )(columnString, type, row)
 
-    const columnNames = functions.renderDatasetID.tableConfig.columns.map(c => c.name)
+    const columnNames = config.dataTables.columns.map(c => c.name)
 
     // TODO: Not all have "_v01".
     const base = 'https://cdaweb.gsfc.nasa.gov/pub/software/cdawlib/'
@@ -47,7 +47,7 @@ functions.renderDatasetID = function () {
     columnString += ` <a href="${fnameJSON}"  title="Master JSON" target="_blank">J</a>`
     columnString += ` <a href="${fnameSKT}"   title="Master Skeleton Table" target="_blank">SK</a>`
 
-    const tableName = functions.renderDatasetID.tableConfig.tableUI.tableMetadata.tableName
+    const tableName = config.dataTablesAdditions.tableMetadata.tableName
     if (tableName === 'cdaweb.variable') {
       const index = columnNames.indexOf('VAR_TYPE')
       if (row[index] === 'data') {
@@ -77,31 +77,31 @@ functions.renderDatasetID = function () {
 function renderTableMetadata (config) {
   console.log('renderTableMetadata(): config:')
 
-  if (!config.tableUI.tableMetadata) return ''
+  if (!config.dataTablesAdditions.tableMetadata) return ''
 
-  let description = config.tableUI.tableMetadata.description || ''
+  let description = config.dataTablesAdditions.tableMetadata.description || ''
   if (description) {
     description = `<p>${description}<p>`
   }
 
-  let tableName = config.tableUI.tableMetadata.tableName || ''
+  let tableName = config.dataTablesAdditions.tableMetadata.tableName || ''
   if (tableName) {
     tableName = ` <code>${tableName}</code>`
   }
 
-  let creationDate = config.tableUI.tableMetadata.creationDate || ''
+  let creationDate = config.dataTablesAdditions.tableMetadata.creationDate || ''
   if (creationDate) {
     creationDate = ` | Created ${creationDate}.`
   }
 
-  //const base = window.location.origin + window.location.pathname.replace(/\/$/, '')
+  // const base = window.location.origin + window.location.pathname.replace(/\/$/, '')
   let txt = ` Table${tableName}: <a href="config" title="config" target="_blank">config</a>`
   let href = ''
-  if (config.tableUI.sqldb) {
-    href = "sqldb"
+  if (config.dataTablesAdditions.sqldb) {
+    href = 'sqldb'
   }
-  if (config.tableUI.jsondb) {
-    href = "jsondb"
+  if (config.dataTablesAdditions.jsondb) {
+    href = 'jsondb'
   }
   txt += ` | <a href="${href}" title="${href}" target="_blank">data</a>`
   txt += creationDate

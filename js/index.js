@@ -18,9 +18,12 @@ async function init () {
 
   createRelatedTablesDropdown(config)
 
-  const renderTableMetadata = window.renderTableMetadata ? window.renderTableMetadata : null
-  const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : ''
-  $('#tableMetadata').html(tableMetadata)
+  // Uses renderTableMetadata() if defined in render.js
+  if (window.renderTableMetadata) {
+    $('#tableMetadata').html(window.renderTableMetadata(config))
+  }
+
+  $('title').text(config.dataTablesAdditions.tableMetadata.tableName)
 
   // Add header names to table. Two rows are added. The first row is for
   // name and sorting, second row is for filtering. Need to add before
@@ -29,18 +32,18 @@ async function init () {
   $(tableID).append('<thead><tr></tr><tr></tr></thead>')
   const tr0 = $(`${tableID} > thead > tr:eq(0)`)
   const tr1 = $(`${tableID} > thead > tr:eq(1)`)
-  for (let i = 0; i < config.columns.length; i++) {
-    const name = config.columns[i].name
+  for (let i = 0; i < config.dataTables.columns.length; i++) {
+    const name = config.dataTables.columns[i].name
     tr0.append(`<th name="${name}"></th>`)
     tr1.append(`<th name="${name}">${name}</th>`)
   }
 
-  setColumnWidths(config.tableUI.columnOptions)
+  setColumnWidths(config.dataTablesAdditions.columnOptions)
 
   // https://datatables.net/reference/option/
   const dataTableOptions =
     {
-      ...config,
+      ...config.dataTables,
       autoWidth: true,
       stateSave: true,
       stateSaveCallBack: function (settings, data) {
@@ -54,7 +57,7 @@ async function init () {
         // state because its column visibility will be used instead
         // of the new column visibility.
         let msg = 'stateLoadParams() called. Deleting start, length, and '
-        msg += 'columns from saved state data: {data}'
+        msg += `columns from saved state data: ${data}`
         console.log(msg)
         delete data.start
         delete data.length
@@ -111,39 +114,40 @@ function dtInitComplete () {
 
 async function getConfig () {
   const url = window.location.pathname + 'config'
+  let config
   try {
     console.log('getConfig() => Getting config from ' + url)
     const resp = await fetch(url)
-    const config = await resp.json()
-    updateConfig(config)
-    console.log('getConfig() => Setting getConfig.config = config.')
-    getConfig.config = config
-    return config
+    config = await resp.json()
   } catch (e) {
     const emsg = 'An error occurred while getting table configuration'
     const fullURL = window.location.origin + url
-    $('#error').html(`${emsg} from <a href="${fullURL}">${fullURL}</a>. See console for details.`).show()
-    console.error('getConfig() => Error getting config:')
-    console.error(e)
+    const link = `<a href="${fullURL}">${fullURL}</a>`
+    $('#error').html(`${emsg} from ${link}. See console for details.`).show()
+    console.error(`getConfig() => Error getting config: ${e}`)
     throw e
   }
 
-  function updateConfig (config) {
-    $('title').text(config.tableUI.tableMetadata.tableName)
+  updateConfig(config)
+  console.log('getConfig() => Setting getConfig.config = config.')
+  getConfig.config = config
 
-    // Update entries in config.columns as needed.
+  return config
+
+  function updateConfig (config) {
+    // Update entries in config.dataTables.columns as needed.
     _columns(config)
 
     // Update config['pageLength'] and config['lengthMenu'] as needed.
     _pageLength(config)
 
     const page0based = (-1 + parseInt(getQueryValue('_page', 1)))
-    config.displayStart = config.pageLength * page0based
+    config.dataTables.displayStart = config.dataTables.pageLength * page0based
 
-    config.ajax = window.location.pathname + 'data/'
+    config.dataTables.ajax = window.location.pathname + 'data/'
 
-    if (config.serverSide) {
-      config.ajax = {
+    if (config.dataTables.serverSide) {
+      config.dataTables.ajax = {
         url: window.location.pathname + 'data/',
         type: 'get',
         data: _ajaxData,
@@ -159,73 +163,73 @@ async function getConfig () {
 
   function _pageLength (config) {
     // Update pageLength and lengthMenu if needed.
-    if (!config.pageLength) {
-      config.pageLength = 25
-      console.log("_pageLength() => No config['pageLength']. Setting default pageLength to 25")
-      let msgo = "_pageLength() => config['lengthMenu'][0][0]"
+    if (!config.dataTables.pageLength) {
+      config.dataTables.pageLength = 25
+      console.log('_pageLength() => No config.dataTables.pageLength. Setting to 25')
+      const msgo = '_pageLength() => config.dataTables.lengthMenu[0][0]'
       try {
-        config.pageLength = config.lengthMenu[0][0]
+        config.dataTables.pageLength = config.dataTables.lengthMenu[0][0]
         let msg = `${msgo} found. Modifying default pageLength to be first `
-        msg += `entry in config['lengthMenu']: ${config.pageLength}`
-        console.log()
+        msg += `entry in config.dataTables.lengthMenu: ${config.dataTables.pageLength}`
+        console.log(msg)
       } catch (e) {
-        let msg = `${msgo} not found. Could not get modified default `
-        console.log(`${msg}pageLength from config['lengthMenu']. Using 25.`)
+        const msg = `${msgo} not found. Could not get modified default `
+        console.log(`${msg}pageLength from config.dataTables.lengthMenu. Using 25.`)
       }
     }
-    let pageLength = config.pageLength
+    let pageLength = config.dataTables.pageLength
     if (getQueryValue('_length')) {
       let msg = '_pageLength() => _length query value found. Modifying default '
       msg += `pageLength to be _length: ${getQueryValue('_length')}`
       console.log(msg)
       pageLength = parseInt(getQueryValue('_length'))
     }
-    config.pageLength = pageLength
+    config.dataTables.pageLength = pageLength
 
-    if (config.lengthMenu) {
+    if (config.dataTables.lengthMenu) {
       try {
-        let msg = "_pageLength() => Attempting to updated config['lengthMenu']"
+        let msg = '_pageLength() => Updating config.dataTables.lengthMenu'
         msg += ` to include pageLength = ${pageLength}, if not already present.`
         console.log(msg)
-        const menuVals = config.lengthMenu[0]
-        const menuNames = config.lengthMenu[1]
+        const menuVals = config.dataTables.lengthMenu[0]
+        const menuNames = config.dataTables.lengthMenu[1]
         if (!menuVals.includes(pageLength)) {
           menuVals.push(pageLength)
           menuNames.push(pageLength)
-          let msg = "_pageLength() => Updated config['lengthMenu'] to include "
-          console.log(`${msg}pageLength = ${pageLength}.`)
-          config.lengthMenu[0] = menuVals
-          config.lengthMenu[1] = menuNames
+          const msg = '_pageLength() => Updated config.dataTables.lengthMenu to '
+          console.log(`include ${msg}pageLength = ${pageLength}.`)
+          config.dataTables.lengthMenu[0] = menuVals
+          config.dataTables.lengthMenu[1] = menuNames
         } else {
           msg = `_pageLength() => pageLength = ${pageLength} already in `
-          msg += "config['lengthMenu']. Not updating it."
+          msg += 'config.dataTables.lengthMenu. Not updating it.'
           console.log(msg)
         }
       } catch (e) {
-        let msg = "_pageLength() => Problem with config['lengthMenu']. "
+        let msg = '_pageLength() => Problem with config.dataTables.lengthMenu. '
         msg += `Setting it to [[${pageLength}, -1], [${pageLength}, 'All']].`
-        console.log()
-        config.lengthMenu = [[pageLength, -1], [pageLength, 'All']]
+        console.log(msg)
+        config.dataTables.lengthMenu = [[pageLength, -1], [pageLength, 'All']]
       }
     } else {
-      let msg = "_pageLength() => No config['lengthMenu']. Setting it to "
+      let msg = '_pageLength() => No config.dataTables.lengthMenu. Setting it to '
       msg += `[[${pageLength}, -1], [${pageLength}, 'All']].`
       console.log(msg)
-      config.lengthMenu = [[pageLength, -1], [pageLength, 'All']]
+      config.dataTables.lengthMenu = [[pageLength, -1], [pageLength, 'All']]
     }
 
     // Sort lengthMenu[0] and lengthMenu[1] by lengthMenu[0] values but keep
     // the correspondence between values and names.
-    if (config.lengthMenu) {
-      let msg = "_pageLength() => Sorting config['lengthMenu'] by values "
-      console.log(`${msg}in config['lengthMenu'][0].`)
-      const vals = config.lengthMenu[0]
-      const names = config.lengthMenu[1]
+    if (config.dataTables.lengthMenu) {
+      const msg = '_pageLength() => Sorting config.dataTables.lengthMenu by '
+      console.log(`${msg} values in config.dataTables.lengthMenu[0].`)
+      const vals = config.dataTables.lengthMenu[0]
+      const names = config.dataTables.lengthMenu[1]
       // Create array of [val, name], sort by val, then split back
       const pairs = vals.map((v, i) => [v, names[i]])
       pairs.sort((a, b) => a[0] - b[0])
-      config.lengthMenu[0] = pairs.map(p => p[0])
-      config.lengthMenu[1] = pairs.map(p => p[1])
+      config.dataTables.lengthMenu[0] = pairs.map(p => p[0])
+      config.dataTables.lengthMenu[1] = pairs.map(p => p[1])
 
       // If -1 is in lengthMenu[0], put it at the end of the list.
       const minusOneIndex = vals.indexOf(-1)
@@ -237,8 +241,8 @@ async function getConfig () {
         vals.push(minusOneVal)
         names.push(minusOneName)
       }
-      config.lengthMenu[0] = vals
-      config.lengthMenu[1] = names
+      config.dataTables.lengthMenu[0] = vals
+      config.dataTables.lengthMenu[1] = names
     }
   }
 
@@ -254,10 +258,9 @@ async function getConfig () {
       _cols = []
     }
 
-    const renderColumnFunction = window.renderColumn ? window.renderColumn : null
     const qs = parseQueryString()
-    config.searchCols = []
-    const columns = config.columns
+    config.dataTables.searchCols = []
+    const columns = config.dataTables.columns
     for (let i = 0; i < columns.length; i++) {
       columns[i].title = columns[i].title || columns[i].name
       // Needed for _verbose server response?
@@ -271,16 +274,14 @@ async function getConfig () {
 
       // Set initial search values from query string
       if (columns[i].name in qs) {
-        config.searchCols.push({ search: qs[columns[i].name] })
+        config.dataTables.searchCols.push({ search: qs[columns[i].name] })
       } else {
-        config.searchCols.push(null)
+        config.dataTables.searchCols.push(null)
       }
 
-      // ellipsis.js plug-in
-      //columns[i]['render'] = DataTable.render.ellipsis( 10 )
-
-      if (renderColumnFunction) {
-        const render = renderColumnFunction(columns[i].name, config)
+      // Uses renderColumn() if defined in render.js
+      if (window.renderColumn || null) {
+        const render = window.renderColumn(columns[i].name, config)
         if (render) {
           columns[i].render = render
         }
@@ -289,7 +290,7 @@ async function getConfig () {
   }
 
   function _ajaxData (dtp) {
-    let msg = '_ajaxData() => Preparing query parameters for AJAX search'
+    const msg = '_ajaxData() => Preparing query parameters for AJAX search'
     console.log(`${msg}using dtp object:`)
     console.log(JSON.parse(JSON.stringify(dtp)))
 
@@ -319,11 +320,11 @@ async function getConfig () {
     }
 
     const config = getConfig.config
-    const columnObject = array2object(config.columns, 'name')
+    const columnObject = array2object(config.dataTables.columns, 'name')
     const qs = parseQueryString()
     for (const [key, val] of Object.entries(qs)) {
       if (!(key in dtp) && (key in columnObject)) {
-        let msg = `_ajaxData() => Adding ${key} = '${val}' from query string`
+        const msg = `_ajaxData() => Adding ${key} = '${val}' from query string`
         console.log(`${msg} to dtp object.`)
         dtp[key] = val
       }
@@ -374,7 +375,7 @@ async function getConfig () {
 }
 
 function createRelatedTablesDropdown (config) {
-  const relatedTables = config.tableUI.relatedTables ? config.tableUI.relatedTables : null
+  const relatedTables = config.dataTablesAdditions.relatedTables || null
   $('#relatedTablesSelect select').empty()
   if (relatedTables && Array.isArray(relatedTables) && relatedTables.length > 0) {
     const options = []
@@ -402,8 +403,8 @@ function createRelatedTablesDropdown (config) {
 }
 
 function createColumnConstraints (tableID, which) {
-  const msg = 'createColumnConstraints() => Setting search inputs with initial'
-  console.log(`${msg} search values and setting search event.`)
+  const msg = 'createColumnConstraints() => Setting dropdowns and search inputs'
+  console.log(msg)
 
   let parent = `${tableID}_wrapper`
   if ($('.dtfh-floatingparent').length > 0) {
@@ -413,14 +414,14 @@ function createColumnConstraints (tableID, which) {
   }
   if (!which) which = 'all'
 
-  let columnOptions = getConfig.config.tableUI.columnOptions || {}
+  let columnOptions = getConfig.config.dataTablesAdditions.columnOptions || {}
   columnOptions = array2object(columnOptions, 'name')
 
   const table = $(tableID).dataTable()
   const config = getConfig.config
   let visibleIndex = 0
   let showDropdowns = false
-  if (config.tableUI.columnDropdowns === true) {
+  if (config.dataTablesAdditions.columnDropdowns === true) {
     // Set default to showing dropdowns for all columns
     showDropdowns = true
   } else {
@@ -439,9 +440,9 @@ function createColumnConstraints (tableID, which) {
   table.api().columns(':visible').every(function () {
     const column = this
     const index = column.index()
-    const name = config.columns[index].name
+    const name = config.dataTables.columns[index].name
     if (which === 'all' || which === 'input') {
-      const searchOnKeypress = config.columns[index].return === false
+      const searchOnKeypress = config.dataTables.columns[index].return === false
       createColumnInput(parent, visibleIndex, name, column, searchOnKeypress)
     }
     if (which === 'all' || which === 'select') {
@@ -450,7 +451,7 @@ function createColumnConstraints (tableID, which) {
         // Override default with column-specific setting
         showDropdown = columnOptions[name].dropdown
       }
-      if (config.serverSide && showDropdowns !== null) {
+      if (config.dataTables.serverSide && showDropdowns !== null) {
         createColumnDropdown(parent, visibleIndex, name, column, showDropdown)
       }
     }
@@ -464,8 +465,7 @@ function createColumnInput (parent, visibleIndex, name, column, searchOnKeypress
   // Create `input` element
   const element = 'thead tr:eq(0) > th'
   const th = $(`${parent} ${element}`).eq(visibleIndex).empty()
-  let attrs = `class="columnSearch" name="${name}"`
-  //attrs += ' style=""'
+  const attrs = `class="columnSearch" name="${name}"`
   const input = $(`<input ${attrs} type="text" placeholder="Search col."/>`)
   const qsName = getQueryValue(name)
 
@@ -485,7 +485,7 @@ function createColumnInput (parent, visibleIndex, name, column, searchOnKeypress
       } else {
         const keycode = (event.keyCode ? event.keyCode : event.which)
         if (keycode === 13) {
-          let msg = 'createColumnInput() => Enter key pressed. Triggering '
+          const msg = 'createColumnInput() => Enter key pressed. Triggering '
           console.log(msg + "search and draw('page').")
           if (th.find('select.columnUniques').length > 0) {
             const select = th.find('select.columnUniques')
@@ -548,8 +548,13 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
   const width = input.outerWidth()
   const title = `Most frequent unique values and (count); max of ${maxLen} shown`
   const attrs = `class="columnUniques" title="${title}" name="${name}"`
-  let select = $(`<div style="white-space: nowrap;"><select ${attrs} style="width: ${width}px;"></select><span style="visibility:hidden">✘</span></div>`)
-  //let select = $(`<select ${attrs} style="width: ${width}px;"></select>`)
+  let select = $(`
+    <div style="white-space: nowrap;">
+      <select ${attrs} style="width: ${width}px;"></select>
+      <span style="visibility:hidden">✘</span>
+    </div>
+  `)
+  // let select = $(`<select ${attrs} style="width: ${width}px;"></select>`)
   select.appendTo(th)
 
   if (show === false) {
@@ -688,7 +693,6 @@ function setEvents (tableID) {
   })
 
   console.log('setEvents() => Setting length.dt.')
-  let lengthChanged = false
   $(tableID).off('length.dt').on('length.dt', function (e, settings, len) {
     console.log('setEvents() => length.dt triggered')
     updateQueryString('_length', len)
@@ -712,16 +716,16 @@ function setEvents (tableID) {
 
       if (pageChanged && getQueryValue('_cols_show') === 'nonempty') {
         const msgo = 'setEvents() => draw.dt => '
-        let msg = `${msgo}Page was changed and _cols_show=nonempty. `
+        const msg = `${msgo}Page was changed and _cols_show=nonempty. `
         console.log(`${msg}Checking for change in number of empty columns.`)
         pageChanged = false
         const _emptyColumnsNow = emptyColumns(tableID)
         if (_emptyColumns.length === _emptyColumnsNow.length) {
-          let msg = `${msgo} Number of empty columns has not changed. Not `
+          const msg = `${msgo} Number of empty columns has not changed. Not `
           console.log(`${msg}updating column visibility.`)
           return
         }
-        console.log(`${msgo} Number of empty columns has changed. Calling init().`)
+        console.log(`${msgo} # of empty columns has changed. Calling init().`)
         _emptyColumns = _emptyColumnsNow
         init()
       }
@@ -895,7 +899,7 @@ function emptyColumns (tableID, indices) {
   const columnEmpty = []
   for (let r = 0; r < data.length; r++) {
     for (let c = 0; c < data[r].length; c++) {
-      if (r == 0) {
+      if (r === 0) {
         columnEmpty.push(true)
       }
       if (data[r][c] !== null && data[r][c] !== '') {
@@ -1021,7 +1025,7 @@ function checkQueryString (config) {
   const qs = parseQueryString()
   console.log('checkQueryString() => Query string:')
   console.log(qs)
-  const columnObject = array2object(config.columns, 'name')
+  const columnObject = array2object(config.dataTables.columns, 'name')
 
   const msg = "checkQueryString() => what = 'keys'. Checking keys but not "
   console.log(`${msg}values in query string.`)
@@ -1038,7 +1042,9 @@ function checkQueryString (config) {
       console.log(`checkQueryString() => Found invalid key = '${key}' in query string. Removing it.`)
       if (alerted === false) {
         alerted = true
-        alert(`Invalid column name in query string: "${key}". Removing it from query string and any other invalid column names.`)
+        let amsg = `Invalid column name in query string: "${key}". `
+        amsg += 'Removing it from query string and any other invalid column names.'
+        alert(amsg)
       }
       updateQueryString(key, null)
     }
@@ -1069,7 +1075,7 @@ function checkQueryString (config) {
       delete _cols[i]
     }
   }
-  const columnNames = config.columns.map(col => col.name)
+  const columnNames = config.dataTables.columns.map(col => col.name)
   if (updateHash) {
     console.log('checkQueryString() => Updating query string to remove invalid column names.')
     _cols = columnNames.filter(Boolean) // Remove any null/undefined values

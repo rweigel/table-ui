@@ -52,11 +52,13 @@ def serve(config=os.path.join(ROOT_DIR, "conf", "default.json"),
     logger.info(f"Adding database with config: {config}")
     _dbinfo(config, update=False)
     dbconfigs.append(config)
+    # Create a list of paths served by this server. Will be added to
+    # return of /config in dataTablesAdditions['relatedTables'].
     paths.append({"path": config['path'], "name": config['table_name']})
 
   for dbconfig in dbconfigs:
     if len(dbconfigs) > 1:
-      dbconfig['tableUI']['relatedTables'] = paths
+      dbconfig['paths'] = paths
     logger.info(f"Initalizing API for with path = '{dbconfig['path']}'")
     _api_init(app, dbconfig)
 
@@ -165,7 +167,10 @@ def _api_init(app, dbconfig):
       content = {"error": err}
       return fastapi.responses.JSONResponse(content=content, status_code=500)
 
-    config = {**dbconfig['config'], "tableUI": dbconfig['tableUI']}
+    config = {
+      "dataTables": dbconfig['config'],
+      "dataTablesAdditions": dbconfig['dataTablesAdditions']
+    }
 
     return fastapi.responses.JSONResponse(content=config)
 
@@ -178,7 +183,8 @@ def _api_init(app, dbconfig):
     if err is not None:
       return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
 
-    return fastapi.responses.FileResponse(dbconfig['js_render'], media_type='application/javascript')
+    renderFunctions = dbconfig['dataTablesAdditions']['renderFunctions']
+    return fastapi.responses.FileResponse(renderFunctions, media_type='application/javascript')
 
   endpoint = f"{path}/data/"
   logger.info(f"Initalizing endpoint '{endpoint}'")
@@ -322,14 +328,7 @@ def _dbinfo(dbconfig, update=True):
       logger.error("Both sqldb and jsondb were given. Choose one. Exiting.")
       exit(1)
 
-  if 'js_render' not in dbconfig:
-    dbconfig['js_render'] = os.path.join(ROOT_DIR, 'js', 'render.js')
-
-  if not os.path.exists(dbconfig['js_render']):
-    emsg = f"File not found: {dbconfig['js_render']}"
-    return _error(emsg, "", update)
-
-  # Add 'table_meta' to dbconfig
+  # Add 'table_meta' to dbconfig (default table metadata)
   emsg = _table_meta(dbconfig, update=update)
   if emsg is not None:
     return emsg
@@ -366,8 +365,8 @@ def _dbinfo(dbconfig, update=True):
     if emsg is not None:
       return emsg
 
-    # Adds or updates 'tableUI' in dbconfig
-    emsg = _tableUI(dbconfig, update=update)
+    # Adds or updates 'dataTablesAdditions' in dbconfig
+    emsg = _dataTablesAdditions(dbconfig, update=update)
     if emsg is not None:
       return emsg
 
@@ -399,8 +398,8 @@ def _dbinfo(dbconfig, update=True):
   if emsg is not None:
     return emsg
 
-  # Adds or updates 'tableUI' in dbconfig
-  emsg = _tableUI(dbconfig, update=update)
+  # Adds or updates 'dataTablesAdditions' in dbconfig
+  emsg = _dataTablesAdditions(dbconfig, update=update)
   if emsg is not None:
     return emsg
 
@@ -409,7 +408,7 @@ def _dbinfo(dbconfig, update=True):
   if emsg is not None:
     return emsg
 
-  # Adds or updates 'tableUI' in dbconfig
+  # Adds or updates 'dataTablesAdditions' in dbconfig
   emsg = _sql_table_meta(dbconfig, update=update)
   if emsg is not None:
     return emsg
@@ -417,78 +416,94 @@ def _dbinfo(dbconfig, update=True):
   return None
 
 
-def _tableUI(dbconfig, update=True):
+def _dataTablesAdditions(dbconfig, update=False):
 
-  tableUI = dbconfig.get("tableUI", {})
+  if 'dataTablesAdditions' in dbconfig:
+    dataTablesAdditions_file = dbconfig.get('dataTablesAdditions_file', None)
+    if isinstance(dbconfig['dataTablesAdditions'], str) or dataTablesAdditions_file is not None:
+      if isinstance(dbconfig['dataTablesAdditions'], str):
+        dataTablesAdditions_file = dbconfig['dataTablesAdditions']
+        dbconfig['dataTablesAdditions_file'] = dataTablesAdditions_file
+      with open(dataTablesAdditions_file) as f:
+        logger.info("Reading: " + dataTablesAdditions_file)
+        try:
+          dbconfig['dataTablesAdditions'] = json.load(f)
+        except Exception as e:
+          emsg = f"Error executing json.load('{dataTablesAdditions_file}')"
+          return _error(emsg, e, update)
+
+  dataTablesAdditions = dbconfig.get("dataTablesAdditions", {})
+
+  if 'renderFunctions' not in dataTablesAdditions:
+    dataTablesAdditions['renderFunctions'] = os.path.join(ROOT_DIR, 'js', 'render.js')
+
+  if not os.path.exists(dataTablesAdditions['renderFunctions']):
+    emsg = f"File not found: {dataTablesAdditions['renderFunctions']}"
+    return _error(emsg, "", update)
+
   if "paths" in dbconfig:
-    tableUI['relatedTables'] = dbconfig['paths']
+    dataTablesAdditions['relatedTables'] = dbconfig['paths']
+
+  print(dbconfig)
 
   if "sqldb" in dbconfig:
     dbfile = dbconfig["sqldb"]
-    tableUI['sqldb'] = os.path.basename(dbfile)
+    dataTablesAdditions['sqldb'] = os.path.basename(dbfile)
 
   if "jsondb" in dbconfig:
     dbfile = dbconfig["jsondb"]["body"]
-    tableUI['jsondb'] = os.path.basename(dbfile)
+    dataTablesAdditions['jsondb'] = os.path.basename(dbfile)
 
-  # Merge table_meta from dbconfig and tableUI
+  # Merge table_meta from dbconfig and dataTablesAdditions
   table_meta = copy.deepcopy(dbconfig.get('table_meta', None))
   if table_meta is not None:
-    # Overwrite any existing keys in dbconfig['table_meta'] with those in tableMetadata
-    table_meta = {**table_meta, **tableUI.get('tableMetadata', {})}
-    tableUI["tableMetadata"] = table_meta
+    # Overwrite any existing keys in dbconfig['table_meta'] (defaults)
+    # with those in tableMetadata
+    table_meta = {**table_meta, **dataTablesAdditions.get('tableMetadata', {})}
+    dataTablesAdditions["tableMetadata"] = table_meta
 
-  if tableUI.get('tableMetadata', None) is None:
-    tableUI['tableMetadata'] = {}
+  if dataTablesAdditions.get('tableMetadata', None) is None:
+    dataTablesAdditions['tableMetadata'] = {}
 
-  if 'tableName' not in tableUI['tableMetadata']:
-    tableUI['tableMetadata']['tableName'] = dbconfig['table_name']
+  if 'tableName' not in dataTablesAdditions['tableMetadata']:
+    dataTablesAdditions['tableMetadata']['tableName'] = dbconfig['table_name']
   else:
-    if tableUI['tableMetadata']['tableName'] != dbconfig['table_name']:
-      tableUI['tableMetadata']['tableName'] = dbconfig['table_name']
+    if dataTablesAdditions['tableMetadata']['tableName'] != dbconfig['table_name']:
+      dataTablesAdditions['tableMetadata']['tableName'] = dbconfig['table_name']
       if not update:
         wmsg = "tableMetadata.tableName does not match config.table_name. "
         wmsg += f"Overriding to config.table_name = {dbconfig['table_name']}"
         logger.warning(wmsg)
 
-  if tableUI['tableMetadata'].get('creationDate', None) is None:
+  if dataTablesAdditions['tableMetadata'].get('creationDate', None) is None:
     try:
       import datetime
       mtime = os.path.getmtime(dbfile)
       creationDate = datetime.datetime.fromtimestamp(mtime).isoformat()
-      tableUI['tableMetadata']['creationDate'] = creationDate[0:-7] + "Z"
+      dataTablesAdditions['tableMetadata']['creationDate'] = creationDate[0:-7] + "Z"
     except Exception as e:
       logger.warning(f"Could not get file modification time for {dbfile}: {e}")
 
-  dbconfig['tableUI'] = tableUI
+  dbconfig['dataTablesAdditions'] = dataTablesAdditions
 
-
-def _error(emsg, err, update):
-  if update:
-    logger.error(f"{emsg}.")
-    return emsg
-  logger.error(f"{emsg}: {err}. Exiting.")
-  exit(1)
 
 def _dtconfig(dbconfig, update=False):
 
   if 'config' not in dbconfig:
     default = os.path.join(ROOT_DIR, 'conf', 'default.json')
-    with open(default) as f:
-      logger.info(f"Reading: {default}")
-      try:
-        dbconfig['config'] = json.load(f)
-      except Exception as e:
-        emsg = f"Error executing json.load('{default}')"
-        return _error(emsg, e, update)
+    dbconfig['config'] = default
 
-  if isinstance(dbconfig['config'], str):
-    with open(dbconfig['config']) as f:
-      logger.info("Reading: " + dbconfig['config'])
+  config_file = dbconfig.get('config_file', None)
+  if isinstance(dbconfig['config'], str) or config_file is not None:
+    if isinstance(dbconfig['config'], str):
+      config_file = dbconfig['config']
+      dbconfig['config_file'] = config_file
+    with open(config_file) as f:
+      logger.info("Reading: " + config_file)
       try:
         dbconfig['config'] = json.load(f)
       except Exception as e:
-        emsg = f"Error executing json.load('{dbconfig['config']}')"
+        emsg = f"Error executing json.load('{config_file}')"
         return _error(emsg, e, update)
 
   serverSide = dbconfig['config'].get('serverSide', None)
@@ -507,6 +522,14 @@ def _dtconfig(dbconfig, update=False):
       if update:
         logger.warning("Warning: Config file specifies serverSide=true but jsondb was given. Overriding to serverSide=false")
       dbconfig['config']['serverSide'] = False
+
+
+def _error(emsg, err, update):
+  if update:
+    logger.error(f"{emsg}.")
+    return emsg
+  logger.error(f"{emsg}: {err}. Exiting.")
+  exit(1)
 
 
 def _data_transform(data, column_names, verbose):
@@ -748,6 +771,7 @@ def _sql_table_meta(dbconfig, update=False):
     except Exception as e:
       emsg = "Error getting table metadata"
       return _error(emsg, e, update)
+
 
 def _sql_n_rows(dbconfig, update=False):
   try:
