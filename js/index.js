@@ -1,8 +1,8 @@
+const tableID = '#table1'
 console.log('Document ready. Calling init()')
 $(document).ready(() => init())
 
 async function init () {
-  const tableID = '#table1'
   if (DataTable.isDataTable(tableID)) {
     let msg = `init() => isDataTable('${tableID}') is true. Destroying `
     msg += 'existing table before re-creating it.'
@@ -13,9 +13,10 @@ async function init () {
   }
 
   const config = await getConfig()
+
   checkQueryString(config)
 
-  createRelatedTables(config)
+  createRelatedTablesDropdown(config)
 
   const renderTableMetadata = window.renderTableMetadata ? window.renderTableMetadata : null
   const tableMetadata = renderTableMetadata ? renderTableMetadata(config) : ''
@@ -25,20 +26,22 @@ async function init () {
   // name and sorting, second row is for filtering. Need to add before
   // table is created so it is included in DataTables column width
   // calculations.
-  $('#table1').append('<thead><tr></tr><tr></tr></thead>')
-  const tr0 = $('#table1 > thead > tr:eq(0)')
+  $(tableID).append('<thead><tr></tr><tr></tr></thead>')
+  const tr0 = $(`${tableID} > thead > tr:eq(0)`)
+  const tr1 = $(`${tableID} > thead > tr:eq(1)`)
   for (let i = 0; i < config.columns.length; i++) {
-    tr0.append('<th></th>')
+    const name = config.columns[i].name
+    tr0.append(`<th name="${name}"></th>`)
+    tr1.append(`<th name="${name}">${name}</th>`)
   }
-  const tr1 = $('#table1 > thead > tr:eq(1)')
-  for (let i = 0; i < config.columns.length; i++) {
-    tr1.append(`<th>${config.columns[i].name}</th>`)
-  }
+
+  setColumnWidths(config.tableUI.columnOptions)
 
   // https://datatables.net/reference/option/
   const dataTableOptions =
     {
       ...config,
+      autoWidth: true,
       stateSave: true,
       stateSaveCallBack: function (settings, data) {
       },
@@ -70,16 +73,14 @@ async function init () {
   // dataTableOptions copy is needed b/c DataTable() modifies it
   // and console.log() shows the modified version.
   console.log(JSON.parse(JSON.stringify(dataTableOptions)))
-  const table = $('#table1').DataTable(dataTableOptions)
+  const table = $(tableID).DataTable(dataTableOptions)
   console.log(`DataTable() returned: ${table}`)
 }
 
 function dtInitComplete () {
   console.log('dtInitComplete() => DOM is ready.')
 
-  const tableID = '#table1'
-
-  stickyHeaderFixes(tableID, 101)
+  fixStickyHeader(101)
 
   const table = $(tableID).dataTable()
   if (getQueryValue('_cols_show') === 'nonempty') {
@@ -110,38 +111,51 @@ function dtInitComplete () {
 
 async function getConfig () {
   const url = window.location.pathname + 'config'
-  console.log('getConfig() => Getting config from ' + url)
-  const resp = await fetch(url)
-  const config = await resp.json()
-
-  $('title').text(config.tableUI.tableMetadata.tableName)
-
-  // Update entries in config.columns as needed.
-  _columns(config)
-
-  // Update config['pageLength'] and config['lengthMenu'] as needed.
-  _pageLength(config)
-
-  const page0based = (-1 + parseInt(getQueryValue('_page', 1)))
-  config.displayStart = config.pageLength * page0based
-
-  config.ajax = window.location.pathname + 'data/'
-
-  if (config.serverSide) {
-    config.ajax = {
-      url: window.location.pathname + 'data/',
-      type: 'get',
-      data: _ajaxData,
-      error: _ajaxError
-    }
+  try {
+    console.log('getConfig() => Getting config from ' + url)
+    const resp = await fetch(url)
+    const config = await resp.json()
+    updateConfig(config)
+    console.log('getConfig() => Setting getConfig.config = config.')
+    getConfig.config = config
+    return config
+  } catch (e) {
+    const emsg = 'An error occurred while getting table configuration'
+    const fullURL = window.location.origin + url
+    $('#error').html(`${emsg} from <a href="${fullURL}">${fullURL}</a>. See console for details.`).show()
+    console.error('getConfig() => Error getting config:')
+    console.error(e)
+    throw e
   }
-  console.log('getConfig() => Setting getConfig.config = config.')
-  getConfig.config = config
 
-  console.log('getConfig() => Returning config:')
-  console.log(config)
+  function updateConfig (config) {
+    $('title').text(config.tableUI.tableMetadata.tableName)
 
-  return config
+    // Update entries in config.columns as needed.
+    _columns(config)
+
+    // Update config['pageLength'] and config['lengthMenu'] as needed.
+    _pageLength(config)
+
+    const page0based = (-1 + parseInt(getQueryValue('_page', 1)))
+    config.displayStart = config.pageLength * page0based
+
+    config.ajax = window.location.pathname + 'data/'
+
+    if (config.serverSide) {
+      config.ajax = {
+        url: window.location.pathname + 'data/',
+        type: 'get',
+        data: _ajaxData,
+        error: _ajaxError
+      }
+    }
+
+    console.log('getConfig() => Returning config:')
+    console.log(config)
+
+    return config
+  }
 
   function _pageLength (config) {
     // Update pageLength and lengthMenu if needed.
@@ -263,7 +277,7 @@ async function getConfig () {
       }
 
       // ellipsis.js plug-in
-      // config['columns'][i]['render'] = DataTable.render.ellipsis( 10 )
+      //columns[i]['render'] = DataTable.render.ellipsis( 10 )
 
       if (renderColumnFunction) {
         const render = renderColumnFunction(columns[i].name, config)
@@ -337,7 +351,7 @@ async function getConfig () {
     if (xhr) {
       const stat = xhr.status || ''
       const text = xhr.statusText || ''
-      emsg = `${emsgo}. Status: '${stat}' | Status text: '${text}'.`
+      emsg = `${emsgo}. Status: '${stat}'; Status text: '${text}'`
       if (xhr.responseURL) {
         emsg = `${emsgo} from ${xhr.responseURL}. ${emsg}.`
       }
@@ -354,13 +368,14 @@ async function getConfig () {
       console.error('Could not parse xhr.responseText as JSON.')
       console.error(e)
     }
-    $('#table1_processing').hide()
+    $(`${tableID}_processing`).hide()
     $('#error').html(emsg + '. See console for details.').show()
   }
 }
 
-function createRelatedTables (config) {
+function createRelatedTablesDropdown (config) {
   const relatedTables = config.tableUI.relatedTables ? config.tableUI.relatedTables : null
+  $('#relatedTablesSelect select').empty()
   if (relatedTables && Array.isArray(relatedTables) && relatedTables.length > 0) {
     const options = []
     for (const rt of relatedTables) {
@@ -397,9 +412,30 @@ function createColumnConstraints (tableID, which) {
     parent = '.dtfh-floatingparent'
   }
   if (!which) which = 'all'
+
+  let columnOptions = getConfig.config.tableUI.columnOptions || {}
+  columnOptions = array2object(columnOptions, 'name')
+
   const table = $(tableID).dataTable()
   const config = getConfig.config
   let visibleIndex = 0
+  let showDropdowns = false
+  if (config.tableUI.columnDropdowns === true) {
+    // Set default to showing dropdowns for all columns
+    showDropdowns = true
+  } else {
+    // No need to call createColumnDropdown() to create hidden select
+    // to get spacing correct.
+    let noDropdowns = true
+    for (const name of Object.keys(columnOptions)) {
+      if (columnOptions[name].dropdown === true) {
+        noDropdowns = false
+        break
+      }
+    }
+    if (noDropdowns) showDropdowns = null
+  }
+
   table.api().columns(':visible').every(function () {
     const column = this
     const index = column.index()
@@ -409,17 +445,12 @@ function createColumnConstraints (tableID, which) {
       createColumnInput(parent, visibleIndex, name, column, searchOnKeypress)
     }
     if (which === 'all' || which === 'select') {
-      let showDropdown = true
-      if (Array.isArray(config.tableUI.columnDropdowns)) {
-        showDropdown = config.tableUI.columnDropdowns.includes(name)
-      } else if (config.tableUI.columnDropdowns === true) {
-        showDropdown = true
-      } else {
-        // No need to call createColumnDropdown() to create hidden select
-        // to get spacing correct.
-        showDropdown = null
+      let showDropdown = showDropdowns
+      if (columnOptions[name] && 'dropdown' in columnOptions[name]) {
+        // Override default with column-specific setting
+        showDropdown = columnOptions[name].dropdown
       }
-      if (config.serverSide && showDropdown !== null) {
+      if (config.serverSide && showDropdowns !== null) {
         createColumnDropdown(parent, visibleIndex, name, column, showDropdown)
       }
     }
@@ -434,7 +465,7 @@ function createColumnInput (parent, visibleIndex, name, column, searchOnKeypress
   const element = 'thead tr:eq(0) > th'
   const th = $(`${parent} ${element}`).eq(visibleIndex).empty()
   let attrs = `class="columnSearch" name="${name}"`
-  attrs += ' style=""'
+  //attrs += ' style=""'
   const input = $(`<input ${attrs} type="text" placeholder="Search col."/>`)
   const qsName = getQueryValue(name)
 
@@ -514,23 +545,15 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
   const input = th.find('input.columnSearch')
 
   const maxLen = 100
-  const width = input.innerWidth()
+  const width = input.outerWidth()
   const title = `Most frequent unique values and (count); max of ${maxLen} shown`
   const attrs = `class="columnUniques" title="${title}" name="${name}"`
-  const dw = 4
-  let select = $(`<select ${attrs} style="width: ${width + dw}px;"></select>`)
+  let select = $(`<div style="white-space: nowrap;"><select ${attrs} style="width: ${width}px;"></select><span style="visibility:hidden">✘</span></div>`)
+  //let select = $(`<select ${attrs} style="width: ${width}px;"></select>`)
   select.appendTo(th)
 
-  // Calculate the offset needed to align with input.columnSearch
-  const inputOffset = input.offset().left
-  const selectOffset = select.offset().left
-  const offsetDifference = inputOffset - selectOffset
-  // Why is -dw here and +dw in select width above needed for alignment?
-  select.css('margin-left', `${offsetDifference - dw}px`)
-
   if (show === false) {
-    // Here we place the dropdown in the DOM but do not show it in order
-    // for spacing to be correct.
+    // Place the dropdown in the DOM but do not show so spacing correct.
     return
   }
 
@@ -613,32 +636,15 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
   }
 }
 
-function watchForFloatingHeader () {
-  if (!watchForFloatingHeader.enabled) {
-    watchForFloatingHeader.enabled = true
-  } else {
-    return
+function clearAllSearches (tableID) {
+  const qs = parseQueryString()
+  for (const key in qs) {
+    if (!key.startsWith('_')) {
+      delete qs[key]
+    }
   }
-  let msg = 'watchForFloatingHeader() => Setting up MutationObserver '
-  console.log(`${msg}to watch for addition of dtfh-floatingparent element.`)
-  const observer = new MutationObserver(function (mutations) {
-    mutations.forEach(function (mutation) {
-      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        mutation.addedNodes.forEach(function (node) {
-          if ($(node).hasClass('dtfh-floatingparent')) {
-            msg = 'watchForFloatingHeader() => dtfh-floatingparent '
-            console.log(`${msg}was added.`)
-            stickyHeaderFixes(1)
-            setTimeout(() => { createColumnConstraints('#table1') }, 1)
-          }
-        })
-      }
-    })
-  })
-  // Observe child additions and in subtrees
-  const config = { childList: true, subtree: true }
-  // Start observing from the body
-  observer.observe(document.body, config)
+  location.hash = decodeURIComponent($.param(qs))
+  init()
 }
 
 function setEvents (tableID) {
@@ -654,12 +660,14 @@ function setEvents (tableID) {
     }
   })
 
+  $('#clearAllSearches').off('click').on('click', clearAllSearches)
+
   console.log('setEvents() => Setting search.dt.')
   $(tableID).off('search.dt').off('search.dt')
   $(tableID).on('search.dt', function (event) {
     console.log('setEvents() => search.dt triggered')
     updateQueryString('_page', null)
-    $('#table1').DataTable().page(0)
+    $(tableID).DataTable().page(0)
     setQueryStringFromSearch()
   })
 
@@ -734,25 +742,6 @@ function setEvents (tableID) {
   })
 }
 
-function stickyHeaderFixes (index) {
-  if (!index) {
-    index = 10
-  }
-  const parent = '#table1_wrapper div.dataTables_scrollHead'
-  // Address a bug in DataTables v1 where duplicate header
-  // cells appear temporarily during transition to sticky header.
-  $(`${parent} thead tr:eq(0) > th:eq(0)`)
-    .css('position', 'sticky')
-    .css('left', '0px')
-    .css('z-index', index)
-    .css('background-color', 'white')
-  $(`${parent} thead tr:eq(1) > th:eq(0)`)
-    .css('position', 'sticky')
-    .css('left', '0px')
-    .css('z-index', index)
-    .css('background-color', 'white')
-}
-
 function adjustDOM (tableID) {
   console.log('adjustDOM() => called.')
   const tableInfo = `${tableID}_info`
@@ -803,7 +792,7 @@ function adjustDOM (tableID) {
   const select = $(`${tableLength} select`)
   select.appendTo(tableLength)
   $(`${tableLength} label`).text('Rows per page: ')
-  $('#table1_length').insertBefore('#clearAllSearches')
+  $(`${tableID}_length`).insertBefore('#clearAllSearches')
 
   console.log('adjustDOM() => Modifying Previous/Next buttons.')
   const prev = $(`${tableID}_previous`)
@@ -851,6 +840,54 @@ function adjustDOM (tableID) {
   console.log('adjustDOM() finished.')
 }
 
+function setColumnWidths (columnOptions) {
+  if (!columnOptions) {
+    console.log('setColumnWidths() => No columnOptions provided. Returning.')
+    return
+  }
+  columnOptions = array2object(columnOptions, 'name')
+  console.log('setColumnWidths() => Setting column widths')
+  // columnWidths is an object with keys that are column names
+  // and values that are widths, e.g. { 'height': '70em', 'age': '5px' }
+  const columnHeads = $(`${tableID} thead tr:eq(0) th`)
+  for (let i = 0; i < columnHeads.length; i++) {
+    const name = $(columnHeads[i]).attr('name')
+    if (columnOptions[name] && columnOptions[name].width) {
+      const width = columnOptions[name].width
+      console.log(`setColumnWidths() => Setting column ${name} width to ${width}`)
+      setColumnWidth(name, width)
+    }
+  }
+  function setColumnWidth (name, width) {
+    // Why does only the input width need to be set to get correct width?
+    // If widths in tbody are set, run into issues when sticky header is shown.
+    // Note that widths will be larger if content in column is wider.
+    $('<style>')
+      .prop('type', 'text/css')
+      .html(`
+        thead tr th[name="${name}"] input {
+          width: ${width} !important;
+        }
+      `)
+      .appendTo('head')
+  }
+
+  function xsetColumnWidth (columnIndex, width) {
+    $('<style>')
+      .prop('type', 'text/css')
+      .html(`
+        thead tr th:nth-child(${columnIndex}),
+        tbody tr td:nth-child(${columnIndex}) {
+          width: ${width} !important;
+        }
+        thead tr th:nth-child(${columnIndex}) input {
+          width: ${width} !important;
+        }
+      `)
+      .appendTo('head')
+  }
+}
+
 function emptyColumns (tableID, indices) {
   const data = $(tableID).DataTable().rows({ page: 'current' }).data().toArray()
   console.log('emptyColumns() => Data for current page:')
@@ -893,7 +930,7 @@ function destroy (tableID) {
     console.log(`destroy() => Destroying table ${tableID}`)
     $('#error').empty()
     $('#tableMetadata').empty()
-    $('#table1_length').remove()
+    $(`${tableID}_length`).remove()
     // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
     $(tableID).DataTable().state.clear()
     $(tableID).DataTable().destroy()
@@ -908,15 +945,51 @@ function destroy (tableID) {
   }
 }
 
-function clearAllSearches (tableID) {
-  const qs = parseQueryString()
-  for (const key in qs) {
-    if (!key.startsWith('_')) {
-      delete qs[key]
-    }
+function fixStickyHeader (index) {
+  if (!index) {
+    index = 10
   }
-  location.hash = decodeURIComponent($.param(qs))
-  init()
+  const parent = `${tableID}_wrapper div.dataTables_scrollHead`
+  // Address a bug in DataTables v1 where duplicate header
+  // cells appear temporarily during transition to sticky header.
+  $(`${parent} thead tr:eq(0) > th:eq(0)`)
+    .css('position', 'sticky')
+    .css('left', '0px')
+    .css('z-index', index)
+    .css('background-color', 'white')
+  $(`${parent} thead tr:eq(1) > th:eq(0)`)
+    .css('position', 'sticky')
+    .css('left', '0px')
+    .css('z-index', index)
+    .css('background-color', 'white')
+}
+
+function watchForFloatingHeader () {
+  if (!watchForFloatingHeader.enabled) {
+    watchForFloatingHeader.enabled = true
+  } else {
+    return
+  }
+  let msg = 'watchForFloatingHeader() => Setting up MutationObserver '
+  console.log(`${msg}to watch for addition of dtfh-floatingparent element.`)
+  const observer = new MutationObserver(function (mutations) {
+    mutations.forEach(function (mutation) {
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        mutation.addedNodes.forEach(function (node) {
+          if ($(node).hasClass('dtfh-floatingparent')) {
+            msg = 'watchForFloatingHeader() => dtfh-floatingparent '
+            console.log(`${msg}was added.`)
+            fixStickyHeader(1)
+            setTimeout(() => { createColumnConstraints(tableID) }, 1)
+          }
+        })
+      }
+    })
+  })
+  // Observe child additions and in subtrees
+  const config = { childList: true, subtree: true }
+  // Start observing from the body
+  observer.observe(document.body, config)
 }
 
 function parseQueryString () {

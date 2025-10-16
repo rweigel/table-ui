@@ -4,7 +4,11 @@
     "sqldb": "../../data/table/cdaweb.dataset.sql",
     "config": "conf/default.json",
     "tableUI": {
-      "columnDropdowns": false
+      "columnDropdowns": false,
+      "columnOptions": [
+        {"name": "TEXT", "render": {"function": "ellipsis", "args": [2]}},
+        {"name": "MODS", "render": "ellipsis"}
+      ]
     }
   },
   {
@@ -12,7 +16,19 @@
     "sqldb": "../../data/table/cdaweb.variable.sql",
     "config": "conf/default.json",
     "tableUI": {
-      "columnDropdowns": ["datasetID", "VariableName"]
+      "columnDropdowns": true,
+      "columnOptions": [
+        {"name": "datasetID", "render": "renderDatasetID"},
+        {"name": "VariableName"},
+        {"name": "RecVariance", "width": "5em"},
+        {"name": "NumDims", "width": "4em"},
+        {"name": "DataType", "width": "8em"},
+        {"name": "NumElements", "width": "5em"},
+        {"name": "FORMAT", "width": "4em"},
+        {"name": "VIRTUAL", "width": "4em"},
+        {"name": "CATDESC", "dropdown": false},
+        {"name": "VAR_NOTES", "dropdown": false}
+      ]
     }
   }
 ]

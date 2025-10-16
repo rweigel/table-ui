@@ -1,23 +1,37 @@
 function renderColumn (columnName, tableConfig) {
-  if (columnName === 'datasetID') {
-    _renderColumn.columnName = columnName
-    _renderColumn.tableConfig = tableConfig
+  let columnOptions = tableConfig.tableUI.columnOptions || {}
+  columnOptions = array2object(columnOptions, 'name')
 
-    const tableName = tableConfig.tableUI.tableMetadata.tableName
-    if (!tableName) {
-      return
-    }
-    if (tableName.startsWith('cdaweb') || tableName.startsWith('spase')) {
-      return _renderColumn
-    }
+  let functionName = columnOptions[columnName]?.render
+  if (typeof functionName === 'string') {
+    // typeof window[columnOptions[columnName]?.render] === 'function'
+    console.log('renderColumn(): columnName:', columnName)
+    functions[functionName].columnName = columnName
+    functions[functionName].tableConfig = tableConfig
+    return functions[functionName]()
+  } else if (typeof functionName === 'object') {
+    functionName = functionName.function
+    functions[functionName].columnName = columnName
+    functions[functionName].tableConfig = tableConfig
+    const args = columnOptions[columnName].render?.args || []
+    return functions[functionName](...args)
   }
+}
 
-  function _renderColumn (columnString, type, row, meta) {
+const functions = {}
+
+functions.ellipsis = function (n) {
+  return DataTable.render.ellipsis(n || 10)
+}
+
+functions.renderDatasetID = function () {
+  return (columnString, type, row, meta) => {
     if (type !== 'display') {
       return columnString
     }
+    //return DataTable.render.ellipsis( 10 )(columnString, type, row)
 
-    const columnNames = _renderColumn.tableConfig.columns.map(c => c.name)
+    const columnNames = functions.renderDatasetID.tableConfig.columns.map(c => c.name)
 
     // TODO: Not all have "_v01".
     const base = 'https://cdaweb.gsfc.nasa.gov/pub/software/cdawlib/'
@@ -33,7 +47,7 @@ function renderColumn (columnName, tableConfig) {
     columnString += ` <a href="${fnameJSON}"  title="Master JSON" target="_blank">J</a>`
     columnString += ` <a href="${fnameSKT}"   title="Master Skeleton Table" target="_blank">SK</a>`
 
-    const tableName = _renderColumn.tableConfig.tableUI.tableMetadata.tableName
+    const tableName = functions.renderDatasetID.tableConfig.tableUI.tableMetadata.tableName
     if (tableName === 'cdaweb.variable') {
       const index = columnNames.indexOf('VAR_TYPE')
       if (row[index] === 'data') {
