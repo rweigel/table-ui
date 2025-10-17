@@ -1,7 +1,7 @@
 {
   "renderFunctions": "js/render.js",
   "tableMetadata": {
-    "description": "Variables from CDAWeb datasets"
+    "description+": "<a href=\"https://github.com/rweigel/cdawmeta\" target=\"_blank\">Table generation code</a>"
   },
   "columnDropdowns": true,
   "columnOptions": [

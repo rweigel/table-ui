@@ -554,7 +554,7 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
   const attrs = `class="columnUniques" title="${title}" name="${name}"`
   let select = $(`
     <div style="white-space: nowrap;">
-      <select ${attrs} style="width: ${width}px;"></select>
+      <select ${attrs} style="width: ${width}px;margin-left:3px"></select>
       <span style="visibility:hidden">✘</span>
     </div>
   `)

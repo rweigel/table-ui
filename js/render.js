@@ -83,6 +83,10 @@ function renderTableMetadata (config) {
   if (description) {
     description = `<p>${description}<p>`
   }
+  const descriptionPlus = config.dataTablesAdditions.tableMetadata['description+'] || ''
+  if (descriptionPlus) {
+    description += `<p>${descriptionPlus}<p>`
+  }
 
   let tableName = config.dataTablesAdditions.tableMetadata.tableName || ''
   if (tableName) {
@@ -95,16 +99,14 @@ function renderTableMetadata (config) {
   }
 
   // const base = window.location.origin + window.location.pathname.replace(/\/$/, '')
-  let txt = ` Table${tableName}: <a href="config" title="config" target="_blank">config</a>`
-  let href = ''
-  if (config.dataTablesAdditions.sqldb) {
-    href = 'sqldb'
-  }
-  if (config.dataTablesAdditions.jsondb) {
-    href = 'jsondb'
-  }
+  let txt = ` Table${tableName}: `
+  txt += '<a href="config" title="config" target="_blank">config</a>'
+
+  const href = config.dataTablesAdditions.file
   txt += ` | <a href="${href}" title="${href}" target="_blank">data</a>`
+
   txt += creationDate
   txt += description
+
   return txt
 }
