@@ -12,10 +12,9 @@ import fastapi
 logger = logging.getLogger(__name__)
 
 ROOT_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-def serve(config=os.path.join(ROOT_DIR, "conf", "default.json"),
-          host="0.0.0.0",
-          port=5001,
-          debug=False):
+CONFIG_DEFAULT = os.path.join(ROOT_DIR,"conf", "default.json")
+
+def serve(config=CONFIG_DEFAULT, host="0.0.0.0", port=5001, debug=False):
 
   if debug:
     logging.basicConfig(level=logging.DEBUG)
@@ -54,7 +53,17 @@ def serve(config=os.path.join(ROOT_DIR, "conf", "default.json"),
     dbconfigs.append(config)
     # Create a list of paths served by this server. Will be added to
     # return of /config in dataTablesAdditions['relatedTables'].
-    paths.append({"path": config['path'], "name": config['table_name']})
+    paths.append({
+      "path": config.get('path', ''),
+      "name": config['table_name']
+    })
+
+  # Ensure that all 'path' values in paths are unique; if not, reset all to table_name
+  path_values = [p['path'] for p in paths]
+  if len(path_values) != len(set(path_values)):
+    logger.warning("Duplicate 'path' values detected. Resetting all 'path' to table_name.")
+    for config in dbconfigs:
+      config['path'] = config['table_name']
 
   for dbconfig in dbconfigs:
     if len(dbconfigs) > 1:
@@ -328,6 +337,8 @@ def _dbinfo(dbconfig, update=True):
       logger.error("Both sqldb and jsondb were given. Choose one. Exiting.")
       exit(1)
 
+  dbconfig['path'] = dbconfig.get('path', '')
+
   # Add 'table_meta' to dbconfig (default table metadata)
   emsg = _table_meta(dbconfig, update=update)
   if emsg is not None:
@@ -358,7 +369,6 @@ def _dbinfo(dbconfig, update=True):
       wmsg += "which is based on file name of json_body"
       logger.warning(wmsg)
 
-    dbconfig['path'] = dbconfig.get('path', dbconfig['table_name'])
 
     # Adds 'column_names' to dbconfig and 'columns' to dbconfig['config']
     emsg = _column_names(dbconfig, update=update)
@@ -390,8 +400,6 @@ def _dbinfo(dbconfig, update=True):
     if dbconfig['table_name'] not in dbconfig['sqldb_tables']:
       emsg = f"Could not find table named '{dbconfig['table_name']}' in {dbconfig['sqldb']}. Tables found: {dbconfig['sqldb_tables']}"
       return _error(emsg, "", update)
-
-  dbconfig['path'] = dbconfig.get('path', dbconfig['table_name'])
 
   # Adds 'column_names' to dbconfig and 'columns' to dbconfig['config']
   emsg = _column_names(dbconfig, update=update)
@@ -444,8 +452,6 @@ def _dataTablesAdditions(dbconfig, update=False):
   if "paths" in dbconfig:
     dataTablesAdditions['relatedTables'] = dbconfig['paths']
 
-  print(dbconfig)
-
   if "sqldb" in dbconfig:
     dbfile = dbconfig["sqldb"]
     dataTablesAdditions['sqldb'] = os.path.basename(dbfile)
@@ -490,8 +496,7 @@ def _dataTablesAdditions(dbconfig, update=False):
 def _dtconfig(dbconfig, update=False):
 
   if 'config' not in dbconfig:
-    default = os.path.join(ROOT_DIR, 'conf', 'default.json')
-    dbconfig['config'] = default
+    dbconfig['config'] = CONFIG_DEFAULT
 
   config_file = dbconfig.get('config_file', None)
   if isinstance(dbconfig['config'], str) or config_file is not None:

@@ -49,7 +49,8 @@ def _run_tests(port, config, head_data, body_data):
   _log_test_title(url)
   response = requests.get(url)
   assert response.status_code == 200
-  assert 'tableUI' in response.json()
+  assert 'dataTables' in response.json()
+  assert 'dataTablesAdditions' in response.json()
 
   url = f"{base}/data/"
   _log_test_title(url)
@@ -266,15 +267,15 @@ if __name__ == "__main__":
     body_data = json.load(f)
 
   # Test 1
-  config = {"path": ""}
-  config["jsondb"] = {"head": head_file, "body": body_file}
+  config = {"jsondb": {"head": head_file, "body": body_file}}
 
   _run_tests(port, config, head_data, body_data)
 
   # Test 2
   table_name = "demo"
-  config = {"path": "", "table_name": table_name}
+  config = {"table_name": table_name}
   import tableui
+  # Convert json to sqlite3 database
   sqldb_path = tableui.json2sql(table_name, body_file, json_head=head_file)
   config["sqldb"] = sqldb_path
 
