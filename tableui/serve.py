@@ -58,10 +58,11 @@ def serve(config=CONFIG_DEFAULT, host="0.0.0.0", port=5001, debug=False):
       "name": config['table_name']
     })
 
-  # Ensure that all 'path' values in paths are unique; if not, reset all to table_name
+  # Ensure 'path' values in paths are unique; if not, reset all to table_name
   path_values = [p['path'] for p in paths]
   if len(path_values) != len(set(path_values)):
-    logger.warning("Duplicate 'path' values detected. Resetting all 'path' to table_name.")
+    wmsg = "Duplicate 'path' values detected. Resetting all 'path' to table_name."
+    logger.warning(wmsg)
     for config in dbconfigs:
       config['path'] = config['table_name']
 
@@ -455,6 +456,9 @@ def _dataTablesAdditions(dbconfig, update=False):
   if "sqldb" in dbconfig:
     dbfile = dbconfig["sqldb"]
     dataTablesAdditions['sqldb'] = os.path.basename(dbfile)
+
+  if "query" in dbconfig:
+    dataTablesAdditions['defaultQueryString'] = dbconfig['query']
 
   if "jsondb" in dbconfig:
     dbfile = dbconfig["jsondb"]["body"]

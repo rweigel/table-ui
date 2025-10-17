@@ -2,12 +2,14 @@
   {
     "path": "cdaweb.dataset",
     "sqldb": "../../data/table/cdaweb.dataset.sql",
+    "query": "_cols_show=nonempty",
     "config": "conf/default.json",
     "dataTablesAdditions": "conf/cdaweb.dataset.json"
   },
   {
     "path": "cdaweb.variable",
     "sqldb": "../../data/table/cdaweb.variable.sql",
+    "query": "_cols_show=nonempty",
     "config": "conf/default.json",
     "dataTablesAdditions": "conf/cdaweb.variable.json"
   }

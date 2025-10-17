@@ -1,8 +1,8 @@
 const tableID = '#table1'
 console.log('Document ready. Calling init()')
-$(document).ready(() => init())
+$(document).ready(() => init(true))
 
-async function init () {
+async function init (firstLoad) {
   if (DataTable.isDataTable(tableID)) {
     let msg = `init() => isDataTable('${tableID}') is true. Destroying `
     msg += 'existing table before re-creating it.'
@@ -13,6 +13,10 @@ async function init () {
   }
 
   const config = await getConfig()
+
+  if (firstLoad) {
+    setDefaultQueryString(config.dataTablesAdditions.defaultQueryString)
+  }
 
   checkQueryString(config)
 
@@ -996,10 +1000,13 @@ function watchForFloatingHeader () {
   observer.observe(document.body, config)
 }
 
-function parseQueryString () {
+function parseQueryString (hash) {
   // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
   const nvpair = {}
-  const qs = window.location.hash.replace('#', '')
+  let qs = window.location.hash.replace('#', '')
+  if (hash) {
+    qs = hash.replace('#', '')
+  }
   if (qs.length === 0) {
     return {}
   }
@@ -1009,6 +1016,21 @@ function parseQueryString () {
     nvpair[pair[0]] = pair[1]
   })
   return nvpair
+}
+
+function setDefaultQueryString (hash) {
+  if (hash) {
+    const qs = parseQueryString()
+    const qsDefault = parseQueryString(hash)
+    for (const [key, val] of Object.entries(qsDefault)) {
+      if (!(key in qs)) {
+        let msg = 'init() => Setting query string parameter '
+        msg += `${key} = ${val} from defaultHash: `
+        console.log(msg)
+        updateQueryString(key, val)
+      }
+    }
+  }
 }
 
 function getQueryValue (name, defaultValue) {
