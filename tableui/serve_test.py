@@ -276,7 +276,7 @@ if __name__ == "__main__":
   config = {"table_name": table_name}
   import tableui
   # Convert json to sqlite3 database
-  sqldb_path = tableui.json2sql(table_name, body_file, json_head=head_file)
+  sqldb_path = tableui.list2sql(table_name, body_file, json_head=head_file)
   config["sqldb"] = sqldb_path
 
   _run_tests(port, config, head_data, body_data)
