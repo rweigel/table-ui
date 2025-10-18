@@ -1,4 +1,5 @@
-from cdawmeta.tableui import dict2sql
+import utilrsw
+import tableui
 
 config = {
   "use_all_attributes": True,
@@ -62,7 +63,6 @@ for server_key in datasets.keys():
   for dataset in datasets[server_key]:
     # Put server key first
     dataset = {'server': server_key, **dataset}
-    print(dataset)
     if 'info' in dataset:
       for k, v in dataset['info'].items():
         if k != 'parameters':
@@ -72,8 +72,6 @@ for server_key in datasets.keys():
     datasets_f[f"{server_key}:{dataset['id']}"] = dataset
 
 
-print(datasets_f)
-header, table, attribute_counts = dict2sql(datasets_f, config)
-print(header)
-print(table)
-print(attribute_counts)
+utilrsw.print_dict(datasets_f)
+info = tableui.dict2sql(datasets_f, config, 'dict2sql_demo')
+utilrsw.print_dict(info)

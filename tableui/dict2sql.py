@@ -2,7 +2,7 @@ import utilrsw
 
 logger = None
 
-def dict2sql(datasets, config, name, out_dir, embed=False, logger=None):
+def dict2sql(datasets, config, name, out_dir='.', embed=False, logger=None):
 
   if logger is None:
     logger = utilrsw.logger('dict2sql')
