@@ -23,6 +23,19 @@ def _log_test_title(url):
   logger.info(f"Testing {url}")
   logger.info(line)
 
+def _wait_for_server(url, retries=50, delay=0.2):
+  # Wait for the server to start
+  print("Checking if server is ready by making request to /config ...")
+  for i in range(retries):
+    try:
+      response = requests.get(url, timeout=0.5)
+      if response.status_code == 200:
+        break
+    except Exception:
+      print(f"Server not ready. Next try in {delay} sec...")
+      time.sleep(delay)
+  else:
+    raise RuntimeError(f"Server did not start after {retries} attempts.")
 
 def _run_tests(port, config, head_data, body_data):
 
@@ -40,12 +53,12 @@ def _run_tests(port, config, head_data, body_data):
   server_process = multiprocessing.Process(**proc_kwargs)
   server_process.start()
 
-  # Wait for the server to start
-  time.sleep(0.5)
-
   base = f"http://127.0.0.1:{port}"
-
   url = f"{base}/config"
+
+  _wait_for_server(url, retries=50, delay=0.2)
+
+
   _log_test_title(url)
   response = requests.get(url)
   assert response.status_code == 200
