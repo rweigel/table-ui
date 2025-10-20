@@ -13,15 +13,6 @@ def dict2sql(datasets, config, name, out_dir='.', embed=False, logger=None):
   for path in paths:
     attributes[path] = config['paths'][path]
 
-  path_type = config.get('path_type', 'dict')
-  if path_type == 'list':
-    if len(paths) != 1:
-      emsg = "Error: If path_type = 'list', only one path may be given."
-      raise Exception(emsg)
-    path = list(paths.keys())[0]
-    attributes[path] = utilrsw.flatten_dicts(paths[path], simplify=True)
-    paths[path] = utilrsw.flatten_dicts(paths[path], simplify=True)
-
   attribute_counts = None
   if config.get('use_all_attributes', False):
     # Modify attributes dict to include all unique attributes found in all
@@ -31,7 +22,7 @@ def dict2sql(datasets, config, name, out_dir='.', embed=False, logger=None):
     # of all uncorrected attribute names encountered.
     import collections
     logger.info("Finding all unique attributes")
-    attributes_all = _table_walk(datasets, attributes, config, path_type, mode='attributes')
+    attributes_all = _table_walk(datasets, attributes, config, mode='attributes')
     attribute_counts = collections.Counter(attributes_all)
     attribute_counts = sorted(attribute_counts.items(), key=lambda i: i[0].lower())
 
@@ -46,7 +37,7 @@ def dict2sql(datasets, config, name, out_dir='.', embed=False, logger=None):
   header = _table_header(attributes, config.get('id_name', None))
 
   logger.info("Creating table rows")
-  table = _table_walk(datasets, attributes, config, path_type, mode='rows')
+  table = _table_walk(datasets, attributes, config, mode='rows')
   s = "" if len(table) == 1 else "s"
   logger.info(f"Created {len(table)} table row{s}")
 
@@ -80,7 +71,7 @@ def _table_header(attributes, id_name):
   return header
 
 
-def _table_walk(datasets, attributes, config, path_type, mode='attributes'):
+def _table_walk(datasets, attributes, config, mode='attributes'):
   """
   If mode='attributes', returns a dictionary of attributes found across all
   datasets and paths starting with the given attributes. If the attribute
@@ -119,74 +110,37 @@ def _table_walk(datasets, attributes, config, path_type, mode='attributes'):
 
   paths = attributes.keys()
 
-  for id, dataset in datasets.items():
-    logger.info(f"  Computing {mode} for id = '{id}'")
+  for idx, dataset in enumerate(datasets):
+    logger.info(f"  Computing {mode} for element {idx}")
 
-    if path_type == 'dict':
+    if mode == 'rows':
+      row = []
 
-      if mode == 'rows':
-        row = []
+    for path in paths:
 
-      for path in paths:
+      logger.info(f"    Reading path = '{path}'")
 
-        logger.info(f"    Reading path = '{path}'")
-
-        data = utilrsw.get_path(dataset, path.split('/'))
-
-        if data is None:
-          if mode == 'rows':
-            logger.info(f"    Path '{path}' not found. Inserting '?' for all attribute values.")
-            # Insert "?" for all attributes
-            n_attribs = len(attributes[path])
-            fill = n_attribs*"?".split()
-            row = [*row, *fill]
-          continue
-
-        if mode == 'attributes':
-          _add_attributes(data, attributes[path], attribute_names, fixes, id + "/" + path, omit_attributes)
-        else:
-          _append_columns(data, attributes[path], row, fixes, omit_attributes)
-
-      if mode == 'rows':
-        logger.debug(f"  {len(row)} columns in row {len(table)}")
-        if n_cols_last is not None and len(row) != n_cols_last:
-          loc = id + "/" + path
-          emsg = f"In {loc}, number of columns changed from"
-          emsg += f"{n_cols_last} to {len(row)}."
-          raise Exception(emsg)
-        n_cols_last = len(row)
-        table.append(row)
-
-    else:
-
-      # Get first (only) path
-      path = next(iter(paths))
       data = utilrsw.get_path(dataset, path.split('/'))
 
       if data is None:
-        logger.debug(f"  Path '{path}' not found in dataset '{id}'.")
+        if mode == 'rows':
+          msg = f"    No path '{path}'. Using '?' for all attrib. vals."
+          logger.info(msg)
+          # Insert "?" for all attributes
+          n_attribs = len(attributes[path])
+          fill = n_attribs*"?".split()
+          row = [*row, *fill]
         continue
 
-      for variable in data:
+      if mode == 'attributes':
+        _add_attributes(data, attributes[path], attribute_names, fixes, path, omit_attributes)
+      else:
+        _append_columns(data, attributes[path], row, fixes, omit_attributes)
 
-        if mode == 'rows':
-          row = []
-
-        if mode == 'attributes':
-          _add_attributes(variable, attributes[path], attribute_names, fixes, id + "/" + path, omit_attributes)
-        else:
-          _append_columns(variable, attributes[path], row, fixes, omit_attributes)
-
-        # Add row for variable
-        if mode == 'rows':
-          logger.debug(f"  row #{len(table)}: {len(row)} columns")
-          if n_cols_last is not None and len(row) != n_cols_last:
-            loc = id + "/" + path
-            emsg = f"In {loc}, number of columns changed from"
-            emsg += f"{n_cols_last} to {len(row)}."
-            raise Exception(emsg)
-          n_cols_last = len(row)
-          table.append(row)
+    if mode == 'rows':
+      logger.debug(f"  {len(row)} columns in row {len(table)}")
+      n_cols_last = len(row)
+      table.append(row)
 
   if mode == 'attributes':
     return attribute_names
@@ -214,6 +168,7 @@ def _append_columns(data, attributes, row, fixes, omit_attributes):
       row.append(val)
     else:
       row.append("")
+
 
 def _add_attributes(data, attributes, attribute_names, fixes, path, omit_attributes):
 

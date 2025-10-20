@@ -1,77 +1,37 @@
-import utilrsw
 import tableui
 
-config = {
+config1 = {
   "use_all_attributes": True,
-  "path_type": "dict",
   "paths": {
     "/": {
-      "server": None,
-      "id": None
+      "id": None,
+      "attribute1": None,
+      "attribute2": None
     }
   }
 }
-datasets = {
-  'server1':
-    [
-      {
-        'id': 'ds1 id',
-        'title': 'ds1 title',
-        'info': {
-          'start': 'ds1 start',
-          'parameters': [
-            {'name': 'param1', 'value': 'value1'},
-          ]
-        }
-      },
-      {
-        'id': 'ds2 id',
-        'title': 'ds2 title',
-        'info': {
-          'start': 'ds2 start',
-          'parameters': [
-            {'name': 'param1', 'value': 'value2'},
-          ]
-        }
-      }
-    ],
-    'server2': [
-      {
-        'id': 'ds1 id',
-        'title': 'ds1 title',
-        'info': {
-          'start': 'ds1 start',
-          'parameters': [
-            {'name': 'param1', 'value': 'value1'}
-          ]
-        }
-      },
-      {
-        'id': 'ds2 id',
-        'title': 'ds2 title',
-        'info': {
-          'start': 'ds2 start',
-          'parameters': [
-            {'name': 'param1', 'value': 'value2'}
-          ]
-        }
-      }
-    ]
+datasets1 = [
+  {
+    "id": "id_11",
+    "attribute1": "id_11/attribute1",
+    "attribute2": "id_11/attribute2"
+  },
+  {
+    "id": "id_12",
+    "attribute1": "id_12/attribute1",
+    "attribute2": "id_12/attribute2"
+  },
+  {
+    "id": "id_21",
+    "attribute1": "id_21/attribute1",
+    "attribute2": "id_21/attribute2"
+  },
+  {
+    "id": "id_22",
+    "attribute1": "id_22/attribute1",
+    "attribute2": "id_22/attribute2"
   }
-datasets_f = {}
-for server_key in datasets.keys():
-  for dataset in datasets[server_key]:
-    # Put server key first
-    dataset = {'server': server_key, **dataset}
-    if 'info' in dataset:
-      for k, v in dataset['info'].items():
-        if k != 'parameters':
-          dataset[k] = v
-      del dataset['info']
-    # Insert 'server' as the first key in the dataset dictionary
-    datasets_f[f"{server_key}:{dataset['id']}"] = dataset
+]
+out_dir1 = 'dict2sql_demo/dict2sql_demo1'
+info = tableui.dict2sql(datasets1, config1, out_dir1, embed=True)
 
-
-utilrsw.print_dict(datasets_f)
-info = tableui.dict2sql(datasets_f, config, 'dict2sql_demo')
-utilrsw.print_dict(info)

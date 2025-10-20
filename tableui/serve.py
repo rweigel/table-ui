@@ -31,6 +31,9 @@ def serve(config=CONFIG_DEFAULT, host="0.0.0.0", port=5001, debug=False):
   app = fastapi.FastAPI()
 
   if isinstance(config, str):
+    base_path = os.path.abspath(os.path.dirname(config))
+    base_path = os.path.normpath(base_path)
+    print(base_path)
     with open(config) as f:
       logger.info(f"Reading: {config}")
       try:
@@ -39,6 +42,7 @@ def serve(config=CONFIG_DEFAULT, host="0.0.0.0", port=5001, debug=False):
         emsg = f"Error executing json.load('{config}')"
         logger.error(f"{emsg}: {e}. Exiting.")
         exit(1)
+      _convert_relative_paths(configs, base_path)
   else:
     configs = config
 
@@ -561,6 +565,34 @@ def _error(emsg, err, update):
   exit(1)
 
 
+def _convert_relative_paths(configs, base_path):
+
+  def check_path(path_rel, path_abs):
+    if not os.path.exists(path_abs):
+      emsg = f"Converted relative path '{path_rel}' to absolute path using"
+      emsg += f"base path = '{base_path}' giving '{path_abs}', but file does not exist."
+      logger.error(emsg)
+      raise FileNotFoundError(emsg)
+
+  for config in configs:
+    for path in ['sqldb', 'jsondb', 'dataTablesAdditions', 'config']:
+      if path in config:
+        if isinstance(config[path], str):
+          if not os.path.isabs(config[path]):
+            path_rel = config[path]
+            config[path] = os.path.join(base_path, config[path])
+            config[path] = os.path.normpath(config[path])
+            check_path(path_rel, config[path])
+
+        if isinstance(config[path], list):
+          for i, p in enumerate(config[path]):
+            if not os.path.isabs(p):
+              path_rel = config[path]
+              config[path][i] = os.path.join(base_path, p)
+              config[path][i] = os.path.normpath(config[path][i])
+              check_path(path_rel, config[path])
+
+
 def _data_transform(data, column_names, verbose):
 
   if not verbose:
@@ -835,7 +867,7 @@ def _sql_table_names(config, update=False):
     logger.info("Got tables names")
     logger.info(f"  {table_names}\n")
   except Exception as e:
-    emsg = "Error getting table names"
+    emsg = f"Error getting table names from {config['sqldb']}"
     return _error(emsg, e, update)
 
   config['sqldb_tables'] = table_names

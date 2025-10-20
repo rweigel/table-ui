@@ -1,8 +1,0 @@
-{
-  "renderFunctions": "js/render.js",
-  "columnDropdowns": false,
-  "columnOptions": [
-    {"name": "TEXT", "render": {"function": "ellipsis", "args": [30]}},
-    {"name": "MODS", "render": "ellipsis"}
-  ]
-}
