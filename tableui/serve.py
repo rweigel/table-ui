@@ -129,6 +129,7 @@ def _api_init(app, config):
         logger.info(f"Redirecting '/' to {target}")
         return fastapi.responses.RedirectResponse(url=target, status_code=302)
 
+
   logger.info(f"Initalizing endpoint {path}/")
   @app.route(f"{path}/", methods=["GET", "HEAD"])
   def indexhtml(request: fastapi.Request):
