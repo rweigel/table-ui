@@ -113,6 +113,22 @@ def _api_init(app, config):
     directory = os.path.join(ROOT_DIR, dir)
     app.mount(f"{path}/{dir}/", StaticFiles(directory=directory))
 
+  paths = config.get('paths', None)
+  if paths is not None:
+    # Redirect root to the first configured path
+    target = None
+    if paths and len(paths) > 0:
+      # Default redirect path
+      default = paths[0].get("path", "")
+      if default != "" and default != "/":
+        target = f"/{default}"
+    if target is not None:
+      logger.info(f"Initalizing endpoint /")
+      @app.route(f"/", methods=["GET", "HEAD"])
+      def root(request: fastapi.Request):
+        logger.info(f"Redirecting '/' to {target}")
+        return fastapi.responses.RedirectResponse(url=target, status_code=302)
+
   logger.info(f"Initalizing endpoint {path}/")
   @app.route(f"{path}/", methods=["GET", "HEAD"])
   def indexhtml(request: fastapi.Request):
