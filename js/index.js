@@ -448,8 +448,15 @@ function createRelatedTablesDropdown (config) {
   $('#relatedTablesSelect select').empty()
   if (relatedTables && Array.isArray(relatedTables) && relatedTables.length > 0) {
     const options = []
+    let basePath = window.location.pathname
     for (const rt of relatedTables) {
-      options.push(`<option value="${rt.path}">${rt.name}</option>`)
+      basePath = basePath.replace(rt.path, '')
+    }
+    // Remove all trailing slashes so later concatenation yields exactly one slash
+    basePath = basePath.replace(/\/+$/, '')
+    basePath = window.location.origin + basePath
+    for (const rt of relatedTables) {
+      options.push(`<option value="${basePath}/${rt.path}/">${rt.name}</option>`)
     }
     // Determine selected option based on current path
     for (let i = 0; i < relatedTables.length; i++) {
@@ -465,8 +472,8 @@ function createRelatedTablesDropdown (config) {
     $('#relatedTablesSelect').on('change', function () {
       const lastSelected = $('#relatedTablesSelect').attr('lastSelected')
       $('#relatedTablesSelect').attr('lastSelected', $(this).val())
-      const url = window.location.href.replace(lastSelected, $(this).val())
-      if (url) window.location.href = url
+      const url = $(this).val()
+      if (url) window.location = $(this).val()
     })
   }
 }
