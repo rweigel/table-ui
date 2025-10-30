@@ -1,0 +1,34 @@
+2025-10-20T09:10:54.473291Z INFO  dict2sql Finding all unique attributes
+2025-10-20T09:10:54.473402Z INFO  dict2sql   Computing attributes for id = '0'
+2025-10-20T09:10:54.473441Z INFO  dict2sql     Reading path = '/'
+2025-10-20T09:10:54.473469Z INFO  dict2sql   Computing attributes for id = '1'
+2025-10-20T09:10:54.473492Z INFO  dict2sql     Reading path = '/'
+2025-10-20T09:10:54.473515Z INFO  dict2sql   Computing attributes for id = '2'
+2025-10-20T09:10:54.473537Z INFO  dict2sql     Reading path = '/'
+2025-10-20T09:10:54.473559Z INFO  dict2sql   Computing attributes for id = '3'
+2025-10-20T09:10:54.473580Z INFO  dict2sql     Reading path = '/'
+2025-10-20T09:10:54.473673Z INFO  dict2sql Found 12 attributes
+2025-10-20T09:10:54.473699Z INFO  dict2sql Creating table rows
+2025-10-20T09:10:54.473734Z INFO  dict2sql   Computing rows for id = '0'
+2025-10-20T09:10:54.473756Z INFO  dict2sql     Reading path = '/'
+2025-10-20T09:10:54.473786Z INFO  dict2sql   Computing rows for id = '1'
+2025-10-20T09:10:54.473807Z INFO  dict2sql     Reading path = '/'
+2025-10-20T09:10:54.473834Z INFO  dict2sql   Computing rows for id = '2'
+2025-10-20T09:10:54.473857Z INFO  dict2sql     Reading path = '/'
+2025-10-20T09:10:54.473885Z INFO  dict2sql   Computing rows for id = '3'
+2025-10-20T09:10:54.473907Z INFO  dict2sql     Reading path = '/'
+2025-10-20T09:10:54.473935Z INFO  dict2sql Created 4 table rows
+2025-10-20T09:10:54.473969Z INFO  dict2sql Writing ./dict2sql_demo/dict2sql_demo1.attribute_counts.csv
+2025-10-20T09:10:54.474648Z INFO  dict2sql Writing: ./dict2sql_demo/dict2sql_demo1.meta.json
+2025-10-20T09:10:54.474928Z INFO  dict2sql Writing: ./dict2sql_demo/dict2sql_demo1.head.json
+2025-10-20T09:10:54.475034Z INFO  dict2sql Writing: ./dict2sql_demo/dict2sql_demo1.body.json
+2025-10-20T09:10:54.475134Z INFO  dict2sql Writing: ./dict2sql_demo/dict2sql_demo1.csv
+2025-10-20T09:10:54.475370Z INFO  dict2sql Writing: ./dict2sql_demo/dict2sql_demo1.sql
+2025-10-20T09:10:54.475406Z INFO  dict2sql    Removing existing SQLite database file './dict2sql_demo/dict2sql_demo1.sql'
+2025-10-20T09:10:54.475788Z INFO  dict2sql    Renaming non-unique column names
+2025-10-20T09:10:54.475818Z INFO  dict2sql    Renamed non-unique column names
+2025-10-20T09:10:54.475840Z INFO  dict2sql    Casting table elements to str.
+2025-10-20T09:10:54.475867Z INFO  dict2sql    Casted table elements to str in 4 rows and 3 columns in 0.00 [s]
+2025-10-20T09:10:54.477480Z INFO  dict2sql    Getting cursor from connection to './dict2sql_demo/dict2sql_demo1.sql'
+2025-10-20T09:10:54.479501Z INFO  dict2sql    Inserting rows
+2025-10-20T09:10:54.480146Z INFO  dict2sql    Creating table dict2sql_demo/dict2sql_demo1.metadata with table metadata stored as a JSON string
