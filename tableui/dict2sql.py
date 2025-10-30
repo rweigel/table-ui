@@ -2,11 +2,14 @@ import utilrsw
 
 logger = None
 
-def dict2sql(datasets, config, name, out_dir='.', embed=False, logger=None):
+def dict2sql(datasets, config, embed=False, logger=None):
 
   if logger is None:
     logger = utilrsw.logger('dict2sql')
   globals()['logger'] = logger
+
+  name = config.get('name', 'table')
+  out_dir = config.get('out_dir', '.')
 
   attributes = {}
   paths = config['paths']
@@ -32,6 +35,8 @@ def dict2sql(datasets, config, name, out_dir='.', embed=False, logger=None):
     else:
       s = "" if len(attributes_all) == 1 else "s"
       logger.info(f"Found {len(attributes_all)} attribute{s}")
+      s = "" if len(attribute_counts) == 1 else "s"
+      logger.info(f"Found {len(attribute_counts)} unique attribute{s}")
 
   # Create table header based on attributes dict.
   header = _table_header(attributes, config.get('id_name', None))
@@ -111,21 +116,21 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
   paths = attributes.keys()
 
   for idx, dataset in enumerate(datasets):
-    logger.info(f"  Computing {mode} for element {idx}")
+    logger.debug(f"  Computing {mode} for element {idx}")
 
     if mode == 'rows':
       row = []
 
     for path in paths:
 
-      logger.info(f"    Reading path = '{path}'")
+      logger.debug(f"    Reading path = '{path}'")
 
       data = utilrsw.get_path(dataset, path.split('/'))
 
       if data is None:
         if mode == 'rows':
           msg = f"    No path '{path}'. Using '?' for all attrib. vals."
-          logger.info(msg)
+          logger.warning(msg)
           # Insert "?" for all attributes
           n_attribs = len(attributes[path])
           fill = n_attribs*"?".split()
@@ -152,7 +157,7 @@ def _append_columns(data, attributes, row, fixes, omit_attributes):
   for attribute in attributes:
 
     if omit_attributes is not None and attribute in omit_attributes:
-      logger.info(f"  Skipping {attribute}")
+      logger.debug(f"  Skipping {attribute}")
       continue
 
     if fixes is not None:
@@ -207,7 +212,7 @@ def _write_files(name, config, out_dir, header, body, counts):
   if counts is None:
     del files['counts']
   else:
-    logger.info(f"Writing {files['counts']}")
+    logger.info(f"Writing: {files['counts']}")
     utilrsw.write(files['counts'], [["attribute", "count"], *counts])
 
   logger.info(f"Writing: {files['meta']}")

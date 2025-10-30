@@ -1,8 +1,8 @@
 {
   "jsondb": {
-    "body": "demo/demo.body.json"
+    "body": "../demo/demo.body.json"
   },
-  "config": "conf/default.json",
+  "config": "default.json",
   "tableUI": {
     "columnDropdowns": false
   }

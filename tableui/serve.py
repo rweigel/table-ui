@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 ROOT_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
 CONFIG_DEFAULT = os.path.join(ROOT_DIR, "conf", "default.json")
-RENDER_DEFAULT = os.path.join(ROOT_DIR, 'js', 'render.js')
 
 def serve(config=CONFIG_DEFAULT, host="0.0.0.0", port=5001, debug=False):
 
@@ -30,65 +29,16 @@ def serve(config=CONFIG_DEFAULT, host="0.0.0.0", port=5001, debug=False):
 
   app = fastapi.FastAPI()
 
-  if isinstance(config, str):
-    base_path = os.path.abspath(os.path.dirname(config))
-    base_path = os.path.normpath(base_path)
-    print(base_path)
-    with open(config) as f:
-      logger.info(f"Reading: {config}")
-      try:
-        configs = json.load(f)
-      except Exception as e:
-        emsg = f"Error executing json.load('{config}')"
-        logger.error(f"{emsg}: {e}. Exiting.")
-        exit(1)
-      _convert_relative_paths(configs, base_path)
-  else:
-    configs = config
-
-  if isinstance(configs, dict):
-    configs = [configs]
-
-  paths = []
-  for config in configs:
-    logger.info("")
-    logger.info(f"Adding database with config: {config}")
-    _config(config, update=False)
-    # Create a list of paths served by this server. Will be added to
-    # return of /config in dataTablesAdditions['relatedTables'].
-    paths.append({
-      "path": config.get('path', ''),
-      "name": config['table_name']
-    })
-
-  # Ensure 'path' values in paths are unique; if not, reset all to table_name
-  path_values = [p['path'] for p in paths]
-  if len(path_values) != len(set(path_values)):
-    wmsg = "Duplicate 'path' values detected. Resetting all 'path' to table_name."
-    logger.warning(wmsg)
-    for config in configs:
-      config['path'] = config['table_name']
-
-  for config in configs:
-    if len(configs) > 1:
-      config['paths'] = paths
-    logger.info(f"Initalizing API for with path = '{config['path']}'")
-    _api_init(app, config)
+  _api_init(app, config)
 
   logger.info("Starting server")
   uvicorn.run(app, **runconfig)
 
 
-def _api_init(app, config):
+def _api_init(app, config, path=None, paths=[]):
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles
-
-  def cors_headers(response: fastapi.Response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
-    return response
 
   def parse_int(parameter, parameters, min=0, default=None):
     if parameter in parameters:
@@ -97,7 +47,8 @@ def _api_init(app, config):
         val = int(val)
       except Exception:
         emsg = f"Error: {parameter} must be an integer"
-        return fastapi.responses.JSONResponse(content={"error": emsg}, status_code=400)
+        content = {"error": emsg}
+        return fastapi.responses.JSONResponse(content=content, status_code=400)
       if not val >= min:
         emsg = f"Error: {parameter} >= {min} required"
     else:
@@ -105,13 +56,40 @@ def _api_init(app, config):
 
     parameters[parameter] = val
 
-  path = ""
-  if "path" in config and config['path']:
-    path = "/" + config['path']
+  if path is None:
+    paths, _ = _paths(config)
+    if len(paths) == 0:
+      _api_init(app, config, path="")
+    else:
+      for path in paths:
+        _api_init(app, config, path=path, paths=paths)
+    return
+
+  logger.info(f"Initalizing API with base path = '{path}'")
+
+  # Get config information. update=False => exit on error
+  # _r => resolved (file paths, table names, column names, etc.)
+  config_r, _ = _config_resolve(config, path=path, update=False)
+
+  path_o = path
+  if path != "":
+    path = f"/{path.strip('/')}"
 
   for dir in ['js', 'css', 'demo', 'misc']:
     directory = os.path.join(ROOT_DIR, dir)
     app.mount(f"{path}/{dir}/", StaticFiles(directory=directory))
+
+  if len(paths) > 1 and "" not in paths:
+    # If more than one path and no root path, redirect root to first path
+    logger.info(f"Initalizing endpoint {path}/")
+    @app.route("/", methods=["GET", "HEAD"])
+    def rootredirect(request: fastapi.Request):
+      target = paths[0]
+      if not target.startswith('/'):
+        target = f"/{target}"
+      url = f"{target}/"
+      logger.info(f"Redirecting '/' to '{url}'")
+      return fastapi.responses.RedirectResponse(url, status_code=302)
 
   logger.info(f"Initalizing endpoint {path}/")
   @app.route(f"{path}/", methods=["GET", "HEAD"])
@@ -123,7 +101,7 @@ def _api_init(app, config):
       indexhtml_ = f.read()
     return fastapi.responses.HTMLResponse(indexhtml_)
 
-  if "jsondb" in config:
+  if "jsondb" in config_r:
     endpoint = f"{path}/jsondb"
     logger.info(f"Initalizing endpoint '{endpoint}'")
     @app.route(endpoint, methods=["GET", "HEAD"])
@@ -131,43 +109,41 @@ def _api_init(app, config):
       # Silently ignores any query parameters other than _verbose
       query_params = dict(request.query_params)
 
-      err = _config(config, update=True)
+      config_r, err = _config_resolve(config, path=path_o, update=True)
       if err is not None:
-        return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
+        content = {"error": err}
+        return fastapi.responses.JSONResponse(content=content, status_code=500)
 
-      with open(config['jsondb']['body']) as f:
+      with open(config_r['jsondb']['body']) as f:
         # TODO: Stream
-        logger.info("Reading and sending: " + config['jsondb']['body'])
+        logger.info("Reading and sending: " + config_r['jsondb']['body'])
         data = json.load(f)
         # TODO: Use _verbose validation in data()
-        data = _data_transform(data, config['column_names'], query_params.get("_verbose", None) == "true")
+        data = _data_transform(data, config_r['column_names'], query_params.get("_verbose", None) == "true")
       data = {
-        "columns": config['column_names'],
+        "columns": config_r['column_names'],
         "data": data
       }
       return fastapi.responses.JSONResponse(data)
 
-  if "sqldb" in config and config["sqldb"] is not None:
+  if "sqldb" in config_r and config_r["sqldb"] is not None:
     endpoint = f"{path}/sqldb"
     logger.info(f"Initalizing endpoint '{endpoint}'")
     @app.route(f"{path}/sqldb", methods=["GET", "HEAD"])
     def sqldb(request: fastapi.Request):
       # Silently ignores any query parameters
 
-      err = _config(config, update=True)
+      config_r, err = _config_resolve(config, path=path_o, update=True)
       if err is not None:
-        return fastapi.responses.JSONResponse(content={"error": err}, status_code=500)
+        content = {"error": err}
+        return fastapi.responses.JSONResponse(content=content, status_code=500)
 
-      filename = os.path.basename(config['sqldb'])
-      if filename.endswith('.sqlite'):
-        filename = filename[0:-7] + '.sqlite3'
-      if filename.endswith('.sql'):
-        filename = filename[0:-4] + '.sqlite3'
-        kwargs = {
-                    'media_type': 'application/x-sqlite3',
-                    'filename': filename
-                  }
-      return fastapi.responses.FileResponse(config['sqldb'], **kwargs)
+      filename = os.path.basename(config_r['sqldb'])
+      kwargs = {
+                  'media_type': 'application/x-sqlite3',
+                  'filename': filename
+                }
+      return fastapi.responses.FileResponse(config_r['sqldb'], **kwargs)
 
   endpoint = f"{path}/config"
   logger.info(f"Initalizing endpoint '{endpoint}'")
@@ -175,14 +151,14 @@ def _api_init(app, config):
   def configx(request: fastapi.Request):
     # Silently ignores any query parameters
 
-    err = _config(config, update=True)
+    config_r, err = _config_resolve(config, path=path_o, update=True)
     if err is not None:
       content = {"error": err}
       return fastapi.responses.JSONResponse(content=content, status_code=500)
 
     content = {
-      "dataTables": config['dataTables'],
-      "dataTablesAdditions": config['dataTablesAdditions']
+      "dataTables": config_r['dataTables'],
+      "dataTablesAdditions": config_r['dataTablesAdditions']
     }
 
     return fastapi.responses.JSONResponse(content=content)
@@ -192,14 +168,17 @@ def _api_init(app, config):
   @app.route(f"{path}/render.js", methods=["GET", "HEAD"])
   def render(request: fastapi.Request):
     # Silently ignores any query parameters
-    err = _config(config, update=True)
+    config_r, err = _config_resolve(config, path=path_o, update=True)
     if err is not None:
       content = {"error": err}
       return fastapi.responses.JSONResponse(content=content, status_code=500)
 
-    renderFunctions = config['dataTablesAdditions']['renderFunctions']
     media_type = "application/javascript"
-    return fastapi.responses.FileResponse(renderFunctions, media_type=media_type)
+    if 'renderFunctions' in config_r['dataTablesAdditions']:
+      renderFunctions = config_r['dataTablesAdditions']['renderFunctions']
+      return fastapi.responses.FileResponse(renderFunctions, media_type=media_type)
+    else:
+      return fastapi.responses.Response(content="", media_type=media_type)
 
   endpoint = f"{path}/data/"
   logger.info(f"Initalizing endpoint '{endpoint}'")
@@ -221,12 +200,12 @@ def _api_init(app, config):
     else:
       query_params["_verbose"] = False
 
-    err = _config(config, update=True)
+    config_r, err = _config_resolve(config, path=path_o, update=True)
     if err is not None:
       content = {"error": err}
       return fastapi.responses.JSONResponse(content=content, status_code=500)
 
-    if "jsondb" in config:
+    if "jsondb" in config_r:
       # No server-side processing. Serve entire JSON and return.
       for key in query_params.keys():
         if key not in ["_", "_verbose"]:
@@ -235,8 +214,9 @@ def _api_init(app, config):
           content = {"error": emsg}
           return fastapi.responses.JSONResponse(content=content, status_code=400)
 
-      data = config['jsondb']['data']
-      data = _data_transform(data, config['column_names'], query_params["_verbose"])
+      data = config_r['jsondb']['data']
+      column_names = config_r['column_names']
+      data = _data_transform(data, column_names, query_params["_verbose"])
       return fastapi.responses.JSONResponse({"data": data})
 
     # sqldb and server-side processing
@@ -252,11 +232,11 @@ def _api_init(app, config):
     ]
 
     for key in query_params.keys():
-      if key not in keys_allowed and key not in config['column_names']:
+      if key not in keys_allowed and key not in config_r['column_names']:
         logger.error(f"Error: Unknown query parameter: {key}.")
         emsg = "Error: Unknown query parameter with first five character of "
         emsg += f"{key[0:5]}. Allowed: {keys_allowed} and column names: "
-        emsg += f"{config['column_names']}"
+        emsg += f"{config_r['column_names']}"
         content = {"error": emsg}
         return fastapi.responses.JSONResponse(content=content, status_code=400)
 
@@ -281,9 +261,9 @@ def _api_init(app, config):
         col = order
         if order.startswith("-"):
           col = order[1:]
-        if col not in config['column_names']:
+        if col not in config_r['column_names']:
           emsg = f"Error: _orders column '{col}' not found in column names: "
-          emsg += f"{config['column_names']}"
+          emsg += f"{config_r['column_names']}"
           content = {"error": emsg}
           return fastapi.responses.JSONResponse(content=content, status_code=400)
       query_params["_orders"] = orders
@@ -294,20 +274,20 @@ def _api_init(app, config):
     if query_params is not None:
       logger.info(f"Query params: {query_params}")
       for key, _ in query_params.items():
-        if key in config['column_names']:
+        if key in config_r['column_names']:
           kwargs = {'encoding': 'utf-8', 'errors': 'replace'}
           searches[key] = urllib.parse.unquote(query_params[key], **kwargs)
       query_params['searches'] = searches
     else:
       query_params['searches'] = None
 
-    return_cols = config['column_names']
+    return_cols = config_r['column_names']
     if "_return" in query_params:
       query_params["_return"] = query_params["_return"].split(",")
       for col in query_params["_return"]:
-        if col not in config['column_names']:
+        if col not in config_r['column_names']:
           emsg = f"Error: _return column '{col}' not found in column names: "
-          emsg += f"{config['column_names']}"
+          emsg += f"{config_r['column_names']}"
           content = {"error": emsg}
           return fastapi.responses.JSONResponse(content=content, status_code=400)
       return_cols = query_params["_return"]
@@ -315,7 +295,7 @@ def _api_init(app, config):
       query_params["_return"] = None
 
     try:
-      result = _sql_query(config, query_params)
+      result = _sql_query(config_r, query_params)
     except Exception as e:
       emsg = f"Error querying database: {e}"
       content = {"error": emsg}
@@ -342,7 +322,129 @@ def _api_init(app, config):
     return fastapi.responses.JSONResponse(content=content)
 
 
-def _config(config, update=True):
+def _dir_resolve(config, base_path, update=False):
+
+  def expand_path(base_path, path):
+
+    if not isinstance(path, str):
+      return path, None
+
+    if path.startswith('~'):
+      path_rel = path
+      path = os.path.expanduser(path)
+      if not os.path.exists(path):
+        emsg = f"Converted path {path_rel} to absolute path {path}, but"
+        emsg += f"'{path}' does not exist."
+        return None, _error(emsg, "", update)
+
+    if not os.path.isabs(path):
+      path_rel = path
+      path = os.path.join(base_path, path)
+      path = os.path.normpath(path)
+      if not os.path.exists(path):
+        emsg = f"Converted relative path '{path_rel}' to absolute path using "
+        emsg += f"base path = '{base_path}' giving '{path}', but file does not exist."
+        return None, _error(emsg, "", update)
+
+    return path, None
+
+  if 'sqldb' in config:
+    config['sqldb'], eobj = expand_path(base_path, config['sqldb'])
+    if eobj is not None:
+      return eobj
+  if 'jsondb' in config:
+    if isinstance(config['jsondb'], str):
+      config['jsondb'], eobj = expand_path(base_path, config['jsondb'])
+      if eobj is not None:
+        return eobj
+    if 'body' in config['jsondb']:
+      config['jsondb']['body'], eobj = expand_path(base_path, config['jsondb']['body'])
+      if eobj is not None:
+        return eobj
+    if 'head' in config['jsondb']:
+      config['jsondb']['head'], eobj = expand_path(base_path, config['jsondb']['head'])
+      if eobj is not None:
+        return eobj
+  if 'dataTables' in config:
+    config['dataTables'], eobj = expand_path(base_path, config['dataTables'])
+    if eobj is not None:
+      return eobj
+
+  if 'dataTablesAdditions' in config:
+    if 'renderFunctions' in config['dataTablesAdditions']:
+      path = config['dataTablesAdditions']['renderFunctions']
+      config['dataTablesAdditions']['renderFunctions'], eobj = expand_path(base_path, path)
+      if eobj is not None:
+        return eobj
+
+
+def _config_read(config_file, update=True):
+  with open(config_file) as f:
+    logger.info(f"Reading: {config_file}")
+    try:
+      configs = json.load(f)
+      if isinstance(configs, dict):
+        configs = [configs]
+      return configs, None
+    except Exception as e:
+      emsg = f"Error executing json.load('{config_file}')"
+      return None, _error(emsg, e, update)
+
+
+def _paths(configs, update=True):
+  if isinstance(configs, str):
+     configs, eobj = _config_read(configs, update=update)
+     if eobj is not None:
+        return None, eobj
+
+  paths = []
+  for config in configs:
+    if 'path' in config:
+      paths.append(config['path'])
+
+  # Ensure 'path' values in paths are unique.
+  if len(paths) != len(set(paths)):
+    emsg = "Duplicate 'path' values detected. Exiting."
+    return None, _error(emsg, "", update=update)
+
+  return paths, None
+
+
+def _config_resolve(config, path=None, update=True):
+
+  if isinstance(config, str):
+    base_path = os.path.abspath(os.path.dirname(config))
+    base_path = os.path.normpath(base_path)
+    logger.info(f"Base path for relative paths in config: '{base_path}'")
+    configs, eobj = _config_read(config, update=update)
+    if eobj is not None:
+      return None, eobj
+  else:
+    base_path = os.getcwd()
+    configs = copy.deepcopy(config)
+
+  # Endpoint paths
+  paths, eobj = _paths(configs, update=update)
+  if eobj is not None:
+    return None, eobj
+
+  if len(paths) > 1:
+    found = False
+    for config in configs:
+      config['paths'] = paths
+      if config.get('path', None) == path:
+        found = True
+        break
+    if not found:
+      emsg = f"Could not find config for path '{path}'"
+      return None, _error(emsg, "", update)
+  else:
+    config = configs[0]
+
+  # Directory paths
+  eobj = _dir_resolve(config, base_path, update=update)
+  if eobj is not None:
+    return None, eobj
 
   if not update:
     if 'sqldb' not in config and 'jsondb' not in config:
@@ -356,20 +458,20 @@ def _config(config, update=True):
   config['path'] = config.get('path', '')
 
   # Add 'table_meta' to config (default table metadata)
-  emsg = _table_meta(config, update=update)
-  if emsg is not None:
-    return emsg
+  eobj = _table_meta(config, update=update)
+  if eobj is not None:
+    return None, eobj
 
   # Add (or updates) and checks 'dataTables' in config
   emsg = _dataTables(config, update=update)
   if emsg is not None:
-    return emsg
+    return None, emsg
 
   if 'jsondb' in config:
 
     if not os.path.exists(config['jsondb']['body']):
       emsg = f"File not found: {config['jsondb']['body']}"
-      return _error(emsg, "", update)
+      return None, _error(emsg, "", update)
 
     try:
       with open(config['jsondb']['body']) as f:
@@ -377,7 +479,7 @@ def _config(config, update=True):
         config['jsondb']['data'] = json.load(f)
     except Exception as e:
       emsg = f"Error reading jsondb body file {config['jsondb']['body']}"
-      return _error(emsg, e, update)
+      return None, _error(emsg, e, update)
 
     if config.get('table_name', None) is None:
       fname = config['jsondb']['body']
@@ -388,22 +490,22 @@ def _config(config, update=True):
 
 
     # Adds 'column_names' to config and 'columns' to config['dataTables']
-    emsg = _column_names(config, update=update)
-    if emsg is not None:
-      return emsg
+    eobj = _column_names(config, update=update)
+    if eobj is not None:
+      return None, eobj
 
     # Adds or updates 'dataTablesAdditions' in config
-    emsg = _dataTablesAdditions(config, update=update)
-    if emsg is not None:
-      return emsg
+    eobj = _dataTablesAdditions(config, update=update)
+    if eobj is not None:
+      return None, eobj
 
-    return None
+    return config, None
 
 
   # Adds 'sqldb_tables' to config
-  emsg = _sql_table_names(config, update=update)
-  if emsg is not None:
-    return emsg
+  eobj = _sql_table_names(config, update=update)
+  if eobj is not None:
+    return None, eobj
 
   if config.get('table_name', None) is None:
     table_name = ".".join(os.path.basename(config['sqldb']).split(".")[0:-1])
@@ -415,66 +517,53 @@ def _config(config, update=True):
     else:
       emsg = "No table_name given and could not find table named "
       emsg += f"'{table_name}' in {config['sqldb']}"
-      return _error(emsg, "", update)
+      return None, _error(emsg, "", update)
   else:
     if config['table_name'] not in config['sqldb_tables']:
       emsg = f"Could not find table named '{config['table_name']}' in "
       emsg += f"{config['sqldb']}. Tables found: {config['sqldb_tables']}"
-      return _error(emsg, "", update)
+      return None, _error(emsg, "", update)
 
   # Adds 'column_names' to config and 'columns' to config['dataTables']
   emsg = _column_names(config, update=update)
   if emsg is not None:
-    return emsg
+    return None, emsg
 
   # Adds or updates 'dataTablesAdditions' in config
-  emsg = _dataTablesAdditions(config, update=update)
-  if emsg is not None:
-    return emsg
+  eobj = _dataTablesAdditions(config, update=update)
+  if eobj is not None:
+    return None, eobj
 
   # Adds 'n_rows' to config
-  emsg = _sql_n_rows(config, update=update)
-  if emsg is not None:
-    return emsg
+  eobj = _sql_n_rows(config, update=update)
+  if eobj is not None:
+    return None, eobj
 
   # Adds or updates 'dataTablesAdditions' in config
-  emsg = _sql_table_meta(config, update=update)
-  if emsg is not None:
-    return emsg
+  eobj = _sql_table_meta(config, update=update)
+  if eobj is not None:
+    return None, eobj
 
-  return None
+  return config, None
 
 
 def _dataTablesAdditions(config, update=False):
 
-  if 'dataTablesAdditions' in config:
-    dataTablesAdditions_file = config.get('dataTablesAdditions_file', None)
-    if isinstance(config['dataTablesAdditions'], str) or dataTablesAdditions_file is not None:
-      if isinstance(config['dataTablesAdditions'], str):
-        dataTablesAdditions_file = config['dataTablesAdditions']
-        config['dataTablesAdditions_file'] = dataTablesAdditions_file
-      with open(dataTablesAdditions_file) as f:
-        logger.info("Reading: " + dataTablesAdditions_file)
-        try:
-          config['dataTablesAdditions'] = json.load(f)
-        except Exception as e:
-          emsg = f"Error executing json.load('{dataTablesAdditions_file}')"
-          return _error(emsg, e, update)
-
   dataTablesAdditions = config.get("dataTablesAdditions", {})
 
-  if 'renderFunctions' not in dataTablesAdditions:
-    dataTablesAdditions['renderFunctions'] = RENDER_DEFAULT
+  if 'renderFunctions' in dataTablesAdditions:
+    if not os.path.exists(dataTablesAdditions['renderFunctions']):
+      emsg = f"File not found: {dataTablesAdditions['renderFunctions']}"
+      return _error(emsg, "", update)
 
-  if not os.path.exists(dataTablesAdditions['renderFunctions']):
-    emsg = f"File not found: {dataTablesAdditions['renderFunctions']}"
-    return _error(emsg, "", update)
-
-  if "paths" in config:
-    dataTablesAdditions['relatedTables'] = config['paths']
-
-  if "query" in config:
-    dataTablesAdditions['defaultQueryString'] = config['query']
+  if 'paths' in config:
+    relatedTables = []
+    for path in config['paths']:
+      relatedTables.append({
+        "name": config['table_name'],
+        "path": path
+      })
+    dataTablesAdditions['relatedTables'] = relatedTables
 
   # Merge table_meta from config and dataTablesAdditions
   table_meta = copy.deepcopy(config.get('table_meta', None))
@@ -499,15 +588,15 @@ def _dataTablesAdditions(config, update=False):
 
   if "sqldb" in config:
     dbfile = config["sqldb"]
-    dataTablesAdditions['sqldb'] = os.path.basename(dbfile)
-    dataTablesAdditions['tableMetadata']['type'] = "sqlite3"
-    dataTablesAdditions['tableMetadata']['file'] = os.path.basename(dbfile)
+    #dataTablesAdditions['sqldb'] = os.path.basename(dbfile)
+    dataTablesAdditions['tableMetadata']['tableType'] = "sqlite3"
+    dataTablesAdditions['tableMetadata']['tableFile'] = os.path.basename(dbfile)
 
   if "jsondb" in config:
     dbfile = config["jsondb"]["body"]
-    dataTablesAdditions['jsondb'] = os.path.basename(dbfile)
-    dataTablesAdditions['tableMetadata']['type'] = "json"
-    dataTablesAdditions['tableMetadata']['file'] = os.path.basename(dbfile)
+    #dataTablesAdditions['jsondb'] = os.path.basename(dbfile)
+    dataTablesAdditions['tableMetadata']['tableType'] = "json"
+    dataTablesAdditions['tableMetadata']['tableFile'] = os.path.basename(dbfile)
 
   if dataTablesAdditions['tableMetadata'].get('creationDate', None) is None:
     try:
@@ -561,36 +650,10 @@ def _error(emsg, err, update):
   if update:
     logger.error(f"{emsg}.")
     return emsg
-  logger.error(f"{emsg}: {err}. Exiting.")
+  if err:
+    err = f"{err}. "
+  logger.error(f"{emsg}: {err}Exiting.")
   exit(1)
-
-
-def _convert_relative_paths(configs, base_path):
-
-  def check_path(path_rel, path_abs):
-    if not os.path.exists(path_abs):
-      emsg = f"Converted relative path '{path_rel}' to absolute path using"
-      emsg += f"base path = '{base_path}' giving '{path_abs}', but file does not exist."
-      logger.error(emsg)
-      raise FileNotFoundError(emsg)
-
-  for config in configs:
-    for path in ['sqldb', 'jsondb', 'dataTablesAdditions', 'config']:
-      if path in config:
-        if isinstance(config[path], str):
-          if not os.path.isabs(config[path]):
-            path_rel = config[path]
-            config[path] = os.path.join(base_path, config[path])
-            config[path] = os.path.normpath(config[path])
-            check_path(path_rel, config[path])
-
-        if isinstance(config[path], list):
-          for i, p in enumerate(config[path]):
-            if not os.path.isabs(p):
-              path_rel = config[path]
-              config[path][i] = os.path.join(base_path, p)
-              config[path][i] = os.path.normpath(config[path][i])
-              check_path(path_rel, config[path])
 
 
 def _data_transform(data, column_names, verbose):
@@ -623,6 +686,7 @@ def _column_names(config, update=False):
       return _error(emsg, e, update)
 
     set_config_columns(config['column_names'])
+
     return None
 
   n_rows = len(config['jsondb']['data'][0])

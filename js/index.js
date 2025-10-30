@@ -23,9 +23,7 @@ async function init (firstLoad) {
   createRelatedTablesDropdown(config)
 
   // Uses renderTableMetadata() if defined in render.js
-  if (window.renderTableMetadata) {
-    $('#tableMetadata').html(window.renderTableMetadata(config))
-  }
+  $('#tableMetadata').html(renderTableMetadata(config))
 
   $('title').text(config.dataTablesAdditions.tableMetadata.tableName)
 
@@ -283,9 +281,8 @@ async function getConfig () {
         config.dataTables.searchCols.push(null)
       }
 
-      // Uses renderColumn() if defined in render.js
-      if (window.renderColumn || null) {
-        const render = window.renderColumn(columns[i].name, config)
+      if (window.renderFunctions) {
+        const render = renderColumn(columns[i].name, config, window.renderFunctions)
         if (render) {
           columns[i].render = render
         }
@@ -376,6 +373,74 @@ async function getConfig () {
     $(`${tableID}_processing`).hide()
     $('#error').html(emsg + '. See console for details.').show()
   }
+}
+
+function renderColumn (columnName, config, renderFunctions) {
+  const columnOptionsArray = config.dataTablesAdditions.columnOptions || null
+  if (!columnOptionsArray) return null
+
+  // Create a map from column name to index
+  const columnOptions = {}
+  for (let i = 0; i < columnOptionsArray.length; i++) {
+    columnOptions[columnOptionsArray[i].name] = columnOptionsArray[i]
+  }
+
+  let functionName = columnOptions[columnName]?.render
+
+  if (typeof functionName === 'string') {
+    return renderFunctions[functionName](columnName, config)
+  } else if (typeof functionName === 'object') {
+    functionName = functionName.function
+    const args = columnOptions[columnName].render?.args || []
+    return renderFunctions[functionName](columnName, config, ...args)
+  }
+}
+
+function renderTableMetadata (config) {
+  console.log('renderTableMetadata(): config:')
+
+  if (!config.dataTablesAdditions.tableMetadata) return ''
+
+  let description = config.dataTablesAdditions.tableMetadata.description || ''
+  if (description) {
+    description = `<p>${description}<p>`
+  }
+  const descriptionPlus = config.dataTablesAdditions.tableMetadata['description+'] || ''
+  if (descriptionPlus) {
+    description += `<p>${descriptionPlus}<p>`
+  }
+
+  let tableName = config.dataTablesAdditions.tableMetadata.tableName || ''
+  if (tableName) {
+    tableName = ` <code>${tableName}</code>`
+  }
+
+  let creationDate = config.dataTablesAdditions.tableMetadata.creationDate || ''
+  if (creationDate) {
+    creationDate = ` | Created ${creationDate}.`
+  }
+
+  // const base = window.location.origin + window.location.pathname.replace(/\/$/, '')
+  let txt = ` Table${tableName}: `
+  txt += '<a href="config" title="config" target="_blank">config</a>'
+
+  const type = config.dataTablesAdditions.tableMetadata.tableType
+  const title = config.dataTablesAdditions.tableMetadata.tableFile
+  let href
+  if (type.startsWith('sql')) {
+    href = 'sqldb'
+  }
+  if (type === 'json') {
+    href = 'jsondb'
+  }
+  if (href) {
+    txt += ` | <a href="${href}" title="${title}" target="_blank">data</a>`
+  }
+
+  txt += creationDate
+  txt += description
+
+  return txt
 }
 
 function createRelatedTablesDropdown (config) {
