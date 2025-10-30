@@ -422,6 +422,8 @@ def _config_resolve(config, path=None, update=True):
   else:
     base_path = os.getcwd()
     configs = copy.deepcopy(config)
+    if not isinstance(configs, list):
+      configs = [configs]
 
   # Endpoint paths
   paths, eobj = _paths(configs, update=update)

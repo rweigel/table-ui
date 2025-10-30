@@ -56,7 +56,7 @@ def _run_tests(port, config, head_data, body_data):
   base = f"http://127.0.0.1:{port}"
   url = f"{base}/config"
 
-  _wait_for_server(url, retries=50, delay=0.2)
+  _wait_for_server(url, retries=50, delay=0.5)
 
 
   _log_test_title(url)
