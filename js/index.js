@@ -281,8 +281,8 @@ async function getConfig () {
         config.dataTables.searchCols.push(null)
       }
 
-      if (window.renderFunctions) {
-        const render = renderColumn(columns[i].name, config, window.renderFunctions)
+      if (renderFunctions) {
+        const render = renderColumn(columns[i].name, config, renderFunctions)
         if (render) {
           columns[i].render = render
         }
@@ -376,6 +376,7 @@ async function getConfig () {
 }
 
 function renderColumn (columnName, config, renderFunctions) {
+  //const columnRenderAll = config.dataTablesAdditions.columnRender || null
   const columnOptionsArray = config.dataTablesAdditions.columnOptions || null
   if (!columnOptionsArray) return null
 
