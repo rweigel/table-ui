@@ -144,7 +144,6 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
 
     if mode == 'rows':
       logger.debug(f"  {len(row)} columns in row {len(table)}")
-      n_cols_last = len(row)
       table.append(row)
 
   if mode == 'attributes':

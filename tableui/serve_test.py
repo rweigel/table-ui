@@ -1,5 +1,5 @@
 # Usage:
-#   python -m tableui.serve_test
+#   python server_test.py
 import os
 import time
 import json
@@ -57,7 +57,6 @@ def _run_tests(port, config, head_data, body_data):
   url = f"{base}/config"
 
   _wait_for_server(url, retries=50, delay=0.5)
-
 
   _log_test_title(url)
   response = requests.get(url)

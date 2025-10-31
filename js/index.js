@@ -25,7 +25,7 @@ async function init (firstLoad) {
   // Uses renderTableMetadata() if defined in render.js
   $('#tableMetadata').html(renderTableMetadata(config))
 
-  $('title').text(config.dataTablesAdditions.tableMetadata.tableName)
+  $('title').text(config.dataTablesAdditions.tableMetadata.tableTitle)
 
   // Add header names to table. Two rows are added. The first row is for
   // name and sorting, second row is for filtering. Need to add before
@@ -456,7 +456,7 @@ function createRelatedTablesDropdown (config) {
     basePath = basePath.replace(/\/+$/, '')
     basePath = window.location.origin + basePath
     for (const rt of relatedTables) {
-      options.push(`<option value="${basePath}/${rt.path}/">${rt.name}</option>`)
+      options.push(`<option value="${basePath}/${rt.path}/">${rt.title}</option>`)
     }
     // Determine selected option based on current path
     for (let i = 0; i < relatedTables.length; i++) {

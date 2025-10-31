@@ -35,7 +35,7 @@ def serve(config=CONFIG_DEFAULT, host="0.0.0.0", port=5001, debug=False):
   uvicorn.run(app, **runconfig)
 
 
-def _api_init(app, config, path=None, paths=[]):
+def _api_init(app, config, path=None, related_paths=[]):
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles
@@ -57,12 +57,13 @@ def _api_init(app, config, path=None, paths=[]):
     parameters[parameter] = val
 
   if path is None:
-    paths, _ = _paths(config)
-    if len(paths) == 0:
+    path_list, _ = _paths(config)
+    related_paths, _ = _related_paths(config, path_list)
+    if len(path_list) == 0:
       _api_init(app, config, path="")
     else:
-      for path in paths:
-        _api_init(app, config, path=path, paths=paths)
+      for path in path_list:
+        _api_init(app, config, path=path, related_paths=related_paths)
     return
 
   logger.info(f"Initalizing API with base path = '{path}'")
@@ -79,17 +80,21 @@ def _api_init(app, config, path=None, paths=[]):
     directory = os.path.join(ROOT_DIR, dir)
     app.mount(f"{path}/{dir}/", StaticFiles(directory=directory))
 
-  if len(paths) > 1 and "" not in paths:
-    # If more than one path and no root path, redirect root to first path
-    logger.info(f"Initalizing endpoint {path}/")
-    @app.route("/", methods=["GET", "HEAD"])
-    def rootredirect(request: fastapi.Request):
-      target = paths[0]
-      if not target.startswith('/'):
-        target = f"/{target}"
-      url = f"{target}/"
-      logger.info(f"Redirecting '/' to '{url}'")
-      return fastapi.responses.RedirectResponse(url, status_code=302)
+  if len(related_paths) > 1:
+    path_list = []
+    for related_path in related_paths:
+      path_list.append(related_path['path'])
+    if "" not in path_list:
+      # If more than one path and no root path, redirect root to first path
+      logger.info(f"Initalizing endpoint {path}/")
+      @app.route("/", methods=["GET", "HEAD"])
+      def rootredirect(request: fastapi.Request):
+        target = path_list[0]
+        if not target.startswith('/'):
+          target = f"/{target}"
+        url = f"{target}/"
+        logger.info(f"Redirecting '/' to '{url}'")
+        return fastapi.responses.RedirectResponse(url, status_code=302)
 
   logger.info(f"Initalizing endpoint {path}/")
   @app.route(f"{path}/", methods=["GET", "HEAD"])
@@ -155,6 +160,14 @@ def _api_init(app, config, path=None, paths=[]):
     if err is not None:
       content = {"error": err}
       return fastapi.responses.JSONResponse(content=content, status_code=500)
+
+    related_paths, err = _related_paths(config, path_list, update=True)
+    if err is not None:
+      content = {"error": err}
+      return fastapi.responses.JSONResponse(content=content, status_code=500)
+
+    if len(related_paths) > 1:
+      config_r['dataTablesAdditions']['relatedTables'] = related_paths
 
     content = {
       "dataTables": config_r['dataTables'],
@@ -378,7 +391,7 @@ def _dir_resolve(config, base_path, update=False):
         return eobj
 
 
-def _config_read(config_file, update=True):
+def _config_read(config_file, update=False):
   with open(config_file) as f:
     logger.info(f"Reading: {config_file}")
     try:
@@ -391,7 +404,7 @@ def _config_read(config_file, update=True):
       return None, _error(emsg, e, update)
 
 
-def _paths(configs, update=True):
+def _paths(configs, update=False):
   if isinstance(configs, str):
      configs, eobj = _config_read(configs, update=update)
      if eobj is not None:
@@ -409,8 +422,22 @@ def _paths(configs, update=True):
 
   return paths, None
 
+def _related_paths(config, path_list, update=False):
+  related_paths = []
+  for path in path_list:
+    config_r, eobj = _config_resolve(config, path=path)
+    if eobj is not None:
+      return None, eobj
+    # Server restart required to update related_paths
+    related_path = {
+      'path': path,
+      'name': config_r['dataTablesAdditions']['tableMetadata']['tableName'],
+      'title': config_r['dataTablesAdditions']['tableMetadata']['tableTitle']
+    }
+    related_paths.append(related_path)
+  return related_paths, None
 
-def _config_resolve(config, path=None, update=True):
+def _config_resolve(config, path=None, update=False):
 
   if isinstance(config, str):
     base_path = os.path.abspath(os.path.dirname(config))
@@ -558,15 +585,6 @@ def _dataTablesAdditions(config, update=False):
       emsg = f"File not found: {dataTablesAdditions['renderFunctions']}"
       return _error(emsg, "", update)
 
-  if 'paths' in config:
-    relatedTables = []
-    for path in config['paths']:
-      relatedTables.append({
-        "name": config['table_name'],
-        "path": path
-      })
-    dataTablesAdditions['relatedTables'] = relatedTables
-
   # Merge table_meta from config and dataTablesAdditions
   table_meta = copy.deepcopy(config.get('table_meta', None))
   if table_meta is not None:
@@ -578,15 +596,9 @@ def _dataTablesAdditions(config, update=False):
   if dataTablesAdditions.get('tableMetadata', None) is None:
     dataTablesAdditions['tableMetadata'] = {}
 
-  if 'tableName' not in dataTablesAdditions['tableMetadata']:
-    dataTablesAdditions['tableMetadata']['tableName'] = config['table_name']
-  else:
-    if dataTablesAdditions['tableMetadata']['tableName'] != config['table_name']:
-      dataTablesAdditions['tableMetadata']['tableName'] = config['table_name']
-      if not update:
-        wmsg = "tableMetadata.tableName does not match config.table_name. "
-        wmsg += f"Overriding to config.table_name = {config['table_name']}"
-        logger.warning(wmsg)
+  dataTablesAdditions['tableMetadata']['tableName'] = config['table_name']
+  if dataTablesAdditions['tableMetadata'].get('tableTitle', None) is None:
+    dataTablesAdditions['tableMetadata']['tableTitle'] = config['table_name']
 
   if "sqldb" in config:
     dbfile = config["sqldb"]
