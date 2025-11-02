@@ -34,7 +34,9 @@ renderFunctions.bold = function (columnName, config) {
     if (type !== 'display') {
       return columnString
     }
-
+    if (!columnString) {
+      return columnString
+    }
     return `<span style="font-weight:bold">${columnString}</span>`
   }
 }

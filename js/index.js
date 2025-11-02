@@ -3,15 +3,6 @@ console.log('Document ready. Calling init()')
 $(document).ready(() => init(true))
 
 async function init (firstLoad) {
-  if (DataTable.isDataTable(tableID)) {
-    let msg = `init() => isDataTable('${tableID}') is true. Destroying `
-    msg += 'existing table before re-creating it.'
-    console.log(msg)
-    const state = $(tableID).DataTable().state()
-    console.log('init() => Current DataTable state:', state)
-    destroy()
-  }
-
   const config = await getConfig()
 
   if (firstLoad) {
@@ -82,11 +73,57 @@ async function init (firstLoad) {
   console.log(`DataTable() returned: ${table}`)
 }
 
+function reInit () {
+  if (true) {
+    // Alternative to destroy() + init()
+    if (!getQueryValue('_cols_show')) {
+      setQueryValue('_cols_show', 'all')
+    }
+    window.location.reload(true)
+    return
+  }
+
+  destroy()
+  init()
+
+  function destroy () {
+    console.log('destroy() => Called.')
+    if (window.DataTable.isDataTable(tableID)) {
+      let msg = `destroy() => isDataTable('${tableID}') is true. Destroying `
+      msg += 'existing table before re-creating it.'
+      console.log(msg)
+      const state = $(tableID).DataTable().state()
+      console.log('destroy() => Current DataTable state:', state)
+    } else {
+      let msg = `destroy() => isDataTable('${tableID}') is false. `
+      msg += 'No existing table to destroy.'
+      console.log(msg)
+    }
+
+    const tableWrapper = $(tableID + '_wrapper')
+    if (tableWrapper.length > 0) {
+      console.log(`destroy() => Destroying table ${tableID}`)
+      $('#error').empty()
+      $('#tableMetadata').empty()
+      $(`${tableID}_length`).remove()
+      // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
+      $(tableID).DataTable().state.clear()
+      $(tableID).DataTable().destroy()
+      tableWrapper.remove()
+      $(tableID).empty()
+      // Remove event handlers added to table, document, and window
+      // This causes fixedHeader to no longer be triggered on scroll.
+      //$(tableID).off()
+      //$(document).off()
+      //$(window).off()
+    } else {
+      console.log(`destroy() => No table ${tableID} to destroy.`)
+    }
+  }
+}
+
 function dtInitComplete () {
   console.log('dtInitComplete() => DOM is ready.')
-
-  fixStickyHeader(101)
-
   const table = $(tableID).dataTable()
   if (getQueryValue('_cols_show') === 'nonempty') {
     let msg = 'dtInitComplete() => Setting hideEmptyColumns '
@@ -106,6 +143,10 @@ function dtInitComplete () {
   // widths of columns to be recalculated based on content added in call
   // to createColumnConstraints().
   createColumnConstraints()
+
+  // Timeout needed here because createColumnConstraints() adds elements to DOM
+  // with async call. Need to modify so createColumnConstraints takes a callback.
+  setTimeout(() => fixedColumns(101), 1)
 
   adjustDOM()
 
@@ -137,11 +178,17 @@ async function getConfig () {
   return config
 
   function updateConfig (config) {
-    if (config.dataTables.fixedHeader === true) {
-      //const wmsg = 'updateConfig() => fixedHeader=true not implemented. Setting to false.'
-      //console.warn(wmsg)
-      //config.dataTables.fixedHeader = false
+    config.dataTablesAdditions = config.dataTablesAdditions || {}
+
+    if (config.dataTables.fixedColumns !== undefined) {
+      // fixedColumns does not work in DataTables 1.14, so remove from config.
+      // If fixedColumns was true, it will be handled in fixedColumns().
+      if (config.dataTablesAdditions.fixedColumns === undefined) {
+        config.dataTablesAdditions.fixedColumns = config.dataTables.fixedColumns
+      }
+      delete config.dataTables.fixedColumns
     }
+
     // Update entries in config.dataTables.columns as needed.
     _columns(config)
 
@@ -267,7 +314,6 @@ async function getConfig () {
 
     let columnOptions = config.dataTablesAdditions.columnOptions || {}
     columnOptions = array2object(columnOptions, 'name')
-    console.log(columnOptions)
     const qs = parseQueryString()
     config.dataTables.searchCols = []
     const columns = config.dataTables.columns
@@ -766,8 +812,8 @@ function clearAllSearches () {
       delete qs[key]
     }
   }
-  location.hash = decodeURIComponent($.param(qs))
-  init()
+  window.location.hash = decodeURIComponent($.param(qs))
+  reInit()
 }
 
 function setEvents () {
@@ -789,7 +835,7 @@ function setEvents () {
   $(tableID).off('search.dt').off('search.dt')
   $(tableID).on('search.dt', function (event) {
     console.log('setEvents() => search.dt triggered')
-    updateQueryString('_page', null)
+    setQueryValue('_page', null)
     $(tableID).DataTable().page(0)
     setQueryStringFromSearch()
   })
@@ -803,9 +849,9 @@ function setEvents () {
     const info = $(tableID).DataTable().page.info()
     $('#pageInfo').html('Showing page: ' + info.page + ' of ' + info.pages)
     if (info.page > 0) {
-      updateQueryString('_page', info.page + 1)
+      setQueryValue('_page', info.page + 1)
     } else {
-      updateQueryString('_page', null)
+      setQueryValue('_page', null)
     }
     pageChanged = true
   })
@@ -813,7 +859,7 @@ function setEvents () {
   console.log('setEvents() => Setting length.dt.')
   $(tableID).off('length.dt').on('length.dt', function (e, settings, len) {
     console.log('setEvents() => length.dt triggered')
-    updateQueryString('_length', len)
+    setQueryValue('_length', len)
   })
 
   console.log('setEvents() => Setting preDraw.dt.')
@@ -822,7 +868,7 @@ function setEvents () {
   })
 
   console.log('setEvents() => Setting draw.dt and triggering it.')
-  let _emptyColumns = emptyColumns()
+  const _emptyColumns = emptyColumns(true)
   $(tableID)
     .off('draw.dt')
     .on('draw.dt', function () {
@@ -836,15 +882,14 @@ function setEvents () {
         const msg = `${msgo}Page was changed and _cols_show=nonempty. `
         console.log(`${msg}Checking for change in number of empty columns.`)
         pageChanged = false
-        const _emptyColumnsNow = emptyColumns()
+        const _emptyColumnsNow = emptyColumns(true)
         if (_emptyColumns.length === _emptyColumnsNow.length) {
           const msg = `${msgo} Number of empty columns has not changed. Not `
           console.log(`${msg}updating column visibility.`)
           return
         }
         console.log(`${msgo} # of empty columns has changed. Calling init().`)
-        _emptyColumns = _emptyColumnsNow
-        init()
+        reInit()
       }
     })
 
@@ -853,13 +898,12 @@ function setEvents () {
   $('#hideEmptyColumns').click(function () {
     if ($(this).is(':checked')) {
       console.log('setEvents() => #hideEmptyColumns clicked to checked.')
-      updateQueryString('_cols_show', 'nonempty')
-      init()
+      setQueryValue('_cols_show', 'nonempty')
     } else {
       console.log('setEvents() => #hideEmptyColumns clicked to unchecked.')
-      updateQueryString('_cols_show', null)
-      init()
+      setQueryValue('_cols_show', null)
     }
+    reInit()
   })
 }
 
@@ -941,7 +985,7 @@ function adjustDOM () {
       if (parseInt(_page) > info.pages) {
         msg += `Setting _page to ${info.pages}`
         console.log(`${msg} and drawing page ${info.pages - 1}.`)
-        updateQueryString('_page', info.pages)
+        setQueryValue('_page', info.pages)
         $(tableID).DataTable().page(info.pages - 1).draw('page')
       }
     }
@@ -1042,36 +1086,25 @@ function emptyColumns (indices) {
   return columnEmpty
 }
 
-function destroy () {
-  console.log('destroy() => Called.')
-
-  const tableWrapper = $(tableID + '_wrapper')
-  if (tableWrapper.length > 0) {
-    console.log(`destroy() => Destroying table ${tableID}`)
-    $('#error').empty()
-    $('#tableMetadata').empty()
-    $(`${tableID}_length`).remove()
-    // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
-    $(tableID).DataTable().state.clear()
-    $(tableID).DataTable().destroy()
-    tableWrapper.remove()
-    $(tableID).empty()
-    // Remove event handlers added to table, document, and window
-    $(tableID).off()
-    $(document).off()
-    $(window).off()
-  } else {
-    console.log(`destroy() => No table ${tableID} to destroy.`)
+function fixedColumns (index) {
+  const config = getConfig.config.dataTablesAdditions
+  if (config.fixedColumns === undefined || config.fixedColumns === false) {
+    return
   }
-}
+  let nFixed = 1
+  if (config.fixedColumns !== true) {
+    nFixed = config.fixedColumns
+  }
+  if (nFixed > 2) {
+    console.warn('fixedColumns() => fixedColumns > 2 not supported.')
+  }
 
-function fixStickyHeader (index) {
   if (!index) {
     index = 10
   }
   const parent = `${tableID}_wrapper div.dataTables_scrollHead`
-  // Address a bug in DataTables v1 where duplicate header
-  // cells appear temporarily during transition to sticky header.
+
+  // First column in header
   $(`${parent} thead tr:eq(0) > th:eq(0)`)
     .css('position', 'sticky')
     .css('left', '0px')
@@ -1081,6 +1114,37 @@ function fixStickyHeader (index) {
     .css('position', 'sticky')
     .css('left', '0px')
     .css('z-index', index)
+    .css('background-color', 'white')
+  // First column in body
+  $(`${tableID} tbody tr td:nth-child(1)`)
+    .css('position', 'sticky')
+    .css('left', '0px')
+    .css('z-index', index - 1)
+    .css('background-color', 'white')
+
+  if (nFixed === 1) {
+    return
+  }
+
+  // Second column in header
+  const firstColWidth = $(`${parent} thead tr:eq(0) > th:eq(0)`).outerWidth()
+  $(`${parent} thead tr:eq(0) > th:eq(1)`)
+    .css('position', 'sticky')
+    .css('left', `${firstColWidth}px`)
+    .css('z-index', index)
+    .css('background-color', 'white')
+  $(`${parent} thead tr:eq(1) > th:eq(1)`)
+    .css('position', 'sticky')
+    .css('left', `${firstColWidth}px`)
+    .css('z-index', index)
+    .css('background-color', 'white')
+
+
+  // Second column in body
+  $(`${tableID} tbody tr td:nth-child(2)`)
+    .css('position', 'sticky')
+    .css('left', `${firstColWidth}px`)
+    .css('z-index', index - 1)
     .css('background-color', 'white')
 }
 
@@ -1099,7 +1163,8 @@ function watchForFloatingHeader () {
           if ($(node).hasClass('dtfh-floatingparent')) {
             msg = 'watchForFloatingHeader() => dtfh-floatingparent '
             console.log(`${msg}was added.`)
-            fixStickyHeader(1)
+            fixedColumns(1)
+            // Timeout needed to allow sub-elements to be added in DOM.
             setTimeout(() => { createColumnConstraints() }, 1)
           }
         })
@@ -1131,7 +1196,8 @@ function parseQueryString (hash) {
 }
 
 function setDefaultQueryString (hash) {
-  if (hash) {
+  const currentHash = window.location.hash.replace('#', '')
+  if (hash && !currentHash) {
     const qs = parseQueryString()
     const qsDefault = parseQueryString(hash)
     for (const [key, val] of Object.entries(qsDefault)) {
@@ -1139,7 +1205,7 @@ function setDefaultQueryString (hash) {
         let msg = 'init() => Setting query string parameter '
         msg += `${key} = ${val} from defaultHash: `
         console.log(msg)
-        updateQueryString(key, val)
+        setQueryValue(key, val)
       }
     }
   }
@@ -1153,8 +1219,36 @@ function getQueryValue (name, defaultValue) {
   return qs[name]
 }
 
+function setQueryValue (name, val) {
+  console.log(`setQueryValue() called with name='${name}' and val='${val}'`)
+  const qs = parseQueryString()
+  if (val === null) {
+    console.log(`setQueryValue() => Removing ${name} from query string.`)
+    delete qs[name]
+  } else {
+    qs[name] = val
+  }
+
+  // Put _ parameters at end of query string
+  const sortedKeys = Object.keys(qs).sort((a, b) => {
+    if (a.startsWith('_')) return 1
+    return -1
+  })
+
+  const sortedQs = {}
+  for (const key of sortedKeys) {
+    sortedQs[key] = qs[key]
+  }
+  window.location.hash = decodeURIComponent($.param(sortedQs))
+}
+
 function checkQueryString (config) {
   console.log('checkQueryString() => Checking query string for invalid column names.')
+
+  const _colsShow = getQueryValue('_cols_show')
+  if (_colsShow && _colsShow === 'all') {
+    setQueryValue('_cols_show', null)
+  }
 
   const qs = parseQueryString()
   console.log('checkQueryString() => Query string:')
@@ -1180,7 +1274,7 @@ function checkQueryString (config) {
         amsg += 'Removing it from query string and any other invalid column names.'
         alert(amsg)
       }
-      updateQueryString(key, null)
+      setQueryValue(key, null)
     }
   }
 
@@ -1214,7 +1308,7 @@ function checkQueryString (config) {
     console.log('checkQueryString() => Updating query string to remove invalid column names.')
     _cols = columnNames.filter(Boolean) // Remove any null/undefined values
     console.log(_cols)
-    updateQueryString('_cols', _cols.join(','))
+    setQueryValue('_cols', _cols.join(','))
   }
 }
 
@@ -1247,7 +1341,7 @@ function setQueryStringFromSearch () {
       msg = 'setQueryStringFromSearch() => Updating query string with '
       msg += `search value for column '${name}' = '${searchValue}'.`
       console.log(msg)
-      updateQueryString(name, searchValue)
+      setQueryValue(name, searchValue)
     } else {
       // console.log(`No search value for column '${name}'.`);
       $(input).css('background-color', '')
@@ -1255,7 +1349,7 @@ function setQueryStringFromSearch () {
       if (qs[name]) {
         const msg = `setQueryStringFromSearch() => Found ${name} in `
         console.log(`${msg}query string. Removing it from query string.`)
-        updateQueryString(name, null)
+        setQueryValue(name, null)
       }
     }
     const qs = parseQueryString()
@@ -1269,29 +1363,6 @@ function setQueryStringFromSearch () {
       $('#clearAllSearches').hide()
     }
   }
-}
-
-function updateQueryString (name, val) {
-  console.log(`updateQueryString() called with name='${name}' and val='${val}'`)
-  const qs = parseQueryString()
-  if (val === null) {
-    console.log(`updateQueryString() => Removing ${name} from query string.`)
-    delete qs[name]
-  } else {
-    qs[name] = val
-  }
-
-  // Put _ parameters at end of query string
-  const sortedKeys = Object.keys(qs).sort((a, b) => {
-    if (a.startsWith('_')) return 1
-    return -1
-  })
-
-  const sortedQs = {}
-  for (const key of sortedKeys) {
-    sortedQs[key] = qs[key]
-  }
-  location.hash = decodeURIComponent($.param(sortedQs))
 }
 
 function array2object (arr, key) {
