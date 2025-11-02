@@ -5,20 +5,31 @@
     "jsondb": {
       "body": "../demo/demo.body.json"
     },
-    "config": "default.json",
-    "tableUI": {
-      "columnDropdowns": false
+    "dataTables": "default.json",
+    "dataTablesAdditions": {
+      "defaultQueryString": "_cols_show=nonempty",
+      "renderFunctions": "render.js",
+      "tableMetadata": {
+        "tableTitle": "Demo Table",
+        "description+": "description+ means append this to default description."
+      }
     }
   },
   {
     "path": "demo2",
     "table_name": "demo2",
     "jsondb": {
-      "body": "../demo/demo.body.json"
+      "body": "../demo/demo.body.json",
+      "header": "../demo/demo.head.json"
     },
-    "config": "default.json",
-    "tableUI": {
-      "columnDropdowns": false
+    "dataTables": "default.json",
+    "dataTablesAdditions": {
+      "defaultQueryString": "_cols_show=nonempty",
+      "renderFunctions": "render.js",
+      "tableMetadata": {
+        "tableTitle": "Demo Table",
+        "description+": "description+ means append this to default description."
+      }
     }
   }
 ]

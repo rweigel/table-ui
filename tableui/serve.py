@@ -80,8 +80,8 @@ def _api_init(app, config, path=None, related_paths=[]):
     directory = os.path.join(ROOT_DIR, dir)
     app.mount(f"{path}/{dir}/", StaticFiles(directory=directory))
 
+  path_list = []
   if len(related_paths) > 1:
-    path_list = []
     for related_path in related_paths:
       path_list.append(related_path['path'])
     if "" not in path_list:

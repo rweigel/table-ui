@@ -9,7 +9,7 @@ async function init (firstLoad) {
     console.log(msg)
     const state = $(tableID).DataTable().state()
     console.log('init() => Current DataTable state:', state)
-    destroy(tableID)
+    destroy()
   }
 
   const config = await getConfig()
@@ -94,20 +94,20 @@ function dtInitComplete () {
     console.log(msg)
     $('#hideEmptyColumns').prop('checked', true)
     console.log('dtInitComplete() => Hiding empty columns.')
-    const columnEmpty = emptyColumns(tableID, true)
+    const columnEmpty = emptyColumns(true)
     table.api().columns(columnEmpty).visible(false, false)
   } else {
     console.log('dtInitComplete() => Showing all columns.')
   }
 
-  setEvents(tableID)
+  setEvents()
 
   // Must be before adjustDOM() b/c calls $(window).resize(), which triggers
   // widths of columns to be recalculated based on content added in call
   // to createColumnConstraints().
-  createColumnConstraints(tableID)
+  createColumnConstraints()
 
-  adjustDOM(tableID)
+  adjustDOM()
 
   watchForFloatingHeader()
 
@@ -137,6 +137,11 @@ async function getConfig () {
   return config
 
   function updateConfig (config) {
+    if (config.dataTables.fixedHeader === true) {
+      //const wmsg = 'updateConfig() => fixedHeader=true not implemented. Setting to false.'
+      //console.warn(wmsg)
+      //config.dataTables.fixedHeader = false
+    }
     // Update entries in config.dataTables.columns as needed.
     _columns(config)
 
@@ -260,6 +265,9 @@ async function getConfig () {
       _cols = []
     }
 
+    let columnOptions = config.dataTablesAdditions.columnOptions || {}
+    columnOptions = array2object(columnOptions, 'name')
+    console.log(columnOptions)
     const qs = parseQueryString()
     config.dataTables.searchCols = []
     const columns = config.dataTables.columns
@@ -271,7 +279,13 @@ async function getConfig () {
 
       const visible = allVisible || _cols.includes(columns[i].name)
       if ([null, undefined].includes(columns[i].visible)) {
+        // Override visibility if not set in dataTables.columns
         columns[i].visible = visible
+      }
+      const hidden = (columnOptions[columns[i].name] &&
+                      columnOptions[columns[i].name].visible === false)
+      if (hidden) {
+        columns[i].visible = false
       }
 
       // Set initial search values from query string
@@ -281,7 +295,9 @@ async function getConfig () {
         config.dataTables.searchCols.push(null)
       }
 
-      if (renderFunctions) {
+      const columnRenderAll = config.dataTablesAdditions.columnRender || null
+
+      if (renderFunctions || columnRenderAll) {
         const render = renderColumn(columns[i].name, config, renderFunctions)
         if (render) {
           columns[i].render = render
@@ -376,24 +392,34 @@ async function getConfig () {
 }
 
 function renderColumn (columnName, config, renderFunctions) {
-  //const columnRenderAll = config.dataTablesAdditions.columnRender || null
-  const columnOptionsArray = config.dataTablesAdditions.columnOptions || null
-  if (!columnOptionsArray) return null
+  // Get column-specific render function if defined.
+  // config.dataTablesAdditions.columnOptions is an array of objects with
+  // an optional 'render' property. If defined, it takes precedence over
+  // the config.dataTablesAdditions.columnRender property, which is used for all
+  // columns.
+  let columnOptions = config.dataTablesAdditions.columnOptions || null
+  if (!columnOptions) return null
 
-  // Create a map from column name to index
-  const columnOptions = {}
-  for (let i = 0; i < columnOptionsArray.length; i++) {
-    columnOptions[columnOptionsArray[i].name] = columnOptionsArray[i]
+  columnOptions = array2object(columnOptions, 'name')
+  let functionName = columnOptions[columnName]?.render
+  if (functionName) {
+    return extractFunction(functionName, renderFunctions, columnName, config)
+  }
+  functionName = config.dataTablesAdditions.columnRender
+  if (functionName) {
+    return extractFunction(functionName, renderFunctions, columnName, config)
   }
 
-  let functionName = columnOptions[columnName]?.render
-
-  if (typeof functionName === 'string') {
-    return renderFunctions[functionName](columnName, config)
-  } else if (typeof functionName === 'object') {
-    functionName = functionName.function
-    const args = columnOptions[columnName].render?.args || []
-    return renderFunctions[functionName](columnName, config, ...args)
+  function extractFunction (functionName, renderFunctions, columnName, config) {
+    if (typeof functionName === 'string') {
+      return renderFunctions[functionName](columnName, config)
+    } else if (typeof functionName === 'object') {
+      const name = functionName.function
+      const args = functionName.args || []
+      return renderFunctions[name](columnName, config, ...args)
+    } else {
+      console.error(`renderColumn() => Unknown render function type: ${functionName}`)
+    }
   }
 }
 
@@ -471,7 +497,6 @@ function createRelatedTablesDropdown (config) {
       }
     }
     $('#relatedTablesSelect').on('change', function () {
-      const lastSelected = $('#relatedTablesSelect').attr('lastSelected')
       $('#relatedTablesSelect').attr('lastSelected', $(this).val())
       const url = $(this).val()
       if (url) window.location = $(this).val()
@@ -479,7 +504,7 @@ function createRelatedTablesDropdown (config) {
   }
 }
 
-function createColumnConstraints (tableID, which) {
+function createColumnConstraints (which) {
   const msg = 'createColumnConstraints() => Setting dropdowns and search inputs'
   console.log(msg)
 
@@ -496,13 +521,12 @@ function createColumnConstraints (tableID, which) {
 
   const table = $(tableID).dataTable()
   const config = getConfig.config
-  let visibleIndex = 0
   let showDropdowns = false
   if (config.dataTablesAdditions.columnDropdowns === true) {
     // Set default to showing dropdowns for all columns
     showDropdowns = true
   } else {
-    // No need to call createColumnDropdown() to create hidden select
+    // No need to call createColumnDropdown() to create hidden dropdown
     // to get spacing correct.
     let noDropdowns = true
     for (const name of Object.keys(columnOptions)) {
@@ -514,10 +538,23 @@ function createColumnConstraints (tableID, which) {
     if (noDropdowns) showDropdowns = null
   }
 
-  table.api().columns(':visible').every(function () {
+  const qsNames = Object.keys(parseQueryString())
+  let visibleIndex = 0
+  table.api().columns().every(function () {
     const column = this
     const index = column.index()
     const name = config.dataTables.columns[index].name
+    if (column.visible() === false) {
+      //const msgo = `createColumnConstraints() => Col '${name}' has visible = false`
+      if (!qsNames.includes(name)) {
+        // console.log(`${msgo} and no search in query string.`)
+        // Do not create constraints for hidden columns unless there
+        // is an initial search value from the query string.
+        return true
+      }
+      //console.log(`${msgo} but search in query string. Showing.`)
+      column.visible(true, false)
+    }
     if (which === 'all' || which === 'input') {
       const searchOnKeypress = config.dataTables.columns[index].return === false
       createColumnInput(parent, visibleIndex, name, column, searchOnKeypress)
@@ -533,12 +570,11 @@ function createColumnConstraints (tableID, which) {
       }
     }
     visibleIndex++
+    return true
   })
 }
 
 function createColumnInput (parent, visibleIndex, name, column, searchOnKeypress) {
-  $('#clearAllSearches').hide()
-
   // Create `input` element
   const element = 'thead tr:eq(0) > th'
   const th = $(`${parent} ${element}`).eq(visibleIndex).empty()
@@ -592,6 +628,8 @@ function createColumnInput (parent, visibleIndex, name, column, searchOnKeypress
     input.val('')
     clearOneSearch.css('visibility', 'hidden')
     input.focus()
+    setQueryStringFromSearch()
+    createColumnConstraints('select')
     column.search('').draw('page')
     const thParent = $(this).closest('th')
     const select = thParent.find('select.columnUniques')
@@ -616,22 +654,22 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
 
   const th = $(`${parent} thead tr:eq(0) > th`).eq(visibleIndex)
 
-  const selectOld = th.find('select.columnUniques')
+  const selectOld = th.find('select.columnUniques').parent()
   selectOld.remove()
 
   const input = th.find('input.columnSearch')
 
   const maxLen = 100
   const width = input.outerWidth()
-  const title = `Most frequent unique values and (count); max of ${maxLen} shown`
+  const title = `List of most frequent unique values and (count); max of ${maxLen} shown`
   const attrs = `class="columnUniques" title="${title}" name="${name}"`
+  // For spacing to be correct, need to place select in DOM even if not shown.
   let select = $(`
     <div style="white-space: nowrap;">
       <select ${attrs} style="width: ${width}px;margin-left:3px"></select>
       <span style="visibility:hidden">✘</span>
     </div>
   `)
-  // let select = $(`<select ${attrs} style="width: ${width}px;"></select>`)
   select.appendTo(th)
 
   if (show === false) {
@@ -650,7 +688,6 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
   searches = new URLSearchParams(searches).toString()
   let url = `data/?${searches}&_return=${encodeURIComponent(name)}`
   url += '&_uniques=true&_length=100'
-
   getOptionHTML(url, setOptionHTML)
 
   function setOptionHTML (html) {
@@ -702,23 +739,27 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
     select.off('change').on('change', function () {
       console.log('createColumnDropdown => select change event triggered.')
       let val = $(this).val().replace(/'/g, "''")
-      if (val === '') {
+      // Get selected option text (strip trailing " (count)" ) and set as input title
+      const selectedText = $(this).find('option:selected').text() || ''
+      if (val === '' && selectedText !== '') {
         console.log('createColumnDropdown => Setting input to empty string.')
-        input.val('')
-        select.parent().find('span.clearOneSearch').css('visibility', 'hidden')
+        input.val("''")
+        select.parent().parent().find('span.clearOneSearch').css('visibility', 'visible')
       } else {
         val = `'${val}'`
         console.log(`createColumnDropdown => Setting input to ${val}.`)
         input.val(val)
-        select.parent().find('span.clearOneSearch').css('visibility', 'visible')
+        select.parent().parent().find('span.clearOneSearch').css('visibility', 'visible')
       }
       console.log("createColumnDropdown => Triggering search and draw('page').")
+      setQueryStringFromSearch()
+      createColumnConstraints('select')
       column.search($(this).val()).draw('page')
     })
   }
 }
 
-function clearAllSearches (tableID) {
+function clearAllSearches () {
   const qs = parseQueryString()
   for (const key in qs) {
     if (!key.startsWith('_')) {
@@ -729,7 +770,7 @@ function clearAllSearches (tableID) {
   init()
 }
 
-function setEvents (tableID) {
+function setEvents () {
   removeEventListener('input', (event) => {
     console.log('Removing input event:', event)
   })
@@ -773,7 +814,6 @@ function setEvents (tableID) {
   $(tableID).off('length.dt').on('length.dt', function (e, settings, len) {
     console.log('setEvents() => length.dt triggered')
     updateQueryString('_length', len)
-    lengthChanged = true
   })
 
   console.log('setEvents() => Setting preDraw.dt.')
@@ -782,21 +822,21 @@ function setEvents (tableID) {
   })
 
   console.log('setEvents() => Setting draw.dt and triggering it.')
-  let _emptyColumns = emptyColumns(tableID)
+  let _emptyColumns = emptyColumns()
   $(tableID)
     .off('draw.dt')
     .on('draw.dt', function () {
       console.log('setEvents() => draw.dt triggered.')
 
       console.log('setEvents() => draw.dt => Calling adjustDOM()')
-      adjustDOM(tableID)
+      adjustDOM()
 
       if (pageChanged && getQueryValue('_cols_show') === 'nonempty') {
         const msgo = 'setEvents() => draw.dt => '
         const msg = `${msgo}Page was changed and _cols_show=nonempty. `
         console.log(`${msg}Checking for change in number of empty columns.`)
         pageChanged = false
-        const _emptyColumnsNow = emptyColumns(tableID)
+        const _emptyColumnsNow = emptyColumns()
         if (_emptyColumns.length === _emptyColumnsNow.length) {
           const msg = `${msgo} Number of empty columns has not changed. Not `
           console.log(`${msg}updating column visibility.`)
@@ -823,7 +863,7 @@ function setEvents (tableID) {
   })
 }
 
-function adjustDOM (tableID) {
+function adjustDOM () {
   console.log('adjustDOM() => called.')
   const tableInfo = `${tableID}_info`
   const tableLength = `${tableID}_length`
@@ -922,6 +962,10 @@ function adjustDOM (tableID) {
 }
 
 function setColumnWidths (columnOptions) {
+  // When autoWidth is true, DataTables sets column widths automatically.
+  // This function overrides those automatic widths based on the
+  // columnOptions.width property for each column.
+  console.log('setColumnWidths() => Called.')
   if (!columnOptions) {
     console.log('setColumnWidths() => No columnOptions provided. Returning.')
     return
@@ -943,25 +987,20 @@ function setColumnWidths (columnOptions) {
     // Why does only the input width need to be set to get correct width?
     // If widths in tbody are set, run into issues when sticky header is shown.
     // Note that widths will be larger if content in column is wider.
+    // .fixedHeader-floating {table-layout: initial !important;} is needed
+    // to override DataTables FixedHeader plugin setting table-layout to 'fixed'
+    // when floating header is shown. This causes change in column widths.
+    console.log(`setColumnWidth() => Setting column ${name} width to ${width}`)
     $('<style>')
       .prop('type', 'text/css')
       .html(`
+        .fixedHeader-floating {
+          table-layout: initial !important;
+        }
+        thead tr th[name="${name}"] {
+          width: ${width} !important;
+        }
         thead tr th[name="${name}"] input {
-          width: ${width} !important;
-        }
-      `)
-      .appendTo('head')
-  }
-
-  function xsetColumnWidth (columnIndex, width) {
-    $('<style>')
-      .prop('type', 'text/css')
-      .html(`
-        thead tr th:nth-child(${columnIndex}),
-        tbody tr td:nth-child(${columnIndex}) {
-          width: ${width} !important;
-        }
-        thead tr th:nth-child(${columnIndex}) input {
           width: ${width} !important;
         }
       `)
@@ -969,7 +1008,7 @@ function setColumnWidths (columnOptions) {
   }
 }
 
-function emptyColumns (tableID, indices) {
+function emptyColumns (indices) {
   const data = $(tableID).DataTable().rows({ page: 'current' }).data().toArray()
   console.log('emptyColumns() => Data for current page:')
   console.log(data)
@@ -1003,7 +1042,7 @@ function emptyColumns (tableID, indices) {
   return columnEmpty
 }
 
-function destroy (tableID) {
+function destroy () {
   console.log('destroy() => Called.')
 
   const tableWrapper = $(tableID + '_wrapper')
@@ -1061,7 +1100,7 @@ function watchForFloatingHeader () {
             msg = 'watchForFloatingHeader() => dtfh-floatingparent '
             console.log(`${msg}was added.`)
             fixStickyHeader(1)
-            setTimeout(() => { createColumnConstraints(tableID) }, 1)
+            setTimeout(() => { createColumnConstraints() }, 1)
           }
         })
       }
@@ -1125,7 +1164,7 @@ function checkQueryString (config) {
   const msg = "checkQueryString() => what = 'keys'. Checking keys but not "
   console.log(`${msg}values in query string.`)
   let alerted = false
-  for (const [key, val] of Object.entries(qs)) {
+  for (const key of Object.keys(qs)) {
     if (key.startsWith('_')) {
       const msg = `checkQueryString() => found state parameter '${key}' in `
       console.log(`${msg}query string. Leaving it.`)
@@ -1223,7 +1262,7 @@ function setQueryStringFromSearch () {
     const numSearchKeys = Object.keys(qs).filter(k => !k.startsWith('_')).length
     const msg = 'setQueryStringFromSearch() => There are '
     if (numSearchKeys > 0) {
-      console.log(`${msg}${numSearchKeys}search keys in the query string. Showing Clear button.`)
+      console.log(`${msg}${numSearchKeys} search keys in the query string. Showing Clear button.`)
       $('#clearAllSearches').show()
     } else {
       console.log(`${msg}no search terms in the query string. Hiding Clear button.`)
