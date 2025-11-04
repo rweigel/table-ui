@@ -104,6 +104,7 @@ function reInit () {
     if (tableWrapper.length > 0) {
       console.log(`destroy() => Destroying table ${tableID}`)
       $('#error').empty()
+      //$('#clearAllSearches').remove()
       $('#tableMetadata').empty()
       $(`${tableID}_length`).remove()
       // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
@@ -137,8 +138,6 @@ function dtInitComplete () {
     console.log('dtInitComplete() => Showing all columns.')
   }
 
-  setEvents()
-
   // Must be before adjustDOM() b/c calls $(window).resize(), which triggers
   // widths of columns to be recalculated based on content added in call
   // to createColumnConstraints().
@@ -149,6 +148,8 @@ function dtInitComplete () {
   setTimeout(() => fixedColumns(101), 1)
 
   adjustDOM()
+
+  setEvents()
 
   watchForFloatingHeader()
 
@@ -399,8 +400,8 @@ async function getConfig () {
     console.log('_ajaxData() => Setting query link in DOM.')
     let url = window.location.pathname + 'data/' + '?'
     url += new URLSearchParams(dtp).toString()
-    $('#query > a').attr('href', url)
-    $('#query').show()
+
+    setQueryLink(url)
 
     return dtp
   }
@@ -742,15 +743,9 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
     return
   }
 
-  const qs = parseQueryString()
-  let searches = {}
-  for (const [key, val] of Object.entries(qs)) {
-    if (!key.startsWith('_')) {
-      searches[key] = val
-    }
-  }
+  const qsSearch = parseQueryString('search')
+  const searches = new URLSearchParams(qsSearch).toString()
 
-  searches = new URLSearchParams(searches).toString()
   let url = `data/?${searches}&_return=${encodeURIComponent(name)}`
   url += '&_uniques=true&_length=100'
   getOptionHTML(url, setOptionHTML)
@@ -766,8 +761,8 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
     }
     select = th.find(`select[name="${name}"]`)
     select.append(html)
-    if (qs[name]) {
-      select.val(qs[name].replace(/^'/, '').replace(/'$/, ''))
+    if (qsSearch[name]) {
+      select.val(qsSearch[name].replace(/^'/, '').replace(/'$/, ''))
     }
     createColumnDropdown.cache[url] = select.html()
     select.css('visibility', 'visible')
@@ -825,12 +820,7 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
 }
 
 function clearAllSearches () {
-  const qs = parseQueryString()
-  for (const key in qs) {
-    if (!key.startsWith('_')) {
-      delete qs[key]
-    }
-  }
+  const qs = parseQueryString('search')
   window.location.hash = decodeURIComponent($.param(qs))
   reInit()
 }
@@ -926,6 +916,11 @@ function setEvents () {
   })
 }
 
+function setQueryLink (url) {
+  // Store URL for use in adjustDOM() after table draw.
+  setQueryLink.url = url
+}
+
 function adjustDOM () {
   console.log('adjustDOM() => called.')
   const tableInfo = `${tableID}_info`
@@ -975,8 +970,8 @@ function adjustDOM () {
   console.log('adjustDOM() => Moving length control.')
   const select = $(`${tableLength} select`)
   select.appendTo(tableLength)
-  $(`${tableLength} label`).text('Rows per page: ')
-  $(`${tableID}_length`).insertBefore('#clearAllSearches')
+  $(`${tableLength} label`).text('')
+  $('#lengthControl').prepend($(`${tableID}_length`))
 
   console.log('adjustDOM() => Modifying Previous/Next buttons.')
   const prev = $(`${tableID}_previous`)
@@ -1010,8 +1005,18 @@ function adjustDOM () {
     }
   }
 
-  console.log('adjustDOM() => Moving query link.')
-  $(tableInfo).append($('#query'))
+  if ($(`${tableID}_wrapper #query`).length === 0) {
+    console.log('adjustDOM() => Setting query link.')
+    $(tableInfo).append('<span id="query" style="clear:both">&nbsp;<a href="" target="_blank">Query</a>&nbsp;</span>')
+  }
+  $('#query > a').attr('href', setQueryLink.url)
+
+  const clearAllSearches = '<span id="clearAllSearches" title="Clear all searches"><button>Clear</button></span>'
+  $(tableInfo).append(clearAllSearches)
+  const qsSearch = parseQueryString('search')
+  if (Object.keys(qsSearch).length > 0) {
+    $('#clearAllSearches').show()
+  }
 
   console.log('adjustDOM() => Setting timeout to execute $(window).resize().')
   setTimeout(function () {
@@ -1158,7 +1163,6 @@ function fixedColumns (index) {
     .css('z-index', index)
     .css('background-color', 'white')
 
-
   // Second column in body
   $(`${tableID} tbody tr td:nth-child(2)`)
     .css('position', 'sticky')
@@ -1196,7 +1200,7 @@ function watchForFloatingHeader () {
   observer.observe(document.body, config)
 }
 
-function parseQueryString (hash) {
+function parseQueryString (component, hash) {
   // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
   const nvpair = {}
   let qs = window.location.hash.replace('#', '')
@@ -1209,8 +1213,14 @@ function parseQueryString (hash) {
   const pairs = qs.split('&')
   $.each(pairs, function (i, v) {
     const pair = v.split('=')
+    if (component === 'search' && pair[0].startsWith('_')) {
+      return // Skip state parameters
+    }
     nvpair[pair[0]] = pair[1]
   })
+  // Remove keys that start with _
+
+
   return nvpair
 }
 
@@ -1218,7 +1228,7 @@ function setDefaultQueryString (hash) {
   const currentHash = window.location.hash.replace('#', '')
   if (hash && !currentHash) {
     const qs = parseQueryString()
-    const qsDefault = parseQueryString(hash)
+    const qsDefault = parseQueryString(null, hash)
     for (const [key, val] of Object.entries(qsDefault)) {
       if (!(key in qs)) {
         let msg = 'init() => Setting query string parameter '
@@ -1332,7 +1342,7 @@ function checkQueryString (config) {
 }
 
 function setQueryStringFromSearch () {
-  let msg = 'setQueryStringFromSearch() => Stepping through column '
+  let msg = 'setQueryStringFromSearch() => Getting query string from search inputs.'
   console.log(`${msg}search inputs.`)
   // Step through column search inputs and update query string
   // Highlight inputs with search values and remove highlight for
@@ -1350,6 +1360,7 @@ function setQueryStringFromSearch () {
   }
   msg = 'setQueryStringFromSearch() => Reading '
   console.log(`${msg}${inputs.length} column search inputs.`)
+  const qsSearch = parseQueryString('search')
   for (const input of inputs) {
     const name = $(input).attr('name')
     searchValue = $(input).val()
@@ -1364,15 +1375,14 @@ function setQueryStringFromSearch () {
     } else {
       // console.log(`No search value for column '${name}'.`);
       $(input).css('background-color', '')
-      const qs = parseQueryString()
-      if (qs[name]) {
+      if (qsSearch[name]) {
         const msg = `setQueryStringFromSearch() => Found ${name} in `
         console.log(`${msg}query string. Removing it from query string.`)
         setQueryValue(name, null)
       }
     }
-    const qs = parseQueryString()
-    const numSearchKeys = Object.keys(qs).filter(k => !k.startsWith('_')).length
+    const qs = parseQueryString('search')
+    const numSearchKeys = Object.keys(qs).length
     const msg = 'setQueryStringFromSearch() => There are '
     if (numSearchKeys > 0) {
       console.log(`${msg}${numSearchKeys} search keys in the query string. Showing Clear button.`)

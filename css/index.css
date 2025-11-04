@@ -14,7 +14,6 @@ summary {
 }
 details {
   background-color: white;
-  float:right;
 }
 input[type="checkbox"] {
   accent-color: black;
@@ -62,8 +61,6 @@ input:-webkit-autofill:focus {
   font-weight: bold;
   padding: 0.5em;
   display: none;
-}
-#controls {
   padding-bottom: 3px;
 }
 #showHideColumns {
@@ -78,7 +75,6 @@ input:-webkit-autofill:focus {
   background-color: yellow;
 }
 #relatedTables {
-  float: left;
   display: none;
 }
 #relatedTablesSelect {
@@ -104,13 +100,13 @@ table.dataTable tbody {
   display: none;
 }
 .dataTables_length {
+  width: 3em;
   display: inline-block;
-  margin-right: 1em;
 }
 .dataTables_wrapper .dataTables_info {
   clear: none;
+  text-align: left;
   padding-top: 0.45em;
-  padding-left: 0.5em;
 }
 .dataTables_wrapper .dataTables_paginate {
   float: left;

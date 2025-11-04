@@ -29,7 +29,25 @@
   <details>
     <summary>Documentation</summary>
     <h1>Table Description</h1>
-    <div id="tableMetadata"></div>
+    <div id="tableDescription" style="margin-left:1em">
+      <div id="tableMetadata"></div>
+      <div id="relatedTables">
+        Related Tables: 
+        <select id="relatedTablesSelect">
+          <option value="">- Related Tables -</option>
+        </select>
+      </div>
+    </div>
+    <h1>Options</h1>
+      <div id="options" style="margin-left:1em">
+        <div id="showHideColumns" title="show/hide columns with no content">
+          <input style="margin-left: 3em" type="checkbox" id="hideEmptyColumns"/>
+          <span>Hide Empty Columns</span>
+        </div>
+        <div id="lengthControl" title="set number of rows per page">
+          <span style="margin-left: 0.5em">Rows per page</span>
+        </div>
+      </div>
     <h1>Usage</h1>
     <ul>
       <li>To execute any search, press enter key after entering text in
@@ -71,22 +89,7 @@
     </p>
   </details>
 
-  <div id="controls">
-    <div id="error"></div>
-    <span id="relatedTables">
-      <select id="relatedTablesSelect">
-        <option value="">- Related Tables -</option></select>
-    </span>
-    <span id="showHideColumns">
-      <!--These must be one line to avoid newlines in button text-->
-      <span title="show/hide columns with no content"><input type="checkbox" id="hideEmptyColumns"><label for="hideEmptyColumns">Hide Empty Columns</label></span>
-    </span>
-    <span id="clearAllSearches" title="Clear all searches"><button>Clear</button></span>
-  </div>
-
-  <span id="query">
-    <a href="" target="_blank">Query</a>
-  </span>
+  <div id="error"></div>
 
   <table id="table1" class="display">
   </table>
