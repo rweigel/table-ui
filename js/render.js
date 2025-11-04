@@ -3,14 +3,29 @@ const renderFunctions = {}
 renderFunctions.ellipsis = function (columnName, config, n) {
   return DataTable.render.ellipsis(n || 30)
 }
-
+renderFunctions.trimURL = function (columnName, config) {
+  return (columnString, type, row, meta) => {
+    if (type !== 'display') {
+      return columnString
+    }
+    const urlSplit = columnString.split('/')
+    if (urlSplit[urlSplit.length - 1] !== '') {
+      const attrs = `href="${columnString}" title="${columnString}"`
+      let urlShort = urlSplit[urlSplit.length - 1]
+      urlShort = `<a ${attrs} target="_blank">${urlShort}</a>`
+      return urlShort
+    }
+    return columnString
+  }
+}
 renderFunctions.underline = function (columnName, config) {
   return (columnString, type, row, meta) => {
     if (type !== 'display') {
       return columnString
     }
     if (columnString) {
-      const style = 'text-decoration-line: underline; text-decoration-style: wavy;'
+      let style = 'text-decoration-line: underline;'
+      style += 'text-decoration-style: wavy;'
       return `<div style="${style}">${columnString}</div>`
     }
     return columnString

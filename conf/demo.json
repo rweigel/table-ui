@@ -5,7 +5,7 @@
   "dataTables": "default.json",
   "dataTablesAdditions": {
     "defaultQueryString": "_cols_show=nonempty",
-    "renderFunctions": "render.js",
+    "renderFunctions": "../js/render.js",
     "tableMetadata": {
       "tableTitle": "Demo Table",
       "description+": "description+ means append this to default description."

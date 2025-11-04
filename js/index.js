@@ -342,8 +342,8 @@ async function getConfig () {
       }
 
       const columnRenderAll = config.dataTablesAdditions.columnRender || null
-
-      if (renderFunctions || columnRenderAll) {
+      const renderFunctionsDefined = typeof renderFunctions !== 'undefined'
+      if (renderFunctionsDefined && (renderFunctions || columnRenderAll)) {
         const render = renderColumn(columns[i].name, config, renderFunctions)
         if (render) {
           columns[i].render = render
@@ -457,14 +457,33 @@ function renderColumn (columnName, config, renderFunctions) {
   }
 
   function extractFunction (functionName, renderFunctions, columnName, config) {
+    function checkName (functionName) {
+      if (!(functionName in renderFunctions)) {
+        let emsg = `renderColumn() => Render function '${functionName}' in <a href="config">config</a>`
+        emsg += 'not found in <a href="render.js">render.js</a>.'
+        return emsg
+      }
+    }
+
     if (typeof functionName === 'string') {
+      const emsg = checkName(functionName)
+      if (emsg) {
+        console.error(emsg)
+        return null
+      }
       return renderFunctions[functionName](columnName, config)
     } else if (typeof functionName === 'object') {
       const name = functionName.function
+      const emsg = checkName(name)
+      if (emsg) {
+        console.error(emsg)
+        return null
+      }
       const args = functionName.args || []
       return renderFunctions[name](columnName, config, ...args)
     } else {
-      console.error(`renderColumn() => Unknown render function type: ${functionName}`)
+      const emsg = `renderColumn() => Render ${functionName} is not a string or object.`
+      console.error(emsg)
     }
   }
 }

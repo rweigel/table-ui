@@ -5,7 +5,8 @@ logger = None
 def dict2sql(datasets, config, embed=False, logger=None):
 
   if logger is None:
-    logger = utilrsw.logger('dict2sql')
+    import logging
+    logger = logging.getLogger('dict2sql')
   globals()['logger'] = logger
 
   name = config.get('name', 'table')
@@ -39,7 +40,7 @@ def dict2sql(datasets, config, embed=False, logger=None):
       logger.info(f"Found {len(attribute_counts)} unique attribute{s}")
 
   # Create table header based on attributes dict.
-  header = _table_header(attributes, config.get('id_name', None))
+  header = _table_header(attributes)
 
   logger.info("Creating table rows")
   table = _table_walk(datasets, attributes, config, mode='rows')
@@ -51,7 +52,7 @@ def dict2sql(datasets, config, embed=False, logger=None):
     raise Exception(emsg)
 
   if len(table) == 0:
-    raise Exception(f"No rows in {name} table for id='{id}'")
+    raise Exception(f"No rows in {name} table")
 
   info = _write_files(name, config, out_dir, header, table, attribute_counts)
 
@@ -66,7 +67,7 @@ def dict2sql(datasets, config, embed=False, logger=None):
 
   return info
 
-def _table_header(attributes, id_name):
+def _table_header(attributes):
 
   header = []
   for path in attributes.keys():
@@ -140,7 +141,7 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
       if mode == 'attributes':
         _add_attributes(data, attributes[path], attribute_names, fixes, path, omit_attributes)
       else:
-        _append_columns(data, attributes[path], row, fixes, omit_attributes)
+        _append_columns(data, attributes[path], row, fixes)
 
     if mode == 'rows':
       logger.debug(f"  {len(row)} columns in row {len(table)}")
@@ -151,13 +152,9 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
   else:
     return table
 
-def _append_columns(data, attributes, row, fixes, omit_attributes):
+def _append_columns(data, attributes, row, fixes):
 
   for attribute in attributes:
-
-    if omit_attributes is not None and attribute in omit_attributes:
-      logger.debug(f"  Skipping {attribute}")
-      continue
 
     if fixes is not None:
       for fix in fixes:
@@ -179,7 +176,7 @@ def _add_attributes(data, attributes, attribute_names, fixes, path, omit_attribu
   for attribute_name in data:
 
     if omit_attributes is not None and attribute_name in omit_attributes:
-      logger.info(f"  Skipping {attribute_name}")
+      logger.info(f"  Skipping {path}{attribute_name} b/c in omit_attributes")
       continue
 
     attribute_names.append(attribute_name)

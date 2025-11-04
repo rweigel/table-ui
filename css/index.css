@@ -1,0 +1,158 @@
+body {
+  margin: 1em;
+  margin-top: 0.5em;
+}
+h1 {
+  font-size: 1em;
+}
+button {
+  background-color: white;
+  border: 1px solid black;
+}
+summary {
+  cursor: pointer;
+}
+details {
+  background-color: white;
+  float:right;
+}
+input[type="checkbox"] {
+  accent-color: black;
+}
+a {
+  color: black;
+  text-decoration-color: black;
+}
+details code {
+  font-size: small;
+  background-color: rgb(244, 244, 244);
+  border: 1px solid black;
+  border-radius: 4px;
+  padding: 0.1em;
+}
+select.columnUniques {
+  visibility: hidden;
+  overflow: auto;
+  margin-top: 0.25em;
+}
+span.clearOneSearch {
+  white-space: nowrap;
+  visibility: hidden;
+  cursor: pointer;
+}
+
+/*
+  Fix for Chrome autofill, which has its own background color.
+  When an autofill value is selected, the input gets a class of
+  input:-webkit-autofill.
+*/
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: black;
+  -webkit-box-shadow: 0 0 0px 40rem yellow inset;
+}
+
+#table1 {
+  width: 100% !important;
+  padding-top: 1em;
+}
+#error {
+  color: red;
+  font-weight: bold;
+  padding: 0.5em;
+  display: none;
+}
+#controls {
+  padding-bottom: 3px;
+}
+#showHideColumns {
+  margin-right: 1em;
+  padding-bottom: 0.5em;
+}
+#clearAllSearches {
+  display: none;
+}
+#clearAllSearches button {
+  margin-right: 1em;
+  background-color: yellow;
+}
+#relatedTables {
+  float: left;
+  display: none;
+}
+#relatedTablesSelect {
+  margin-right: 1em;
+}
+
+table.dataTable thead th {
+  font-size: 0.8em;
+  text-align: center;
+}
+table.dataTable tbody {
+  font-family: monospace;
+  text-align: center;
+  font-size: 9pt;
+}
+
+.ellipsis {
+  cursor: pointer;
+}
+
+.dataTables_filter {
+  float: left;
+  display: none;
+}
+.dataTables_length {
+  display: inline-block;
+  margin-right: 1em;
+}
+.dataTables_wrapper .dataTables_info {
+  clear: none;
+  padding-top: 0.45em;
+  padding-left: 0.5em;
+}
+.dataTables_wrapper .dataTables_paginate {
+  float: left;
+  text-align: right;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+  padding: 0em;
+}
+.dataTables_wrapper .dataTables_paginate .ellipsis {
+  padding: 0em;
+}
+
+/* Move processing indicator to top of page */
+div.dataTables_processing {
+  z-index: 101;
+  top: 0px;
+}
+
+/* Scrollbar styling */
+/* https://simurai.com/blog/2011/07/26/webkit-scrollbar */
+.dataTables_scrollBody::-webkit-scrollbar {
+  -webkit-appearance: none;
+  height: 10px;
+  width: 1px;
+}
+.dataTables_scrollBody::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background-color: rgba(0,0,0,.5);
+  box-shadow: 0 0 1px rgba(255,255,255,.5);
+}
+
+/*
+  https://stackoverflow.com/a/63507769
+  See also
+  https://datatables.net/forums/discussion/72111/
+  how-can-i-make-the-x-scroller-fixed-sticky
+  For options that may be better for when the header is stick
+*/
+#table1 {
+  transform: rotateX(180deg);
+  overflow-x: auto;
+}
+.dataTables_scrollBody {
+  transform: rotateX(180deg);
+}
