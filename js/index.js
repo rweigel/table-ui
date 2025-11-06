@@ -104,7 +104,6 @@ function reInit () {
     if (tableWrapper.length > 0) {
       console.log(`destroy() => Destroying table ${tableID}`)
       $('#error').empty()
-      //$('#clearAllSearches').remove()
       $('#tableMetadata').empty()
       $(`${tableID}_length`).remove()
       // https://datatables.net/forums/discussion/comment/190544/#Comment_190544
@@ -113,7 +112,7 @@ function reInit () {
       tableWrapper.remove()
       $(tableID).empty()
       // Remove event handlers added to table, document, and window
-      // This causes fixedHeader to no longer be triggered on scroll.
+      // Disabled b/c this causes fixedHeader to no longer be triggered on scroll.
       //$(tableID).off()
       //$(document).off()
       //$(window).off()
@@ -138,14 +137,14 @@ function dtInitComplete () {
     console.log('dtInitComplete() => Showing all columns.')
   }
 
-  // Must be before adjustDOM() b/c calls $(window).resize(), which triggers
-  // widths of columns to be recalculated based on content added in call
+  // Must be before adjustDOM() b/c adjustDOM() calls $(window).resize(), which
+  // triggers widths of columns to be recalculated based on content added in call
   // to createColumnConstraints().
   createColumnConstraints()
 
   // Timeout needed here because createColumnConstraints() adds elements to DOM
   // with async call. Need to modify so createColumnConstraints takes a callback.
-  setTimeout(() => fixedColumns(101), 1)
+  setTimeout(() => fixedColumns(), 1)
 
   adjustDOM()
 
@@ -401,7 +400,7 @@ async function getConfig () {
     let url = window.location.pathname + 'data/' + '?'
     url += new URLSearchParams(dtp).toString()
 
-    setQueryLink(url)
+    setQueryLink(decodeURIComponent(url))
 
     return dtp
   }
@@ -556,14 +555,12 @@ function createRelatedTablesDropdown (config) {
       // Remove trailing slash from path
       const w = window.location.pathname.replace(/\/$/, '')
       if (w.endsWith(relatedTables[i].path)) {
-        $('#relatedTablesSelect').append(options).prop('selectedIndex', i + 1)
-        $('#relatedTablesSelect').attr('lastSelected', relatedTables[i].path)
+        $('#relatedTablesSelect').append(options).prop('selectedIndex', i)
         $('#relatedTables').show()
         break
       }
     }
     $('#relatedTablesSelect').on('change', function () {
-      $('#relatedTablesSelect').attr('lastSelected', $(this).val())
       const url = $(this).val()
       if (url) window.location = $(this).val()
     })
@@ -651,7 +648,8 @@ function createColumnInput (parent, visibleIndex, name, column, searchOnKeypress
   let title = 'Enter search text and enter to search. '
   title += 'See documentation for search syntax.'
 
-  const val = qsName || ''
+  let val = qsName || ''
+  val = decodeURIComponent(val)
   input
     .val(val)
     .attr('title', 'Enter search string and press enter to search')
@@ -671,6 +669,11 @@ function createColumnInput (parent, visibleIndex, name, column, searchOnKeypress
             if (select.find('option').length > 0) {
               select.prop('selectedIndex', 0)
             }
+          }
+          if ($(this).val()) {
+            clearOneSearch.css('visibility', 'visible')
+          } else {
+            clearOneSearch.css('visibility', 'hidden')
           }
           column.search($(this).val()).draw('page')
         }
@@ -820,7 +823,10 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
 }
 
 function clearAllSearches () {
-  const qs = parseQueryString('search')
+  const qs = parseQueryString('state')
+  delete qs._page
+  // Could avoid reInit by looping though all inputs, setting value to ''
+  // and triggering search.
   window.location.hash = decodeURIComponent($.param(qs))
   reInit()
 }
@@ -837,8 +843,6 @@ function setEvents () {
       $('#clearAllSearches').show()
     }
   })
-
-  $('#clearAllSearches').off('click').on('click', clearAllSearches)
 
   console.log('setEvents() => Setting search.dt.')
   $(tableID).off('search.dt').off('search.dt')
@@ -922,7 +926,7 @@ function setQueryLink (url) {
 }
 
 function adjustDOM () {
-  console.log('adjustDOM() => called.')
+  console.log('adjustDOM() => Called.')
   const tableInfo = `${tableID}_info`
   const tableLength = `${tableID}_length`
   const tableFilter = `${tableID}_filter`
@@ -933,7 +937,7 @@ function adjustDOM () {
   $(`${tableFilter} label`).replaceWith(input[0])
   $(`${tableInfo}`).insertAfter(tableFilter)
 
-  console.log('adjustDOM() => Moving global search input.')
+  console.log("adjustDOM() => Creating 'Showing ...' string.")
   const numCols = $(tableID).DataTable().columns().nodes().length
   const numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length
   let colInfo = ` and all ${numCols} columns`
@@ -941,7 +945,6 @@ function adjustDOM () {
     colInfo = ` and ${numColsVisible} of ${numCols} columns`
   }
 
-  console.log("adjustDOM() => Creating 'Showing ...' string.")
   const info = $(tableID).DataTable().page.info()
   const nRows = info.recordsDisplay.toLocaleString('en-US')
   let txt = `Showing ${parseInt(info.start) + 1}-${parseInt(info.end)} `
@@ -1007,12 +1010,19 @@ function adjustDOM () {
 
   if ($(`${tableID}_wrapper #query`).length === 0) {
     console.log('adjustDOM() => Setting query link.')
-    $(tableInfo).append('<span id="query" style="clear:both">&nbsp;<a href="" target="_blank">Query</a>&nbsp;</span>')
+    $(tableInfo).append('<span id="query" style="clear:both">&nbsp;<a href="" target="_blank">(Query)</a>&nbsp;</span>')
   }
   $('#query > a').attr('href', setQueryLink.url)
 
-  const clearAllSearches = '<span id="clearAllSearches" title="Clear all searches"><button>Clear</button></span>'
-  $(tableInfo).append(clearAllSearches)
+  if ($('#clearAllSearches button').length === 0) {
+    const clearAllSearches = '<span id="clearAllSearches" title="Clear all searches" onclick="clearAllSearches()"><button>Clear</button></span>'
+    //const clearAllSearches = '<span id="clearAllSearches" title="Clear all searches"><button>Clear</button></span>'
+    $(tableInfo).append(clearAllSearches)
+    //$('#clearAllSearches button').off('click').on('click', clearAllSearches)
+    // Need to use onclick method instead of .on('click') because .on('click') gives
+    // "datatables.min.js:14 Uncaught TypeError: Cannot create property 'guid' on string"
+    // (DataTables code sees this inserted span)
+  }
   const qsSearch = parseQueryString('search')
   if (Object.keys(qsSearch).length > 0) {
     $('#clearAllSearches').show()
@@ -1024,6 +1034,7 @@ function adjustDOM () {
     msg += 'trigger event that causes left column header widths'
     console.log(`${msg} to match the width of the left column body.`)
     $(window).resize()
+    scrollII()
   }, 0)
 
   console.log('adjustDOM() finished.')
@@ -1110,7 +1121,7 @@ function emptyColumns (indices) {
   return columnEmpty
 }
 
-function fixedColumns (index) {
+function fixedColumns () {
   const config = getConfig.config.dataTablesAdditions
   if (config.fixedColumns === undefined || config.fixedColumns === false) {
     return
@@ -1119,56 +1130,46 @@ function fixedColumns (index) {
   if (config.fixedColumns !== true) {
     nFixed = config.fixedColumns
   }
-  if (nFixed > 2) {
-    console.warn('fixedColumns() => fixedColumns > 2 not supported.')
-  }
+  let index = nFixed + 1
 
-  if (!index) {
-    index = 10
-  }
   const parent = `${tableID}_wrapper div.dataTables_scrollHead`
+  const parent2 = '.dtfh-floatingparent'
 
-  // First column in header
-  $(`${parent} thead tr:eq(0) > th:eq(0)`)
-    .css('position', 'sticky')
-    .css('left', '0px')
-    .css('z-index', index)
-    .css('background-color', 'white')
-  $(`${parent} thead tr:eq(1) > th:eq(0)`)
-    .css('position', 'sticky')
-    .css('left', '0px')
-    .css('z-index', index)
-    .css('background-color', 'white')
-  // First column in body
-  $(`${tableID} tbody tr td:nth-child(1)`)
-    .css('position', 'sticky')
-    .css('left', '0px')
-    .css('z-index', index - 1)
-    .css('background-color', 'white')
-
-  if (nFixed === 1) {
-    return
+  if ($(parent2).length > 0) {
+    index = 0
   }
+  let left = 0
+  for (let i = 0; i < nFixed; i++) {
+    if (i > 0) {
+      left += $(`${parent} thead tr:eq(0) > th:eq(${i-1})`).outerWidth()
+    }
+    // First row in header
+    $(`${parent} thead tr:eq(0) > th:eq(${i})`)
+      .css('position', 'sticky')
+      .css('left', `${left}px`)
+      .css('z-index', index)
+      .css('background-color', 'white')
+    // Second row in header
+    $(`${parent} thead tr:eq(1) > th:eq(${i})`)
+      .css('position', 'sticky')
+      .css('left', `${left}px`)
+      .css('z-index', index)
+      .css('background-color', 'white')
+    // Body
+    $(`${tableID} tbody tr td:nth-child(${i+1})`)
+      .css('position', 'sticky')
+      .css('left', `${left}px`)
+      .css('z-index', index)
+      .css('background-color', 'white')
 
-  // Second column in header
-  const firstColWidth = $(`${parent} thead tr:eq(0) > th:eq(0)`).outerWidth()
-  $(`${parent} thead tr:eq(0) > th:eq(1)`)
-    .css('position', 'sticky')
-    .css('left', `${firstColWidth}px`)
-    .css('z-index', index)
-    .css('background-color', 'white')
-  $(`${parent} thead tr:eq(1) > th:eq(1)`)
-    .css('position', 'sticky')
-    .css('left', `${firstColWidth}px`)
-    .css('z-index', index)
-    .css('background-color', 'white')
-
-  // Second column in body
-  $(`${tableID} tbody tr td:nth-child(2)`)
-    .css('position', 'sticky')
-    .css('left', `${firstColWidth}px`)
-    .css('z-index', index - 1)
-    .css('background-color', 'white')
+    if ($(parent2).length > 0) {
+      $(`${parent2} thead tr:eq(0) > th:eq(${i})`)
+        .css('z-index', 100)
+      // Second row in header
+      $(`${parent2} thead tr:eq(1) > th:eq(${i})`)
+        .css('z-index', 100)
+    }
+  }
 }
 
 function watchForFloatingHeader () {
@@ -1186,8 +1187,9 @@ function watchForFloatingHeader () {
           if ($(node).hasClass('dtfh-floatingparent')) {
             msg = 'watchForFloatingHeader() => dtfh-floatingparent '
             console.log(`${msg}was added.`)
-            fixedColumns(1)
             // Timeout needed to allow sub-elements to be added in DOM.
+            fixedColumns()
+            setTimeout(() => { scrollII(true) }, 0)
             setTimeout(() => { createColumnConstraints() }, 1)
           }
         })
@@ -1200,6 +1202,79 @@ function watchForFloatingHeader () {
   observer.observe(document.body, config)
 }
 
+function scrollII (floatingHeader) {
+  let container2 = $('.dataTables_scrollBody');
+  if (floatingHeader) {
+    floatingHeader = true
+    $('#container1').hide()
+    container2 = $('.dtfh-floatingparent');
+  } else {
+    floatingHeader = false
+  }
+  // Method II.
+  // Fixes (1) - (3) in Method I.
+  // New problems:
+  //  (1) The top scrollbar is on top of the header instead of the body.
+  //      This may not be desired.
+  //  (2) When the header becomes fixed, the top scrollbar overlaps the header.
+  //      (Scrollbar overlaps header a small amount.)
+  const container1 = $('#container1');
+  let element = '#table1_wrapper table thead tr th:eq(0)'
+  let shift = 0;
+  // get widths of first two header columns (include padding/border)
+  const $ths = $('#table1 thead tr th');
+  const firstWidth = $ths.eq(0).outerWidth() || 0;
+  const secondWidth = $ths.eq(1).outerWidth() || 0;
+  shift = firstWidth + secondWidth;
+  $('#container1 div').width($('#table1').width() - shift);
+  $('#container1').css('margin-left', shift);
+  if (floatingHeader) {
+    console.log('triggered')
+    //$('.dtfh-floatingparent').css('top', $('#container1').height() + 'px');
+    //$('.dtfh-floatingparent').append($("#container1"))
+    //$('.dataTables_scrollBody').before($('#container1'))
+    const top = $('.dtfh-floatingparent').outerHeight() + 'px';
+    $("#container1").css('position', 'sticky').css('top', top).css('z-index', '10');
+    $('#container1').show()
+  } else {
+    $('.dataTables_scrollBody').before($('#container1'))
+  }
+
+  let scrolling = false;
+  container1.off('scroll').on('scroll', () => {
+    //console.log('#container1 scrollLeft', container1.scrollLeft());
+    console.log('container1 scroll event')
+    if (scrolling) {
+      console.log('container1 scrolling = true found. Stopping.')
+      return;
+    } else {
+      console.log('container1 scrolling = false found. Continuing.')
+    }
+    console.log('container1 setting scrolling = true')
+    scrolling = true
+    $('.dataTables_scrollBody').scrollLeft(container1.scrollLeft());
+    $('.dataTables_scrollHead').scrollLeft(container1.scrollLeft());
+    container2.scrollLeft(container1.scrollLeft());
+    console.log('container1 setting scrolling = false')
+    scrolling = false
+  });
+  container2.off('scroll').on('scroll', () => {
+    console.log('container2 scroll event')
+    if (scrolling) {
+      console.log('container2 scrolling = true found. Stopping.')
+      return;
+    } else {
+      console.log('container2 scrolling = false found. Continuing.')
+    }
+    console.log('container2 setting scrolling = true')
+    if (scrolling) return;
+    console.log('container2 scroll event')
+    scrolling = true;
+    container1.scrollLeft(container2.scrollLeft());
+    console.log('container2 setting scrolling = false')
+    scrolling = false;
+  });
+}
 function parseQueryString (component, hash) {
   // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
   const nvpair = {}
@@ -1216,10 +1291,11 @@ function parseQueryString (component, hash) {
     if (component === 'search' && pair[0].startsWith('_')) {
       return // Skip state parameters
     }
+    if (component === 'state' && !pair[0].startsWith('_')) {
+      return // Keep state parameters
+    }
     nvpair[pair[0]] = pair[1]
   })
-  // Remove keys that start with _
-
 
   return nvpair
 }

@@ -1,9 +1,70 @@
+:root {
+  --scroll-height: 10px;
+  --scroll-height-fix: -12px;
+}
+
 body {
   margin: 1em;
   margin-top: 0.5em;
 }
 h1 {
   font-size: 1em;
+}
+th, td { white-space: nowrap; }
+table {
+  border: 3px solid yellow !important;
+  border-left: 0px !important;
+}
+th, td {
+  border-right: 3px solid green;
+}
+tr td:first-child {
+  border-left: 3px solid black;
+}
+tr th:first-child {
+  border-left: 3px solid black;
+}
+
+.dataTables_wrapper.no-footer div.dataTables_scrollHead table.dataTable {
+  border-bottom: var(--scroll-height) solid #ddd;
+}
+
+.scroll-container::-webkit-scrollbar, .dt-scroll-head::-webkit-scrollbar {
+  -webkit-appearance: none;
+  height: var(--scroll-height);
+  width: 1px;
+}
+.scroll-container::-webkit-scrollbar-thumb, .dt-scroll-head::-webkit-scrollbar-thumb {
+  border-radius: var(--scroll-height);
+  background-color: rgba(0,0,0,0.1);
+  box-shadow: 0 0 0px rgba(255,255,255,.1);
+}
+.scroll-container {
+  position: relative;
+  top: 0;
+  z-index: 5;
+  height: var(--scroll-height);
+  overflow-x: auto;
+  background: rgba(226, 223, 223, 0.1);
+  /* Causes problems w/ syntax highlighting in Code
+  @-moz-document url-prefix() {
+    background: lightgrey;
+  }
+  */
+  margin-bottom: var(--scroll-height-fix);
+}
+div.cell {
+  position: relative;
+  height: 100%;
+}
+.icon-in-cell {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+}
+
+.dataTables_wrapper.no-footer div.dataTables_scrollBody>table {
+  border: 1px solid #ddd;
 }
 button {
   background-color: white;
@@ -52,9 +113,19 @@ input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0px 40rem yellow inset;
 }
 
+#relatedTables {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  background-color: white;
+  padding: 5px;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
 #table1 {
   width: 100% !important;
-  padding-top: 1em;
 }
 #error {
   color: red;
@@ -85,16 +156,19 @@ table.dataTable thead th {
   font-size: 0.8em;
   text-align: center;
 }
+
 table.dataTable tbody {
   font-family: monospace;
   text-align: center;
   font-size: 9pt;
 }
+table.dataTable tbody th, table.dataTable tbody tr:first-child td {
+  padding-top: 18px;
+}
 
 .ellipsis {
   cursor: pointer;
 }
-
 .dataTables_filter {
   float: left;
   display: none;
@@ -123,32 +197,4 @@ table.dataTable tbody {
 div.dataTables_processing {
   z-index: 101;
   top: 0px;
-}
-
-/* Scrollbar styling */
-/* https://simurai.com/blog/2011/07/26/webkit-scrollbar */
-.dataTables_scrollBody::-webkit-scrollbar {
-  -webkit-appearance: none;
-  height: 10px;
-  width: 1px;
-}
-.dataTables_scrollBody::-webkit-scrollbar-thumb {
-  border-radius: 10px;
-  background-color: rgba(0,0,0,.5);
-  box-shadow: 0 0 1px rgba(255,255,255,.5);
-}
-
-/*
-  https://stackoverflow.com/a/63507769
-  See also
-  https://datatables.net/forums/discussion/72111/
-  how-can-i-make-the-x-scroller-fixed-sticky
-  For options that may be better for when the header is stick
-*/
-#table1 {
-  transform: rotateX(180deg);
-  overflow-x: auto;
-}
-.dataTables_scrollBody {
-  transform: rotateX(180deg);
 }

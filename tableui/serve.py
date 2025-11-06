@@ -800,11 +800,94 @@ def _table_meta(config, update=False):
   return None
 
 
-def _sql_execute(query, cursor=None, sqldb=None, params=None):
-  if sqldb is not None:
+def _sql_cursor(sqldb, memory=False):
+  import threading
+  # memory = True not well tested.
+  #  Seems much slower for small and fast queries and
+  #  ~3x faster for large and complex queries.
+  if not memory:
     connection = sqlite3.connect(sqldb)
     cursor = connection.cursor()
+  else:
+    try:
+      # Open the file-based DB and a fresh in-memory DB
+      file_conn = sqlite3.connect(sqldb)
+      mem_conn = sqlite3.connect(":memory:")
+      # Copy the whole file DB into memory
+      # Simple module-level cache to avoid re-copying unchanged DB files into memory
+      if '_MEMORY_DB_CACHE' not in globals():
+        _MEMORY_DB_CACHE = {}
+        _MEMORY_DB_LOCK = threading.Lock()
+      else:
+        _MEMORY_DB_CACHE = globals()['_MEMORY_DB_CACHE']
+        _MEMORY_DB_LOCK = globals()['_MEMORY_DB_LOCK']
+
+      file_path = os.path.abspath(sqldb)
+      try:
+        mtime = os.path.getmtime(file_path)
+      except Exception:
+        mtime = None
+
+      # If we've already copied this exact file (same mtime), reuse the in-memory connection
+      with _MEMORY_DB_LOCK:
+        cache_entry = _MEMORY_DB_CACHE.get(file_path)
+        if cache_entry is not None and cache_entry[0] == mtime:
+          connection = cache_entry[1]
+          cursor = connection.cursor()
+          return cursor, connection
+
+      # Otherwise create a fresh in-memory DB (closing any stale cached connection)
+      if cache_entry is not None:
+        try:
+          cache_entry[1].close()
+        except Exception:
+          pass
+        with _MEMORY_DB_LOCK:
+          _MEMORY_DB_CACHE.pop(file_path, None)
+
+      try:
+        # Open the file-based DB and a fresh in-memory DB, then copy
+        logger.info(f"Copying database '{sqldb}' into memory")
+        file_conn = sqlite3.connect(sqldb)
+        mem_conn = sqlite3.connect(":memory:")
+        file_conn.backup(mem_conn)
+        file_conn.close()
+        connection = mem_conn
+        cursor = mem_conn.cursor()
+        # Cache the new in-memory DB keyed by absolute path and current mtime
+        with _MEMORY_DB_LOCK:
+          _MEMORY_DB_CACHE[file_path] = (mtime, mem_conn)
+      except Exception:
+        # Ensure any opened connections are closed on error
+        try:
+          file_conn.close()
+        except Exception:
+          pass
+        try:
+          mem_conn.close()
+        except Exception:
+          pass
+        raise
+    except Exception:
+      # Ensure any opened connections are closed on error
+      try:
+        file_conn.close()
+      except Exception:
+        pass
+      try:
+        mem_conn.close()
+      except Exception:
+        pass
+      raise
+
+  return cursor, connection
+
+
+def _sql_execute(query, sqldb=None, params=None):
+
   start = time.time()
+  cursor, connection = _sql_cursor(sqldb, memory=False)
+
   logger.info("  Executing")
   logger.info(f"  {query}")
   if params:
@@ -817,12 +900,12 @@ def _sql_execute(query, cursor=None, sqldb=None, params=None):
   else:
       result = cursor.execute(query)
   data = result.fetchall()
-  if sqldb is not None:
-    connection.close()
+  connection.close()
   dt = "{:.4f} [s]".format(time.time() - start)
   n_rows = len(data)
   n_cols = len(data[0]) if n_rows > 0 else 0
   logger.info(f"  {dt} to execute query and fetch {n_rows}x{n_cols} table.")
+
   return data
 
 
@@ -852,6 +935,18 @@ def _sql_query(dbinfo, query_params):
         if val == "''" or val == '""':
             where.append(f"`{key}` = ?")
             params.append('')
+        elif val.startswith('>'):
+            where.append(f"`{key}` > ?")
+            params.append(val[1:])
+        elif val.startswith('≥'):
+            where.append(f"`{key}` >= ?")
+            params.append(val[1:])
+        elif val.startswith('<'):
+            where.append(f"`{key}` < ?")
+            params.append(val[1:])
+        elif val.startswith('≤'):
+            where.append(f"`{key}` <= ?")
+            params.append(val[1:])
         elif val.startswith("'") and val.endswith("'"):
             where.append(f"`{key}` = ?")
             params.append(val.strip("'"))

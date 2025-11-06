@@ -1,5 +1,5 @@
 {
-  "serverSide": false,
+  "serverSide": true,
   "deferRender": true,
   "stateSave": true,
   "lengthMenu": [
@@ -7,7 +7,7 @@
     [2, 10, 50, 100, 500, 1000, "All"]
   ],
   "displayStart": 0,
-  "pageLength": 10,
+  "pageLength": 50,
   "processing": true,
   "lengthChange": true,
   "scrollX": true,

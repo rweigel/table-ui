@@ -26,74 +26,91 @@
 
 <body>
 
+  <div id="relatedTables">
+    Related Tables: 
+    <select id="relatedTablesSelect">
+    </select>
+  </div>
+
   <details>
-    <summary>Documentation</summary>
-    <h1>Table Description</h1>
-    <div id="tableDescription" style="margin-left:1em">
-      <div id="tableMetadata"></div>
-      <div id="relatedTables">
-        Related Tables: 
-        <select id="relatedTablesSelect">
-          <option value="">- Related Tables -</option>
-        </select>
+    <summary>Options and Documentation</summary>
+    <div style="margin-left: 1em">
+
+      <h1>Options</h1>
+        <div id="options" style="margin-left:1em">
+          <div id="showHideColumns" title="show/hide columns with no content">
+            <label style="margin-left:2.4em; cursor:pointer">
+              <input type="checkbox" id="hideEmptyColumns"/>
+              <span>Hide Empty Columns</span>
+            </label>
+            <span>Hide Empty Columns</span>
+          </div>
+          <div id="lengthControl" title="set number of rows per page">
+            <span style="margin-left: 0.6em">Rows per page</span>
+          </div>
+        </div>
+
+      <h1>Table Description</h1>
+      <div id="tableDescription" style="margin-left:1em">
+        <div id="tableMetadata"></div>
       </div>
+
+      <h1>Usage</h1>
+      <ul>
+        <li>To execute any search, press enter key after entering text in
+            column text entry area.</li>
+        <li>Shift+click on sort arrows
+            (<span style="font-size:small;opacity:0.25">▼</span>
+            or <span style="font-size:small;opacity:0.25">▲</span>) 
+            to sort on multiple columns.</li>
+        <li>A entry of <code>⎵</code> means value is a single blank space.</li>
+        <li>To show only certain columns, enter, e.g., <code>_cols=a,b,c</code> 
+            and reload page to apply changes.</li>
+      </ul>
+
+      <h1>Search</h1>
+      <ul>
+        <li>A search string <code>abc</code> on a column results in an SQL 
+            <code>LIKE = '%abc%'</code> query. See 
+            <a href="https://www.w3schools.com/sql/sql_like.asp" target="_blank">
+              SQL LIKE
+            </a>
+            for more information on the SQL <code>LIKE</code> operator.</li>
+        <li>However, if search string starts and/or ends with <code>%</code>,
+            the percentage wildcards are not added automatically.</li>
+        <li>Escape <code>%</code> and <code>_</code> using <code>\</code>. 
+            Escape <code>\</code> with <code>\\</code>.</li>
+        <li>For an exact match search for <code>abc</code>, use single quotes: 
+            <code>'abc'</code>.</li>
+        <li>Escape single quotes by repeating, e.g., 
+            <code>'''single quoted string'''</code>.</li>
+        <li>All table entries are strings.</li>
+      </ul>
+      <p>
+        <a
+            href="https://github.com/rweigel/table-ui"
+            title="https://github.com/rweigel/table-ui"
+            style="text-decoration:none"
+            target="_blank">
+              <img src="css/github-mark.svg" alt="GitHub logo" height="24px">
+        </a>
+      </p>
+
     </div>
-    <h1>Options</h1>
-      <div id="options" style="margin-left:1em">
-        <div id="showHideColumns" title="show/hide columns with no content">
-          <input style="margin-left: 3em" type="checkbox" id="hideEmptyColumns"/>
-          <span>Hide Empty Columns</span>
-        </div>
-        <div id="lengthControl" title="set number of rows per page">
-          <span style="margin-left: 0.5em">Rows per page</span>
-        </div>
-      </div>
-    <h1>Usage</h1>
-    <ul>
-      <li>To execute any search, press enter key after entering text in
-          column text entry area.</li>
-      <li>Shift+click on sort arrows
-          (<span style="font-size:small;opacity:0.25">▼</span>
-          or <span style="font-size:small;opacity:0.25">▲</span>) 
-          to sort on multiple columns.</li>
-      <li>A entry of <code>⎵</code> means value is a single blank space.</li>
-      <li>To show only certain columns, enter, e.g., <code>_cols=a,b,c</code> 
-          and reload page to apply changes.</li>
-    </ul>
-    <h1>Search</h1>
-    <ul>
-      <li>A search string <code>abc</code> on a column results in an SQL 
-          <code>LIKE = '%abc%'</code> query. See 
-          <a href="https://www.w3schools.com/sql/sql_like.asp" target="_blank">
-            SQL LIKE
-          </a>
-          for more information on the SQL <code>LIKE</code> operator.</li>
-      <li>However, if search string starts and/or ends with <code>%</code>,
-          the percentage wildcards are not added automatically.</li>
-      <li>Escape <code>%</code> and <code>_</code> using <code>\</code>. 
-          Escape <code>\</code> with <code>\\</code>.</li>
-      <li>For an exact match search for <code>abc</code>, use single quotes: 
-          <code>'abc'</code>.</li>
-      <li>Escape single quotes by repeating, e.g., 
-          <code>'''single quoted string'''</code>.</li>
-      <li>All table entries are strings.</li>
-    </ul>
-    <p>
-      <a
-          href="https://github.com/rweigel/table-ui"
-          title="https://github.com/rweigel/table-ui"
-          style="text-decoration:none"
-          target="_blank">
-            <img src="css/github-mark.svg" alt="GitHub logo" height="24px">
-      </a>
-    </p>
   </details>
 
   <div id="error"></div>
 
+    <div id="container1" class="scroll-container">
+      <div style="width:2022px; height:1px;"></div>
+    </div>
+
   <table id="table1" class="display">
   </table>
 
+<script>
+
+</script>
 </body>
 
 </html>
