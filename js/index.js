@@ -1189,7 +1189,8 @@ function watchForFloatingHeader () {
             console.log(`${msg}was added.`)
             // Timeout needed to allow sub-elements to be added in DOM.
             fixedColumns()
-            setTimeout(() => { scrollII(true) }, 0)
+            scrollII(true)
+            //setTimeout(() => { scrollII(true) }, 0)
             setTimeout(() => { createColumnConstraints() }, 1)
           }
         })
