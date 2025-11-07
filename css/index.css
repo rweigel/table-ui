@@ -1,9 +1,14 @@
 :root {
   --scroll-height: 10px;
   --scroll-height-fix: -10px;
-  --border: 1px;
+  --border: 1px solid rgb(1, 1, 1, 0.1);
 }
-
+::placeholder {
+   text-align: center;
+}
+input[type="text"] {
+  text-align: center;
+}
 body {
   margin: 1em;
   margin-top: 0.5em;
@@ -20,13 +25,13 @@ table {
 }
 th, td {
   /* border-right: var(--border) solid green; */
-  border-right: var(--border) solid black;
+  border-right: var(--border);
 }
 tr td:first-child {
-  border-left: var(--border) solid black;
+  border-left: var(--border);
 }
 tr th:first-child {
-  border-left: var(--border) solid black;
+  border-left: var(--border);
 }
 
 table.dataTable tbody th, table.dataTable tbody tr:first-child td {
@@ -35,20 +40,20 @@ table.dataTable tbody th, table.dataTable tbody tr:first-child td {
 .dtfh-floatingparenthead table.dataTable thead th,
 .dataTables_scrollHead table thead th {
   /* border-bottom: var(--border) solid yellow !important; */
-  border-bottom: var(--border) solid black !important;
+  border-bottom: var(--border) !important;
 }
 
 table tbody td {
   /* border-top: var(--border) solid black !important */
-  border-top: var(--border) solid black !important;
+  border-top: var(--border) !important;
 }
 div.dataTables_scrollHead table.dataTable {
   /* border-top: var(--border) solid blue !important; */
-  border-top: var(--border) solid black !important;
+  border-top: var(--border) !important;
 }
 div.dataTables_scrollBody table.dataTable {
   /* border-bottom: var(--border) solid red !important; */
-  border-bottom: var(--border) solid black !important;
+  border-bottom: var(--border) !important;
 }
 
 .scroll-container::-webkit-scrollbar, .dt-scroll-head::-webkit-scrollbar {
