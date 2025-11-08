@@ -31,8 +31,6 @@ async function init (firstLoad) {
     tr1.append(`<th name="${name}">${name}</th>`)
   }
 
-  setColumnWidths(config.dataTablesAdditions.columnOptions)
-
   // https://datatables.net/reference/option/
   const dataTableOptions =
     {
@@ -74,7 +72,8 @@ async function init (firstLoad) {
 }
 
 function reInit () {
-  if (true) {
+  const altReInit = true
+  if (altReInit) {
     // Alternative to destroy() + init()
     if (!getQueryValue('_cols_show')) {
       setQueryValue('_cols_show', 'all')
@@ -140,11 +139,7 @@ function dtInitComplete () {
   // Must be before adjustDOM() b/c adjustDOM() calls $(window).resize(), which
   // triggers widths of columns to be recalculated based on content added in call
   // to createColumnConstraints().
-  createColumnConstraints()
-
-  // Timeout needed here because createColumnConstraints() adds elements to DOM
-  // with async call. Need to modify so createColumnConstraints takes a callback.
-  setTimeout(() => fixedColumns(), 1)
+  createColumnConstraints(null)
 
   adjustDOM()
 
@@ -340,7 +335,11 @@ async function getConfig () {
       } else {
         config.dataTables.searchCols.push(null)
       }
-
+      const width = (columnOptions[columns[i].name] &&
+                     columnOptions[columns[i].name].width)
+      if (width) {
+        columns[i].width = width
+      }
       const columnRenderAll = config.dataTablesAdditions.columnRender || null
       const renderFunctionsDefined = typeof renderFunctions !== 'undefined'
       if (renderFunctionsDefined && (renderFunctions || columnRenderAll)) {
@@ -607,20 +606,22 @@ function createColumnConstraints (which) {
     const column = this
     const index = column.index()
     const name = config.dataTables.columns[index].name
+    let width = config.dataTables.columns[index].width
+    if (width) {
+      width = ` style="width: ${config.dataTables.columns[index].width}"`
+    }
     if (column.visible() === false) {
-      //const msgo = `createColumnConstraints() => Col '${name}' has visible = false`
       if (!qsNames.includes(name)) {
         // console.log(`${msgo} and no search in query string.`)
         // Do not create constraints for hidden columns unless there
         // is an initial search value from the query string.
         return true
       }
-      //console.log(`${msgo} but search in query string. Showing.`)
       column.visible(true, false)
     }
     if (which === 'all' || which === 'input') {
       const searchOnKeypress = config.dataTables.columns[index].return === false
-      createColumnInput(parent, visibleIndex, name, column, searchOnKeypress)
+      createColumnInput(parent, visibleIndex, name, column, width, searchOnKeypress)
     }
     if (which === 'all' || which === 'select') {
       let showDropdown = showDropdowns
@@ -629,7 +630,7 @@ function createColumnConstraints (which) {
         showDropdown = columnOptions[name].dropdown
       }
       if (config.dataTables.serverSide && showDropdowns !== null) {
-        createColumnDropdown(parent, visibleIndex, name, column, showDropdown)
+        createColumnDropdown(parent, visibleIndex, name, column, width, showDropdown)
       }
     }
     visibleIndex++
@@ -637,12 +638,12 @@ function createColumnConstraints (which) {
   })
 }
 
-function createColumnInput (parent, visibleIndex, name, column, searchOnKeypress) {
+function createColumnInput (parent, visibleIndex, name, column, width, searchOnKeypress) {
   // Create `input` element
   const element = 'thead tr:eq(0) > th'
   const th = $(`${parent} ${element}`).eq(visibleIndex).empty()
   const attrs = `class="columnSearch" name="${name}"`
-  const input = $(`<input ${attrs} type="text" placeholder="Search col."/>`)
+  const input = $(`<input ${attrs} type="text" ${width} placeholder="Search col."/>`)
   const qsName = getQueryValue(name)
 
   let title = 'Enter search text and enter to search. '
@@ -822,20 +823,11 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
   }
 }
 
-function clearAllSearches () {
-  const qs = parseQueryString('state')
-  delete qs._page
-  // Could avoid reInit by looping though all inputs, setting value to ''
-  // and triggering search.
-  window.location.hash = decodeURIComponent($.param(qs))
-  reInit()
-}
-
 function setEvents () {
-  removeEventListener('input', (event) => {
+  window.removeEventListener('input', (event) => {
     console.log('Removing input event:', event)
   })
-  addEventListener('input', (event) => {
+  window.addEventListener('input', (event) => {
     if (event.target && event.target.className === 'columnSearch') {
       let msg = 'setEvents() => input event. Autocomplete selection event '
       msg += 'on columnSearch input. Showing clearAllSearches button.'
@@ -926,7 +918,13 @@ function setQueryLink (url) {
 }
 
 function adjustDOM () {
+  // Timeout needed here because createColumnConstraints() adds elements to DOM
+  // with async call. Need to modify so createColumnConstraints takes a callback
+  // of adjustDOM().
+  setTimeout(() => fixedColumns(), 10)
+
   console.log('adjustDOM() => Called.')
+
   const tableInfo = `${tableID}_info`
   const tableLength = `${tableID}_length`
   const tableFilter = `${tableID}_filter`
@@ -1016,9 +1014,7 @@ function adjustDOM () {
 
   if ($('#clearAllSearches button').length === 0) {
     const clearAllSearches = '<span id="clearAllSearches" title="Clear all searches" onclick="clearAllSearches()"><button>Clear</button></span>'
-    //const clearAllSearches = '<span id="clearAllSearches" title="Clear all searches"><button>Clear</button></span>'
     $(tableInfo).append(clearAllSearches)
-    //$('#clearAllSearches button').off('click').on('click', clearAllSearches)
     // Need to use onclick method instead of .on('click') because .on('click') gives
     // "datatables.min.js:14 Uncaught TypeError: Cannot create property 'guid' on string"
     // (DataTables code sees this inserted span)
@@ -1034,57 +1030,20 @@ function adjustDOM () {
     msg += 'trigger event that causes left column header widths'
     console.log(`${msg} to match the width of the left column body.`)
     $(window).resize()
-    scrollII()
+    scrollBar()
   }, 0)
 
   console.log('adjustDOM() finished.')
 }
 
-function setColumnWidths (columnOptions) {
-  // When autoWidth is true, DataTables sets column widths automatically.
-  // This function overrides those automatic widths based on the
-  // columnOptions.width property for each column.
-  console.log('setColumnWidths() => Called.')
-  if (!columnOptions) {
-    console.log('setColumnWidths() => No columnOptions provided. Returning.')
-    return
-  }
-  columnOptions = array2object(columnOptions, 'name')
-  console.log('setColumnWidths() => Setting column widths')
-  // columnWidths is an object with keys that are column names
-  // and values that are widths, e.g. { 'height': '70em', 'age': '5px' }
-  const columnHeads = $(`${tableID} thead tr:eq(0) th`)
-  for (let i = 0; i < columnHeads.length; i++) {
-    const name = $(columnHeads[i]).attr('name')
-    if (columnOptions[name] && columnOptions[name].width) {
-      const width = columnOptions[name].width
-      console.log(`setColumnWidths() => Setting column ${name} width to ${width}`)
-      setColumnWidth(name, width)
-    }
-  }
-  function setColumnWidth (name, width) {
-    // Why does only the input width need to be set to get correct width?
-    // If widths in tbody are set, run into issues when sticky header is shown.
-    // Note that widths will be larger if content in column is wider.
-    // .fixedHeader-floating {table-layout: initial !important;} is needed
-    // to override DataTables FixedHeader plugin setting table-layout to 'fixed'
-    // when floating header is shown. This causes change in column widths.
-    console.log(`setColumnWidth() => Setting column ${name} width to ${width}`)
-    $('<style>')
-      .prop('type', 'text/css')
-      .html(`
-        .fixedHeader-floating {
-          table-layout: initial !important;
-        }
-        thead tr th[name="${name}"] {
-          width: ${width} !important;
-        }
-        thead tr th[name="${name}"] input {
-          width: ${width} !important;
-        }
-      `)
-      .appendTo('head')
-  }
+function clearAllSearches () {
+  // Used in onclick attribute of Clear All Searches button set in adjustDOM()
+  const qs = parseQueryString('state')
+  delete qs._page
+  // Could avoid reInit by looping though all inputs, setting value to ''
+  // and triggering search.
+  window.location.hash = decodeURIComponent($.param(qs))
+  reInit()
 }
 
 function emptyColumns (indices) {
@@ -1141,7 +1100,7 @@ function fixedColumns () {
   let left = 0
   for (let i = 0; i < nFixed; i++) {
     if (i > 0) {
-      left += $(`${parent} thead tr:eq(0) > th:eq(${i-1})`).outerWidth()
+      left += $(`${parent} thead tr:eq(0) > th:eq(${i - 1})`).outerWidth()
     }
     // First row in header
     $(`${parent} thead tr:eq(0) > th:eq(${i})`)
@@ -1156,7 +1115,7 @@ function fixedColumns () {
       .css('z-index', index)
       .css('background-color', 'white')
     // Body
-    $(`${tableID} tbody tr td:nth-child(${i+1})`)
+    $(`${tableID} tbody tr td:nth-child(${i + 1})`)
       .css('position', 'sticky')
       .css('left', `${left}px`)
       .css('z-index', index)
@@ -1180,7 +1139,7 @@ function watchForFloatingHeader () {
   }
   let msg = 'watchForFloatingHeader() => Setting up MutationObserver '
   console.log(`${msg}to watch for addition of dtfh-floatingparent element.`)
-  const observer = new MutationObserver(function (mutations) {
+  const observer = new window.MutationObserver(function (mutations) {
     mutations.forEach(function (mutation) {
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         mutation.addedNodes.forEach(function (node) {
@@ -1189,9 +1148,8 @@ function watchForFloatingHeader () {
             console.log(`${msg}was added.`)
             // Timeout needed to allow sub-elements to be added in DOM.
             fixedColumns()
-            scrollII(true)
-            //setTimeout(() => { scrollII(true) }, 0)
-            setTimeout(() => { createColumnConstraints() }, 1)
+            scrollBar(true)
+            createColumnConstraints()
           }
         })
       }
@@ -1203,7 +1161,7 @@ function watchForFloatingHeader () {
   observer.observe(document.body, config)
 }
 
-function scrollII (floatingHeader) {
+function scrollBar (floatingHeader) {
   let container2 = $('.dataTables_scrollBody');
   if (floatingHeader) {
     floatingHeader = true
@@ -1219,63 +1177,60 @@ function scrollII (floatingHeader) {
   //      This may not be desired.
   //  (2) When the header becomes fixed, the top scrollbar overlaps the header.
   //      (Scrollbar overlaps header a small amount.)
-  const container1 = $('#container1');
-  let element = '#table1_wrapper table thead tr th:eq(0)'
-  let shift = 0;
-  // get widths of first two header columns (include padding/border)
-  const $ths = $('#table1 thead tr th');
-  const firstWidth = $ths.eq(0).outerWidth() || 0;
-  const secondWidth = $ths.eq(1).outerWidth() || 0;
-  shift = firstWidth + secondWidth;
-  $('#container1 div').width($('#table1').width() - shift);
-  $('#container1').css('margin-left', shift);
+  const container1 = $('#container1')
+
+  let shift = 0
+  // get widths of first fixed columns (include padding/border)
+  const $ths = $('#table1 thead tr th')
+  const config = getConfig.config.dataTablesAdditions
+  let nFixed
+  if (config.fixedColumns === undefined || config.fixedColumns === false) {
+    nFixed = 0
+  } else if (config.fixedColumns === true) {
+    nFixed = 1
+  } else {
+    nFixed = config.fixedColumns
+  }
+  for (let i = 0; i < nFixed; i++) {
+    shift += $ths.eq(i).outerWidth() || 0
+  }
+  $('#container1 div').width($('#table1').width() - shift)
+  $('#container1').css('margin-left', shift)
+
   if (floatingHeader) {
     console.log('triggered')
-    //$('.dtfh-floatingparent').css('top', $('#container1').height() + 'px');
-    //$('.dtfh-floatingparent').append($("#container1"))
-    //$('.dataTables_scrollBody').before($('#container1'))
     const top = $('.dtfh-floatingparent').outerHeight() + 'px';
-    $("#container1").css('position', 'sticky').css('top', top).css('z-index', '10');
+    $('#container1')
+      .css('position', 'sticky')
+      .css('top', top)
+      .css('z-index', '10')
     $('#container1').show()
   } else {
     $('.dataTables_scrollBody').before($('#container1'))
   }
 
-  let scrolling = false;
+  let scrolling = false
   container1.off('scroll').on('scroll', () => {
-    //console.log('#container1 scrollLeft', container1.scrollLeft());
-    console.log('container1 scroll event')
     if (scrolling) {
-      console.log('container1 scrolling = true found. Stopping.')
-      return;
-    } else {
-      console.log('container1 scrolling = false found. Continuing.')
+      return
     }
-    console.log('container1 setting scrolling = true')
     scrolling = true
-    $('.dataTables_scrollBody').scrollLeft(container1.scrollLeft());
-    $('.dataTables_scrollHead').scrollLeft(container1.scrollLeft());
-    container2.scrollLeft(container1.scrollLeft());
-    console.log('container1 setting scrolling = false')
+    $('.dataTables_scrollBody').scrollLeft(container1.scrollLeft())
+    $('.dataTables_scrollHead').scrollLeft(container1.scrollLeft())
+    container2.scrollLeft(container1.scrollLeft())
     scrolling = false
-  });
+  })
   container2.off('scroll').on('scroll', () => {
-    console.log('container2 scroll event')
     if (scrolling) {
-      console.log('container2 scrolling = true found. Stopping.')
-      return;
-    } else {
-      console.log('container2 scrolling = false found. Continuing.')
+      return
     }
-    console.log('container2 setting scrolling = true')
-    if (scrolling) return;
-    console.log('container2 scroll event')
-    scrolling = true;
-    container1.scrollLeft(container2.scrollLeft());
-    console.log('container2 setting scrolling = false')
-    scrolling = false;
-  });
+    if (scrolling) return
+    scrolling = true
+    container1.scrollLeft(container2.scrollLeft())
+    scrolling = false
+  })
 }
+
 function parseQueryString (component, hash) {
   // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
   const nvpair = {}
@@ -1378,7 +1333,7 @@ function checkQueryString (config) {
         alerted = true
         let amsg = `Invalid column name in query string: "${key}". `
         amsg += 'Removing it from query string and any other invalid column names.'
-        alert(amsg)
+        window.alert(amsg)
       }
       setQueryValue(key, null)
     }
@@ -1403,7 +1358,7 @@ function checkQueryString (config) {
       if (!updateHash) {
         let amsg = 'checkQueryString() => Column name in query string not '
         amsg += `found: "${columnName}". Removing it and any other invalid `
-        alert(`${amsg}column names from query string.`)
+        window.alert(`${amsg}column names from query string.`)
       }
       updateHash = true
       delete _cols[i]

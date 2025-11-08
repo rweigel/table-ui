@@ -1,8 +1,36 @@
 const renderFunctions = {}
 
 renderFunctions.ellipsis = function (columnName, config, n) {
-  return DataTable.render.ellipsis(n || 30)
+  return window.DataTable.render.ellipsis(n || 30)
 }
+renderFunctions.renderLink = function (columnName, config, remove) {
+  return (columnString, type, row, meta) => {
+    if (type !== 'display') {
+      return columnString
+    }
+    const url = columnString.replace(remove, '')
+    columnString = `<a href="${columnString}" title="${columnString}" target="_blank">${url}</a>`
+    return columnString
+  }
+}
+renderFunctions.renderURI = function (columnName, config, prefix, prefixReplace, trim) {
+  return (columnString, type, row, meta) => {
+    if (type !== 'display') {
+      return columnString
+    }
+    if (columnString.startsWith(prefix)) {
+      const url = columnString.replace(prefix, prefixReplace)
+      let shortURL = url.replace(prefixReplace, '')
+      if (trim) {
+        shortURL = columnString.split('/')
+        shortURL = shortURL[shortURL.length - 1]
+      }
+      columnString = `<a href="${url}" title="${url}" target="_blank">${shortURL}</a>`
+    }
+    return columnString
+  }
+}
+
 renderFunctions.trimURL = function (columnName, config) {
   return (columnString, type, row, meta) => {
     if (type !== 'display') {
@@ -12,12 +40,16 @@ renderFunctions.trimURL = function (columnName, config) {
     if (urlSplit[urlSplit.length - 1] !== '') {
       const attrs = `href="${columnString}" title="${columnString}"`
       let urlShort = urlSplit[urlSplit.length - 1]
+      if (urlShort.startsWith('?')) {
+        urlShort = '…/' + urlShort
+      }
       urlShort = `<a ${attrs} target="_blank">${urlShort}</a>`
       return urlShort
     }
     return columnString
   }
 }
+
 renderFunctions.underline = function (columnName, config) {
   return (columnString, type, row, meta) => {
     if (type !== 'display') {
