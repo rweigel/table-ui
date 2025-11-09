@@ -3,12 +3,22 @@ const renderFunctions = {}
 renderFunctions.ellipsis = function (columnName, config, n) {
   return window.DataTable.render.ellipsis(n || 30)
 }
-renderFunctions.renderLink = function (columnName, config, remove) {
+renderFunctions.renderLink = function (columnName, config, remove, replace) {
   return (columnString, type, row, meta) => {
     if (type !== 'display') {
       return columnString
     }
-    const url = columnString.replace(remove, '')
+    let url = columnString
+    if (!replace) {
+      replace = ''
+    }
+    //console.log(`renderLink: ${columnString} typeof remove: ${typeof remove} remove=${remove} replace=${replace}`)
+    if (remove) {
+      if (typeof remove === 'string' && remove.startsWith('^')) {
+        remove = new RegExp(remove)
+        url = columnString.replace(remove, replace)
+      }
+    }
     columnString = `<a href="${columnString}" title="${columnString}" target="_blank">${url}</a>`
     return columnString
   }
@@ -18,6 +28,7 @@ renderFunctions.renderURI = function (columnName, config, prefix, prefixReplace,
     if (type !== 'display') {
       return columnString
     }
+    console.log(`renderURI: ${columnString} prefix=${prefix} prefixReplace=${prefixReplace} trim=${trim}`)
     if (columnString.startsWith(prefix)) {
       const url = columnString.replace(prefix, prefixReplace)
       let shortURL = url.replace(prefixReplace, '')

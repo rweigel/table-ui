@@ -68,7 +68,8 @@ async function init (firstLoad) {
   // and console.log() shows the modified version.
   console.log(JSON.parse(JSON.stringify(dataTableOptions)))
   const table = $(tableID).DataTable(dataTableOptions)
-  console.log(`DataTable() returned: ${table}`)
+  console.log('DataTable() returned:')
+  console.log(table)
 }
 
 function reInit () {
@@ -1165,7 +1166,7 @@ function scrollBar (floatingHeader) {
   let container2 = $('.dataTables_scrollBody');
   if (floatingHeader) {
     floatingHeader = true
-    $('#container1').hide()
+    $('#scroll-container').hide()
     container2 = $('.dtfh-floatingparent');
   } else {
     floatingHeader = false
@@ -1177,7 +1178,7 @@ function scrollBar (floatingHeader) {
   //      This may not be desired.
   //  (2) When the header becomes fixed, the top scrollbar overlaps the header.
   //      (Scrollbar overlaps header a small amount.)
-  const container1 = $('#container1')
+  const container1 = $('#scroll-container')
 
   let shift = 0
   // get widths of first fixed columns (include padding/border)
@@ -1194,19 +1195,20 @@ function scrollBar (floatingHeader) {
   for (let i = 0; i < nFixed; i++) {
     shift += $ths.eq(i).outerWidth() || 0
   }
-  $('#container1 div').width($('#table1').width() - shift)
-  $('#container1').css('margin-left', shift)
+  $('#scroll-container div').width($('#table1').width() - shift)
+  $('#scroll-container').css('margin-left', shift)
 
   if (floatingHeader) {
     console.log('triggered')
     const top = $('.dtfh-floatingparent').outerHeight() + 'px';
-    $('#container1')
+    $('#scroll-container')
       .css('position', 'sticky')
       .css('top', top)
       .css('z-index', '10')
-    $('#container1').show()
+    $('#scroll-container').show()
   } else {
-    $('.dataTables_scrollBody').before($('#container1'))
+    $('.dataTables_scrollBody').before($('#scroll-container'))
+    $('#scroll-container').show()
   }
 
   let scrolling = false

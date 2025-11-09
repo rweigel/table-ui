@@ -362,8 +362,8 @@ def _paths(configs, update=False):
 
   # Ensure 'path' values in paths are unique.
   if len(paths) != len(set(paths)):
-    emsg = "Duplicate 'path' values detected. Exiting."
-    return None, _error(emsg, "", update=update)
+    emsg = f"Duplicate 'path' values detected in config; paths = {paths}"
+    return None, _error(emsg, None, update=update)
 
   return paths, None
 
@@ -625,8 +625,10 @@ def _error(emsg, err, update):
     logger.error(f"{emsg}.")
     return emsg
   if err:
-    err = f"{err}. "
-  logger.error(f"{emsg}: {err}Exiting.")
+    err = f"{emsg}: {err}"
+  if emsg.endswith('.'):
+    emsg = emsg[0:-1]
+  logger.error(f"{emsg}. Exiting.")
   exit(1)
 
 

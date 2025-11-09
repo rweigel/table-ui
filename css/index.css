@@ -56,17 +56,18 @@ div.dataTables_scrollBody table.dataTable {
   border-bottom: var(--border) !important;
 }
 
-.scroll-container::-webkit-scrollbar, .dt-scroll-head::-webkit-scrollbar {
+#scroll-container::-webkit-scrollbar, .dt-scroll-head::-webkit-scrollbar {
   -webkit-appearance: none;
   height: var(--scroll-height);
   width: 1px;
 }
-.scroll-container::-webkit-scrollbar-thumb, .dt-scroll-head::-webkit-scrollbar-thumb {
+#scroll-container::-webkit-scrollbar-thumb, .dt-scroll-head::-webkit-scrollbar-thumb {
   border-radius: var(--scroll-height);
   background-color: rgba(0,0,0,0.4);
   box-shadow: 0 0 0px rgba(255,255,255,.4);
 }
-.scroll-container {
+#scroll-container {
+  display: none;
   position: relative;
   top: 0;
   z-index: 5;
