@@ -3,63 +3,6 @@ const renderFunctions = {}
 renderFunctions.ellipsis = function (columnName, config, n) {
   return window.DataTable.render.ellipsis(n || 30)
 }
-renderFunctions.renderLink = function (columnName, config, remove, replace) {
-  return (columnString, type, row, meta) => {
-    if (type !== 'display') {
-      return columnString
-    }
-    let url = columnString
-    if (!replace) {
-      replace = ''
-    }
-    //console.log(`renderLink: ${columnString} typeof remove: ${typeof remove} remove=${remove} replace=${replace}`)
-    if (remove) {
-      if (typeof remove === 'string' && remove.startsWith('^')) {
-        remove = new RegExp(remove)
-        url = columnString.replace(remove, replace)
-      }
-    }
-    columnString = `<a href="${columnString}" title="${columnString}" target="_blank">${url}</a>`
-    return columnString
-  }
-}
-renderFunctions.renderURI = function (columnName, config, prefix, prefixReplace, trim) {
-  return (columnString, type, row, meta) => {
-    if (type !== 'display') {
-      return columnString
-    }
-    console.log(`renderURI: ${columnString} prefix=${prefix} prefixReplace=${prefixReplace} trim=${trim}`)
-    if (columnString.startsWith(prefix)) {
-      const url = columnString.replace(prefix, prefixReplace)
-      let shortURL = url.replace(prefixReplace, '')
-      if (trim) {
-        shortURL = columnString.split('/')
-        shortURL = shortURL[shortURL.length - 1]
-      }
-      columnString = `<a href="${url}" title="${url}" target="_blank">${shortURL}</a>`
-    }
-    return columnString
-  }
-}
-
-renderFunctions.trimURL = function (columnName, config) {
-  return (columnString, type, row, meta) => {
-    if (type !== 'display') {
-      return columnString
-    }
-    const urlSplit = columnString.split('/')
-    if (urlSplit[urlSplit.length - 1] !== '') {
-      const attrs = `href="${columnString}" title="${columnString}"`
-      let urlShort = urlSplit[urlSplit.length - 1]
-      if (urlShort.startsWith('?')) {
-        urlShort = '…/' + urlShort
-      }
-      urlShort = `<a ${attrs} target="_blank">${urlShort}</a>`
-      return urlShort
-    }
-    return columnString
-  }
-}
 
 renderFunctions.underline = function (columnName, config) {
   return (columnString, type, row, meta) => {
@@ -96,5 +39,61 @@ renderFunctions.bold = function (columnName, config) {
       return columnString
     }
     return `<span style="font-weight:bold">${columnString}</span>`
+  }
+}
+
+function trimURL (url, trim) {
+  const attrs = `href="${url}" title="${url}"`
+  let urlTrimmed = url
+  if (trim !== undefined) {
+    urlTrimmed = url.replace(trim, '')
+  } else {
+    const urlSplit = url.split('/')
+    if (urlSplit[urlSplit.length - 1] !== '') {
+      urlTrimmed = urlSplit[urlSplit.length - 1]
+      if (urlTrimmed.startsWith('?')) {
+        urlTrimmed = '…/' + urlTrimmed
+      }
+    }
+  }
+  return `<a ${attrs} target="_blank">${urlTrimmed}</a>`
+}
+
+renderFunctions.trimURL = function (columnName, config, trim) {
+  return (columnString, type, row, meta) => {
+    if (type !== 'display') {
+      return columnString
+    }
+    return trimURL(columnString, trim)
+  }
+}
+
+renderFunctions.renderLink = function (columnName, config, options) {
+  return (columnString, type, row, meta) => {
+    if (type !== 'display') {
+      return columnString
+    }
+    options = options || {}
+    let url = columnString
+    if (options.modify) {
+      options.remove = options.remove || null
+      options.replace = options.replace || ''
+      console.log('renderLink:', options)
+      if (options.remove) {
+        url = columnString.replace(options.remove, options.replace)
+        if (typeof remove === 'string') {
+          //if (remove.startsWith('^')) {
+          //  remove = new RegExp(remove)
+          //}
+        }
+      }
+    }
+    let urlTrimmed = url
+    if (options.trim) {
+      urlTrimmed = trimURL(url, options.trim)
+    }
+    const attrs = `href="${url}" title="${url}"`
+    columnString = `<a ${attrs} target="_blank">${urlTrimmed}</a>`
+    return columnString
   }
 }

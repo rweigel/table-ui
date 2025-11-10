@@ -303,6 +303,7 @@ async function getConfig () {
     console.log('_columns() => _cols from query string:', _cols)
     let allVisible = true
     if (_cols) {
+      _cols = _cols.trim().split(',')
       allVisible = false
     } else {
       _cols = []
@@ -479,8 +480,8 @@ function renderColumn (columnName, config, renderFunctions) {
         console.error(emsg)
         return null
       }
-      const args = functionName.args || []
-      return renderFunctions[name](columnName, config, ...args)
+      const args = functionName.args || undefined
+      return renderFunctions[name](columnName, config, args)
     } else {
       const emsg = `renderColumn() => Render ${functionName} is not a string or object.`
       console.error(emsg)
