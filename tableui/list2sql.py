@@ -7,6 +7,7 @@ def list2sql(table_name, json_body, json_head=None, out=None):
   logger = logging.getLogger(__name__)
   logging.basicConfig(level=logging.INFO)
 
+  out_path = out
   if out is None:
     if json_body.endswith(".json"):
       out_path = json_body.replace(".json", ".sqlite")

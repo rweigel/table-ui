@@ -1,0 +1,32 @@
+{
+  "sqldb": "../demo/demo.body.sqlite",
+  "dataTables": "default.json",
+  "table_name": "demo",
+  "dataTablesAdditions": {
+    "defaultQueryString": "_cols_show=nonempty",
+    "renderFunctions": "../js/render.js",
+    "tableMetadata": {
+      "tableTitle": "Demo Table",
+      "description+": "description+ means append this to default description."
+    },
+    "columnRender": {
+      "function": "underline"
+    },
+    "columnOptions": [
+      {
+        "name": "0",
+        "render": {
+          "function": "annotate",
+          "args": ["⇨"]
+        },
+        "width": "3em"
+      },
+      {
+        "name": "1",
+        "render": {
+          "function": "bold"
+        }
+    }
+    ]
+  }
+}

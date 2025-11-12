@@ -76,11 +76,11 @@ renderFunctions.renderLink = function (columnName, config, options) {
     options = options || {}
     let url = columnString
     if (options.modify) {
-      options.remove = options.remove || null
-      options.replace = options.replace || ''
+      options.modify.remove = options.modify.remove || null
+      options.modify.replace = options.modify.replace || ''
       console.log('renderLink:', options)
-      if (options.remove) {
-        url = columnString.replace(options.remove, options.replace)
+      if (options.modify.remove) {
+        url = url.replace(options.modify.remove, options.modify.replace)
         if (typeof remove === 'string') {
           //if (remove.startsWith('^')) {
           //  remove = new RegExp(remove)

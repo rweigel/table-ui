@@ -7,7 +7,6 @@ import logging
 
 import sqlite3
 import uvicorn
-import fastapi
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +14,28 @@ ROOT_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
 CONFIG_DEFAULT = os.path.join(ROOT_DIR, "conf", "default.json")
 RENDER_DEFAULT = os.path.join(ROOT_DIR, "js", "render.js")
 STYLE_DEFAULT = os.path.join(ROOT_DIR, "css", "index.css")
+
+def factory(config=None):
+  # To start with multiple workers, use
+  #  CONFIG=conf/demos.json uvicorn tableui:factory --factory --workers 2 --port 5001
+  import fastapi
+  if config is None:
+    config = os.environ.get("CONFIG")
+
+  # Configure logging to work with uvicorn
+  logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+  )
+  logger = logging.getLogger(__name__)
+  logger.setLevel(logging.INFO)
+  logger.propagate = True
+
+  logger.info(f"Creating app with config: {config}")
+
+  app = fastapi.FastAPI()
+  _api_init(app, config)
+  return app
 
 def serve(config=CONFIG_DEFAULT, host="0.0.0.0", port=5001, debug=False):
 
@@ -29,15 +50,13 @@ def serve(config=CONFIG_DEFAULT, host="0.0.0.0", port=5001, debug=False):
                 "server_header": False
               }
 
-  app = fastapi.FastAPI()
-
-  _api_init(app, config)
-
+  app = factory(config=config)
   logger.info("Starting server")
   uvicorn.run(app, **runconfig)
 
-
 def _api_init(app, config, path=None, related_paths=[]):
+  import fastapi
+
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles

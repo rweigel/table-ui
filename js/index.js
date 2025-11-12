@@ -542,20 +542,34 @@ function createRelatedTablesDropdown (config) {
   if (relatedTables && Array.isArray(relatedTables) && relatedTables.length > 0) {
     const options = []
     let basePath = window.location.pathname
+    basePath = basePath.replace(/\/+$/, '')
+    basePath = basePath.replace(/^\/+/, '')
+    let shortestBasePath
     for (const rt of relatedTables) {
-      basePath = basePath.replace(rt.path, '')
+      if (basePath.endsWith(rt.path)) {
+        const path = basePath.slice(0, -rt.path.length)
+        if (shortestBasePath === undefined) {
+          shortestBasePath = path
+        }
+        if (path.length < shortestBasePath.length) {
+          shortestBasePath = path
+        }
+      }
     }
     // Remove all trailing slashes so later concatenation yields exactly one slash
-    basePath = basePath.replace(/\/+$/, '')
+    basePath = shortestBasePath.replace(/\/+$/, '')
     basePath = window.location.origin + basePath
     for (const rt of relatedTables) {
       options.push(`<option value="${basePath}/${rt.path}/">${rt.title}</option>`)
     }
     // Determine selected option based on current path
+    const w = window.location.pathname.replace(/\/$/, '').replace(/^\//, '')
     for (let i = 0; i < relatedTables.length; i++) {
       // Remove trailing slash from path
-      const w = window.location.pathname.replace(/\/$/, '')
-      if (w.endsWith(relatedTables[i].path)) {
+      if (w.endsWith(relatedTables[i].path) && (w.length <= relatedTables[i].path.length)) {
+        console.log(relatedTables[i].path)
+        console.log(w)
+        console.log(i)
         $('#relatedTablesSelect').append(options).prop('selectedIndex', i)
         $('#relatedTables').show()
         break
