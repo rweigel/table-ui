@@ -542,30 +542,53 @@ function createRelatedTablesDropdown (config) {
   if (relatedTables && Array.isArray(relatedTables) && relatedTables.length > 0) {
     const options = []
     let basePath = window.location.pathname
-    basePath = basePath.replace(/\/+$/, '')
-    basePath = basePath.replace(/^\/+/, '')
+    console.log(`createRelatedTablesDropdown() => window.location.pathname: '${basePath}'`)
+    basePath = basePath.replace(/\/+$/, '') // Remove trailing slashes
+    basePath = basePath.replace(/^\/+/, '') // Remove leading slashes
+    console.log(`createRelatedTablesDropdown() => modified window.location.pathname: '${basePath}' (leading & trailing slashes removed)`)
     let shortestBasePath
     for (const rt of relatedTables) {
+      console.log(`createRelatedTablesDropdown() => related table path: '${rt.path}'`)
+      rt.path = rt.path.replace(/\/+$/, '') // Remove trailing slashes
+      rt.path = rt.path.replace(/^\/+/, '') // Remove leading slashes
+      console.log(`createRelatedTablesDropdown() => modified related table path: '${rt.path}' (leading & trailing slashes removed)`)
       if (basePath.endsWith(rt.path)) {
+        console.log(`createRelatedTablesDropdown() => basePath '${basePath}' ends with related table path '${rt.path}'`)
         const path = basePath.slice(0, -rt.path.length)
         if (shortestBasePath === undefined) {
           shortestBasePath = path
         }
         if (path.length < shortestBasePath.length) {
+          console.log(`createRelatedTablesDropdown() => New shortest base path: '${path}'`)
           shortestBasePath = path
         }
       }
     }
-    // Remove all trailing slashes so later concatenation yields exactly one slash
-    basePath = shortestBasePath.replace(/\/+$/, '')
-    baseURL = window.location.origin + "/" + basePath
-    for (const rt of relatedTables) {
-      options.push(`<option value="${baseURL}/${rt.path}/">${rt.title}</option>`)
+    basePath = shortestBasePath
+    console.log(`createRelatedTablesDropdown() => Final basePath: '${basePath}'`)
+    let baseURL = window.location.origin // (has not trailing slash)
+    if (basePath) {
+      baseURL += '/' + basePath
     }
+    console.log(`createRelatedTablesDropdown() => baseURL: '${baseURL}'`)
+    for (const rt of relatedTables) {
+      const option = `<option value="${baseURL}/${rt.path}/">${rt.title}</option>`
+      console.log(`createRelatedTablesDropdown() => Adding option ${option}`)
+      options.push(option)
+    }
+
     // Determine selected option based on current path
-    const w = window.location.pathname.replace(/\/$/, '').replace(/^\//, '')
+    console.log(`createRelatedTablesDropdown() => Determining selected option based on current path`)
+    let w = window.location.pathname
+    console.log(`createRelatedTablesDropdown() => window.location.pathname = ${w}`)
+    w = w.replace(/\/$/, '').replace(/^\//, '')
+    console.log(`createRelatedTablesDropdown() => modified window.location.pathname = ${w} (leading & trailing slashes removed)`)
+    w = w.replace(basePath, '')
+    console.log(`createRelatedTablesDropdown() => modified window.location.pathname = ${w} (removed basePath = '${basePath}')`)
     for (let i = 0; i < relatedTables.length; i++) {
-      if (w.replace(basePath + '/', '') === relatedTables[i].path.replace(/\/+$/, '')) {
+      console.log(`w = '${w}'; comparing with '${relatedTables[i].path}'`)
+      if (w === relatedTables[i].path) {
+        console.log(`createRelatedTablesDropdown() => Match found. Setting selectedIndex to ${i}`)
         $('#relatedTablesSelect').append(options).prop('selectedIndex', i)
         $('#relatedTables').show()
         break

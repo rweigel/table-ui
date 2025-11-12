@@ -78,7 +78,7 @@ renderFunctions.renderLink = function (columnName, config, options) {
     if (options.modify) {
       options.modify.remove = options.modify.remove || null
       options.modify.replace = options.modify.replace || ''
-      console.log('renderLink:', options)
+      //console.log('renderLink:', options)
       if (options.modify.remove) {
         url = url.replace(options.modify.remove, options.modify.replace)
         if (typeof remove === 'string') {
