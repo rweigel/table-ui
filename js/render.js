@@ -17,7 +17,26 @@ renderFunctions.underline = function (columnName, config) {
     return columnString
   }
 }
-
+renderFunctions.splitArray = function (columnName, config, symbol) {
+  return (columnString, type, row, meta) => {
+    if (type !== 'display') {
+      return columnString
+    }
+    if (typeof columnString === 'string') {
+      try {
+        const parsed = JSON.parse(columnString.replace(/'/g, '"'))
+        if (Array.isArray(parsed)) {
+          columnString = JSON.stringify(parsed, null, 2).replace(/\n/g, '<br>')
+          columnString = `<div style="text-align: left;">${columnString}</div>`
+        }
+        return columnString
+      } catch (e) {
+        // not JSON — leave original string
+      }
+    }
+    return columnString
+  }
+}
 renderFunctions.annotate = function (columnName, config, symbol) {
   return (columnString, type, row, meta) => {
     if (type !== 'display') {
