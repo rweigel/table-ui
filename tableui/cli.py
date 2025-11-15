@@ -1,32 +1,29 @@
-import tableui
-
 def cli():
   import argparse
 
-  def get_keywords(func):
-    import inspect
-    """Return a dict of (reversed) keyword arguments from a function."""
-    spec = inspect.getfullargspec(func)
-    keys = reversed(spec.args)
-    values = reversed(spec.defaults)
-    return {k: v for k, v in zip(keys, values)}
+  # Define the text for the header
+  description = """
+  Serve a table UI application using Uvicorn.
+  --------------------
+  Example usage:
+    python serve.py --config conf/demo.json
+    python serve.py --config conf/demos.json
+  """
 
-  kwargs = get_keywords(tableui.serve)
+  import utilrsw.uvicorn
+  clargs_uvicorn = utilrsw.uvicorn.cli()
+
+  config_help = "Path to JSON configuration file. Relative paths are "
+  config_help += "interpreted as relative to current working directory "
+  config_help += "server.py executed from."
 
   clargs = {
     "config": {
-      "help": "Path to JSON configuration file. Relative paths are interpreted as relative to current working directory server.py executed from.",
-      "default": kwargs['config']
+      "help": config_help,
+      "type": str,
+      "required": True
     },
-    "host": {
-      "help": "Serve table as a web page at http://host:port.",
-      "default": kwargs['host']
-    },
-    "port": {
-      "help": "Serve table as a web page at http://host:port.",
-      "type": int,
-      "default": kwargs['port']
-    },
+    **clargs_uvicorn,
     "debug": {
       "help": "Verbose logging.",
       "action": "store_true",
@@ -34,10 +31,17 @@ def cli():
     }
   }
 
+  parser_kwargs = {
+    "description": description,
+    "formatter_class": argparse.RawDescriptionHelpFormatter
+  }
+
   parser = argparse.ArgumentParser()
+  parser = argparse.ArgumentParser(**parser_kwargs)
+
   for k, v in clargs.items():
     parser.add_argument(f'--{k}', **v)
 
-  args = vars(parser.parse_args())
+  args = utilrsw.uvicorn.cli(parser=parser)
 
   return args

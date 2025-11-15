@@ -15,44 +15,23 @@ CONFIG_DEFAULT = os.path.join(ROOT_DIR, "conf", "default.json")
 RENDER_DEFAULT = os.path.join(ROOT_DIR, "js", "render.js")
 STYLE_DEFAULT = os.path.join(ROOT_DIR, "css", "index.css")
 
-def factory(config=None):
+
+def run(config_server=None, config_app=None):
+  import utilrsw.uvicorn
+  app_function = "tableui.app"
+  config_server['server_header'] = config_server.get('server_header', False)
+  utilrsw.uvicorn.run(app_function, config_server=config_server, config_app=config_app)
+
+
+def app(config=None):
   # To start with multiple workers, use
   #  CONFIG=conf/demos.json uvicorn tableui:factory --factory --workers 2 --port 5001
   import fastapi
-  if config is None:
-    config = os.environ.get("CONFIG")
-
-  # Configure logging to work with uvicorn
-  logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-  )
-  logger = logging.getLogger(__name__)
-  logger.setLevel(logging.INFO)
-  logger.propagate = True
-
-  logger.info(f"Creating app with config: {config}")
 
   app = fastapi.FastAPI()
   _api_init(app, config)
   return app
 
-def serve(config=CONFIG_DEFAULT, host="0.0.0.0", port=5001, debug=False):
-
-  if debug:
-    logging.basicConfig(level=logging.DEBUG)
-  else:
-    logging.basicConfig(level=logging.INFO)
-
-  runconfig = {
-                "host": host,
-                "port": port,
-                "server_header": False
-              }
-
-  app = factory(config=config)
-  logger.info("Starting server")
-  uvicorn.run(app, **runconfig)
 
 def _api_init(app, config, path=None, related_paths=[]):
   import fastapi
@@ -419,14 +398,15 @@ def _config_read(config_file, update=False):
 def _config_resolve(config, path=None, update=False):
 
   if isinstance(config, str):
-    base_path = os.path.abspath(os.path.dirname(config))
-    base_path = os.path.normpath(base_path)
-    logger.info(f"Base path for relative paths in config: '{base_path}'")
+    base_dir = os.path.abspath(os.path.dirname(config))
+    base_dir = os.path.normpath(base_dir)
+    logger.info(f"Base path for relative paths in config: '{base_dir}'")
     configs, eobj = _config_read(config, update=update)
     if eobj is not None:
       return None, eobj
+    for config in configs:
+      config['base_dir'] = base_dir
   else:
-    base_path = os.getcwd()
     configs = copy.deepcopy(config)
     if not isinstance(configs, list):
       configs = [configs]
@@ -450,7 +430,7 @@ def _config_resolve(config, path=None, update=False):
     config = configs[0]
 
   # Directory paths
-  eobj = _dir_resolve(config, base_path, update=update)
+  eobj = _dir_resolve(config, update=update)
   if eobj is not None:
     return None, eobj
 
@@ -553,6 +533,68 @@ def _config_resolve(config, path=None, update=False):
     return None, eobj
 
   return config, None
+
+
+def _dir_resolve(config, update=False):
+
+  def expand_path(base_dir, path):
+
+    if not isinstance(path, str):
+      return path, None
+
+    if path.startswith('~'):
+      path_rel = path
+      path = os.path.expanduser(path)
+      if not os.path.exists(path):
+        emsg = f"Converted path {path_rel} in config to absolute path {path}, but"
+        emsg += f"'{path}' does not exist."
+        return None, _error(emsg, "", update)
+
+    if not os.path.isabs(path):
+      path_rel = path
+      path = os.path.join(base_dir, path)
+      path = os.path.normpath(path)
+      if not os.path.exists(path):
+        emsg = f"Converted relative path '{path_rel}' to absolute path using "
+        emsg += f"base path = '{base_dir}' giving '{path}', but file does not exist."
+        return None, _error(emsg, "", update)
+
+    return path, None
+
+  base_dir = config.get('base_dir', os.getcwd())
+  if 'sqldb' in config:
+    config['sqldb'], eobj = expand_path(base_dir, config['sqldb'])
+    if eobj is not None:
+      return eobj
+  if 'jsondb' in config:
+    if isinstance(config['jsondb'], str):
+      config['jsondb'], eobj = expand_path(base_dir, config['jsondb'])
+      if eobj is not None:
+        return eobj
+    if 'body' in config['jsondb']:
+      config['jsondb']['body'], eobj = expand_path(base_dir, config['jsondb']['body'])
+      if eobj is not None:
+        return eobj
+    if 'head' in config['jsondb']:
+      config['jsondb']['head'], eobj = expand_path(base_dir, config['jsondb']['head'])
+      if eobj is not None:
+        return eobj
+  if 'dataTables' in config:
+    config['dataTables'], eobj = expand_path(base_dir, config['dataTables'])
+    if eobj is not None:
+      return eobj
+
+  if 'dataTablesAdditions' in config:
+    if 'renderFunctions' in config['dataTablesAdditions']:
+      path = config['dataTablesAdditions']['renderFunctions']
+      config['dataTablesAdditions']['renderFunctions'], eobj = expand_path(base_dir, path)
+      if eobj is not None:
+        return eobj
+    if 'style' in config['dataTablesAdditions']:
+      path = config['dataTablesAdditions']['style']
+      config['dataTablesAdditions']['style'], eobj = expand_path(base_dir, path)
+      if eobj is not None:
+        return eobj
 
 
 def _dataTablesAdditions(config, update=False):
@@ -740,67 +782,6 @@ def _read_default(which, config_r):
     content += default
 
   return content
-
-
-def _dir_resolve(config, base_path, update=False):
-
-  def expand_path(base_path, path):
-
-    if not isinstance(path, str):
-      return path, None
-
-    if path.startswith('~'):
-      path_rel = path
-      path = os.path.expanduser(path)
-      if not os.path.exists(path):
-        emsg = f"Converted path {path_rel} to absolute path {path}, but"
-        emsg += f"'{path}' does not exist."
-        return None, _error(emsg, "", update)
-
-    if not os.path.isabs(path):
-      path_rel = path
-      path = os.path.join(base_path, path)
-      path = os.path.normpath(path)
-      if not os.path.exists(path):
-        emsg = f"Converted relative path '{path_rel}' to absolute path using "
-        emsg += f"base path = '{base_path}' giving '{path}', but file does not exist."
-        return None, _error(emsg, "", update)
-
-    return path, None
-
-  if 'sqldb' in config:
-    config['sqldb'], eobj = expand_path(base_path, config['sqldb'])
-    if eobj is not None:
-      return eobj
-  if 'jsondb' in config:
-    if isinstance(config['jsondb'], str):
-      config['jsondb'], eobj = expand_path(base_path, config['jsondb'])
-      if eobj is not None:
-        return eobj
-    if 'body' in config['jsondb']:
-      config['jsondb']['body'], eobj = expand_path(base_path, config['jsondb']['body'])
-      if eobj is not None:
-        return eobj
-    if 'head' in config['jsondb']:
-      config['jsondb']['head'], eobj = expand_path(base_path, config['jsondb']['head'])
-      if eobj is not None:
-        return eobj
-  if 'dataTables' in config:
-    config['dataTables'], eobj = expand_path(base_path, config['dataTables'])
-    if eobj is not None:
-      return eobj
-
-  if 'dataTablesAdditions' in config:
-    if 'renderFunctions' in config['dataTablesAdditions']:
-      path = config['dataTablesAdditions']['renderFunctions']
-      config['dataTablesAdditions']['renderFunctions'], eobj = expand_path(base_path, path)
-      if eobj is not None:
-        return eobj
-    if 'style' in config['dataTablesAdditions']:
-      path = config['dataTablesAdditions']['style']
-      config['dataTablesAdditions']['style'], eobj = expand_path(base_path, path)
-      if eobj is not None:
-        return eobj
 
 
 def _table_meta(config, update=False):
