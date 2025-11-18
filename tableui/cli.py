@@ -8,6 +8,11 @@ def cli():
   Example usage:
     python serve.py --config conf/demo.json
     python serve.py --config conf/demos.json
+
+  Pass additional Uvicorn arguments as needed
+    python serve.py --config conf/demos.json [Uvicorn options]
+  See
+    python -m uvicorn --help
   """
 
   import utilrsw.uvicorn
@@ -21,13 +26,18 @@ def cli():
     "config": {
       "help": config_help,
       "type": str,
-      "required": True
+      "default": "conf/demo.json"
     },
     **clargs_uvicorn,
     "debug": {
       "help": "Verbose logging.",
       "action": "store_true",
       "default": False
+    },
+    "log-level": {
+      "help": "Set logging level (e.g., DEBUG, INFO, WARNING, ERROR).",
+      "type": str,
+      "default": None
     }
   }
 
@@ -42,6 +52,6 @@ def cli():
   for k, v in clargs.items():
     parser.add_argument(f'--{k}', **v)
 
-  args = utilrsw.uvicorn.cli(parser=parser)
+  configs = utilrsw.uvicorn.cli(parser=parser)
 
-  return args
+  return configs

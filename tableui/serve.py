@@ -6,7 +6,6 @@ import urllib
 import logging
 
 import sqlite3
-import uvicorn
 
 logger = logging.getLogger(__name__)
 
@@ -16,26 +15,33 @@ RENDER_DEFAULT = os.path.join(ROOT_DIR, "js", "render.js")
 STYLE_DEFAULT = os.path.join(ROOT_DIR, "css", "index.css")
 
 
-def run(config_server=None, config_app=None):
-  import utilrsw.uvicorn
-  app_function = "tableui.app"
-  config_server['server_header'] = config_server.get('server_header', False)
-  utilrsw.uvicorn.run(app_function, config_server=config_server, config_app=config_app)
-
-
-def app(config=None):
-  # To start with multiple workers, use
-  #  CONFIG=conf/demos.json uvicorn tableui:factory --factory --workers 2 --port 5001
+def app(config):
   import fastapi
+
+  if isinstance(config, str):
+    # Load configuration from JSON file
+    with open(config, "r") as f:
+      logger.info(f"Reading: {config}")
+      config = f.read()
+      config = json.loads(config)
+      debug = config.get("debug", False)
+      log_level = config.get("log_level", None)
+      config = config['config']
+      if debug:
+        logger.setLevel(logging.DEBUG)
+      if log_level is not None:
+        logger.setLevel(log_level.upper())
+      logger.info(f"Debug: {debug}, log_level: {log_level}")
 
   app = fastapi.FastAPI()
   _api_init(app, config)
+
   return app
 
 
 def _api_init(app, config, path=None, related_paths=[]):
-  import fastapi
 
+  import fastapi
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles
@@ -257,8 +263,8 @@ def _api_init(app, config, path=None, related_paths=[]):
 
     for key in query_params.keys():
       if key not in keys_allowed and key not in config_r['column_names']:
-        logger.error(f"Error: Unknown query parameter: {key}.")
-        emsg = "Error: Unknown query parameter with first five character of "
+        logger.error(f"Unknown query parameter: {key}.")
+        emsg = "Unknown query parameter with first five character of "
         emsg += f"{key[0:5]}. Allowed: {keys_allowed} and column names: "
         emsg += f"{config_r['column_names']}"
         content = {"error": emsg}

@@ -1,21 +1,11 @@
 # Usage:
 #   python server_test.py
 import os
-import time
 import json
 import logging
 import requests
-import multiprocessing
-
-from tableui import serve
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
-
-
-def _server_test_run_server(kwargs):
-  serve(port=kwargs['port'], config=kwargs['config'])
-
 
 def _log_test_title(url):
   line = len(url)*"-"
@@ -23,40 +13,20 @@ def _log_test_title(url):
   logger.info(f"Testing {url}")
   logger.info(line)
 
-def _wait_for_server(url, retries=50, delay=0.2):
-  # Wait for the server to start
-  print("Checking if server is ready by making request to /config ...")
-  for i in range(retries):
-    try:
-      response = requests.get(url, timeout=0.5)
-      if response.status_code == 200:
-        break
-    except Exception:
-      print(f"Server not ready. Next try in {delay} sec...")
-      time.sleep(delay)
-  else:
-    raise RuntimeError(f"Server did not start after {retries} attempts.")
 
-def _run_tests(port, config, head_data, body_data):
+def _run_tests(configs, head_data, body_data):
 
-  server_kwargs = {
-    "port": port,
-    "config": config,
-  }
+  import utilrsw.uvicorn
 
-  proc_kwargs = {
-    "target": _server_test_run_server,
-    "args": (server_kwargs,),
-    "daemon": True
-  }
-
-  server_process = multiprocessing.Process(**proc_kwargs)
-  server_process.start()
-
-  base = f"http://127.0.0.1:{port}"
+  base = f"http://127.0.0.1:{configs['server']['--port']}"
   url = f"{base}/config"
 
-  _wait_for_server(url, retries=50, delay=0.5)
+  wait = {
+    "url": url,
+    "retries": 10,
+    "delay": 0.5
+  }
+  process = utilrsw.uvicorn.start('tableui.app', configs, wait=wait)
 
   _log_test_title(url)
   response = requests.get(url)
@@ -75,7 +45,6 @@ def _run_tests(port, config, head_data, body_data):
   _log_test_title(url)
   response = requests.get(url)
   assert response.status_code == 400
-  print(response.json())
   assert 'error' in response.json()
 
   url = f"{base}/data/?_verbose=true"
@@ -108,7 +77,6 @@ def _run_tests(port, config, head_data, body_data):
     assert response.json()['recordsTotal'] == len(body_data)
     assert response.json()['recordsFiltered'] == len(body_data)
     assert len(response.json()['data']) == len(body_data)
-    print(response.json()['data'])
     for i in range(len(body_data)):
       for j in range(len(head_data)):
         assert response.json()['data'][i][j] == body_data[len(body_data)-1-i][j]
@@ -260,12 +228,14 @@ def _run_tests(port, config, head_data, body_data):
     for col in data.keys():
       assert len(data[col]) <= 3
 
-  server_process.terminate()
-  server_process.join()
+  utilrsw.uvicorn.stop(process)
 
 
 if __name__ == "__main__":
-  port = 4977
+
+  import tableui
+  configs = tableui.cli()
+  configs['server']['--port'] = 4777
 
   scriptdir = os.path.dirname(__file__)
   root_dir = os.path.normpath(os.path.join(scriptdir, "..", "demo"))
@@ -280,15 +250,14 @@ if __name__ == "__main__":
 
   # Test 1
   config = {"jsondb": {"head": head_file, "body": body_file}}
-
-  _run_tests(port, config, head_data, body_data)
+  configs['app']['config'] = config
+  #_run_tests(configs, head_data, body_data)
 
   # Test 2
   table_name = "demo"
   config = {"table_name": table_name}
-  import tableui
   # Convert json to sqlite3 database
   sqldb_path = tableui.list2sql(table_name, body_file, json_head=head_file)
   config["sqldb"] = sqldb_path
-
-  _run_tests(port, config, head_data, body_data)
+  configs['app']['config'] = config
+  _run_tests(configs, head_data, body_data)
