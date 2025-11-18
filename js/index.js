@@ -564,11 +564,12 @@ function createRelatedTablesDropdown (config) {
         }
       }
     }
+    //basePath = shortestBasePath.replace(/\/+$/, '') // Remove trailing slashes
     basePath = shortestBasePath
     console.log(`createRelatedTablesDropdown() => Final basePath: '${basePath}'`)
-    let baseURL = window.location.origin // (has not trailing slash)
+    let baseURL = window.location.origin // (has no trailing slash)
     if (basePath) {
-      baseURL += '/' + basePath
+      baseURL += '/' + basePath.replace(/\/+$/, '')
     }
     console.log(`createRelatedTablesDropdown() => baseURL: '${baseURL}'`)
     for (const rt of relatedTables) {

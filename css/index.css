@@ -199,7 +199,6 @@ table.dataTable tbody {
   display: none;
 }
 .dataTables_length {
-  width: 3em;
   display: inline-block;
 }
 .dataTables_wrapper .dataTables_info {
