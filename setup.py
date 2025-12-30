@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-install_requires = ["pysqlite3", "uvicorn", "fastapi"]
+install_requires = ["uvicorn", "fastapi"]
 
 setup(
     name='tableui',
