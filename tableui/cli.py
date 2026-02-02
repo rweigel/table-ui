@@ -9,9 +9,9 @@ def cli():
     python serve.py --config conf/demo.json
     python serve.py --config conf/demos.json
 
-  Pass additional Uvicorn arguments as needed
+  Additional Uvicorn arguments can be passed:
     python serve.py --config conf/demos.json [Uvicorn options]
-  See
+  To see Uvicorn options:
     python -m uvicorn --help
   """
 

@@ -1,5 +1,6 @@
 # Usage:
-#   python server_test.py
+#   python serve_test.py
+
 import os
 import json
 import logging
@@ -238,7 +239,7 @@ if __name__ == "__main__":
   configs['server']['--port'] = 4777
 
   scriptdir = os.path.dirname(__file__)
-  root_dir = os.path.normpath(os.path.join(scriptdir, "..", "demo"))
+  root_dir = os.path.normpath(os.path.join(scriptdir, "demo"))
 
   head_file = os.path.join(root_dir, 'demo.head.json')
   body_file = os.path.join(root_dir, 'demo.body.json')

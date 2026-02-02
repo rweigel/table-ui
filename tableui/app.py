@@ -19,7 +19,9 @@ def app(config):
   import fastapi
 
   if isinstance(config, str):
-    # Load configuration from JSON file
+    # Load app configuration from JSON file
+    # If config['config'] is a string, it is a file path and will be re-read
+    # for each API request that requires it.
     with open(config, "r") as f:
       logger.info(f"Reading: {config}")
       config = f.read()
