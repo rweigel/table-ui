@@ -976,7 +976,7 @@ function adjustDOM () {
   const numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length
   let colInfo = ` and all ${numCols} columns`
   if (numCols !== numColsVisible) {
-    colInfo = ` and ${numColsVisible} of ${numCols} columns`
+    colInfo = ` and ${numColsVisible}<sup><span style="cursor: help;" title="Unselect 'Hide empty columns' in options to see all columns">*</sup></span> of ${numCols} columns`
   }
 
   const info = $(tableID).DataTable().page.info()
@@ -991,7 +991,7 @@ function adjustDOM () {
     txt += ` (filtered from ${recordsTotal} total)`
   }
   txt += `${colInfo}.`
-  $(tableInfo).text(txt)
+  $(tableInfo).html(txt)
 
   console.log('adjustDOM() => Moving pagination controls and hiding if only one page.')
   $(tablePaginate).insertAfter(tableFilter)
