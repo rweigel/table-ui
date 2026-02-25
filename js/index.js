@@ -946,7 +946,16 @@ function setEvents () {
   console.log('setEvents() => Setting click event for ellipsis spans.')
   $(document).off('click.ellipsis').on('click.ellipsis', 'span.ellipsis', function () {
     const title = $(this).attr('title')
-    if (title) $(this).replaceWith(title)
+    if (!title) return
+    const maxWidth = $(this).closest('td').width() + 'px'
+    $(this).replaceWith(
+      $('<span>').text(title).css({
+        display: 'inline-block',
+        maxWidth,
+        whiteSpace: 'normal',
+        wordBreak: 'break-word'
+      })
+    )
   })
 
   console.log('setEvents() => Setting click event for hideEmptyColumns checkbox.')
