@@ -1,4 +1,5 @@
 const tableID = '#table1'
+let nonemptyMode = false
 console.log('Document ready. Calling init()')
 $(document).ready(() => init(true))
 
@@ -126,6 +127,7 @@ function dtInitComplete () {
   console.log('dtInitComplete() => DOM is ready.')
   const table = $(tableID).dataTable()
   if (getQueryValue('_cols_show') === 'nonempty') {
+    nonemptyMode = true
     let msg = 'dtInitComplete() => Setting hideEmptyColumns '
     msg += 'checkbox to checked because _cols_show=nonempty in query string.'
     console.log(msg)
@@ -133,6 +135,10 @@ function dtInitComplete () {
     console.log('dtInitComplete() => Hiding empty columns.')
     const columnEmpty = emptyColumns(true)
     table.api().columns(columnEmpty).visible(false, false)
+    if (columnEmpty.length === 0) {
+      console.log('dtInitComplete() => No empty columns. Removing _cols_show from query string.')
+      setQueryValue('_cols_show', null)
+    }
   } else {
     console.log('dtInitComplete() => Showing all columns.')
   }
@@ -918,9 +924,9 @@ function setEvents () {
       console.log('setEvents() => draw.dt => Calling adjustDOM()')
       adjustDOM()
 
-      if (pageChanged && getQueryValue('_cols_show') === 'nonempty') {
+      if (pageChanged && nonemptyMode) {
         const msgo = 'setEvents() => draw.dt => '
-        const msg = `${msgo}Page was changed and _cols_show=nonempty. `
+        const msg = `${msgo}Page was changed and nonempty mode is active. `
         console.log(`${msg}Checking for change in number of empty columns.`)
         pageChanged = false
         const _emptyColumnsNow = emptyColumns(true)
@@ -930,6 +936,9 @@ function setEvents () {
           return
         }
         console.log(`${msgo} # of empty columns has changed. Calling init().`)
+        if (_emptyColumnsNow.length > 0) {
+          setQueryValue('_cols_show', 'nonempty')
+        }
         reInit()
       }
     })
