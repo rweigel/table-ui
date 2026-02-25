@@ -771,8 +771,8 @@ def _read_default(which, config_r):
     default = f.read()
 
   content = f"/* Default {content_type} */\n"
-  if which in config_r['dataTablesAdditions']:
-    user = config_r['dataTablesAdditions'][which]
+  user = config_r['dataTablesAdditions'].get(which, None)
+  if user is not None and default_file != user:
     try:
       with open(user) as f:
         user = f.read()

@@ -1,7 +1,30 @@
 const renderFunctions = {}
 
 renderFunctions.ellipsis = function (columnName, config, n) {
-  return window.DataTable.render.ellipsis(n || 30)
+  // https://github.com/DataTables/Plugins/blob/master/dataRender/ellipsis.js
+  // Previous version used only this line
+  //  return window.DataTable.render.ellipsis(n || 30)
+  // This version allows click to expand text.
+  let esc = function (t) {
+      return ('' + t)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+  };
+  return (columnString, type, row, meta) => {
+    if (type !== 'display' || typeof columnString !== 'string') {
+      return columnString
+    }
+    n = n || 30
+    if (n > columnString.length) {
+      return columnString
+    }
+    shortened = columnString.substring(0, n)
+    const ellipsisClick = '<span class="ellipsis-click">&#8230;</span>'
+    shortened += ellipsisClick
+    return `<span class="ellipsis" title="${columnString}">${shortened}</span>`
+  }
 }
 
 renderFunctions.underline = function (columnName, config) {

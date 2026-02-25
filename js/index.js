@@ -943,6 +943,12 @@ function setEvents () {
       }
     })
 
+  console.log('setEvents() => Setting click event for ellipsis spans.')
+  $(document).off('click.ellipsis').on('click.ellipsis', 'span.ellipsis', function () {
+    const title = $(this).attr('title')
+    if (title) $(this).replaceWith(title)
+  })
+
   console.log('setEvents() => Setting click event for hideEmptyColumns checkbox.')
   $('#hideEmptyColumns').unbind('click')
   $('#hideEmptyColumns').click(function () {
@@ -985,7 +991,7 @@ function adjustDOM () {
   const numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length
   let colInfo = ` and all ${numCols} columns`
   if (numCols !== numColsVisible) {
-    colInfo = ` and ${numColsVisible}<sup><span style="cursor: help;" title="Unselect 'Hide empty columns' in options to see all columns">*</sup></span> of ${numCols} columns`
+    colInfo = ` and ${numColsVisible}<sup><span style="cursor: help;" title="Unselect 'Hide empty columns' in options to see all columns">?</sup></span> of ${numCols} columns`
   }
 
   const info = $(tableID).DataTable().page.info()

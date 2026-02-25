@@ -27,7 +27,14 @@
         "render": {
           "function": "bold"
         }
-    }
+      },
+      {
+        "name": "2",
+        "render": {
+          "function": "ellipsis",
+          "args": [2]
+        }
+      }
     ]
   }
 }
