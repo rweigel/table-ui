@@ -176,7 +176,7 @@ def _add_attributes(data, attributes, attribute_names, fixes, path, omit_attribu
   for attribute_name in data:
 
     if omit_attributes is not None and attribute_name in omit_attributes:
-      logger.info(f"  Skipping {path}{attribute_name} b/c in omit_attributes")
+      logger.debug(f"  Skipping {path}{attribute_name} b/c in omit_attributes")
       continue
 
     attribute_names.append(attribute_name)
