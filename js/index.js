@@ -1000,7 +1000,7 @@ function adjustDOM () {
   const numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length
   let colInfo = ` and all ${numCols} columns`
   if (numCols !== numColsVisible) {
-    colInfo = ` and ${numColsVisible}<sup><span style="cursor: help;" title="Unselect 'Hide empty columns' in options to see all columns">?</sup></span> of ${numCols} columns`
+    colInfo = ` and ${numColsVisible}<sup><span style="cursor: help;font-size: 0.40em" title="Unselect 'Hide empty columns' in options to see all columns">&#9432;</sup></span> of ${numCols} columns`
   }
 
   const info = $(tableID).DataTable().page.info()
@@ -1068,7 +1068,7 @@ function adjustDOM () {
 
   if ($(`${tableID}_wrapper #query`).length === 0) {
     console.log('adjustDOM() => Setting query link.')
-    $(tableInfo).append('<span id="query" style="clear:both">&nbsp;<a href="" target="_blank">(Query)</a>&nbsp;</span>')
+    $(tableInfo).append('<span id="query" style="clear:both">&nbsp;<a href="" title="show query string that returns table data in JSON" target="_blank">(Query)</a>&nbsp;</span>')
   }
   $('#query > a').attr('href', setQueryLink.url)
 
