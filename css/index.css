@@ -9,6 +9,9 @@
 input[type="text"] {
   text-align: center;
 }
+#table1_filter input::-webkit-calendar-picker-indicator {
+  display: none !important;
+}
 body {
   margin: 1em;
   margin-top: 0.5em;
@@ -100,6 +103,7 @@ button {
 }
 summary {
   cursor: pointer;
+  width: fit-content;
 }
 details {
   background-color: white;
@@ -196,7 +200,11 @@ table.dataTable tbody {
 }
 .dataTables_filter {
   float: left;
-  display: none;
+}
+.dataTables_filter input {
+  height: 1.4em;
+  box-sizing: border-box;
+  padding: 0;
 }
 .dataTables_length {
   display: inline-block;

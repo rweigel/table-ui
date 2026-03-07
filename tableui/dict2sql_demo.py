@@ -2,6 +2,7 @@ import tableui
 
 config1 = {
   "use_all_attributes": True,
+  "out_dir": 'dict2sql_demo/dict2sql_demo1',
   "paths": {
     "/": {
       "id": None,
@@ -32,6 +33,5 @@ datasets1 = [
     "attribute2": "id_22/attribute2"
   }
 ]
-out_dir1 = 'dict2sql_demo/dict2sql_demo1'
-info = tableui.dict2sql(datasets1, config1, out_dir1, embed=True)
+info = tableui.dict2sql(datasets1, config1, embed=True)
 

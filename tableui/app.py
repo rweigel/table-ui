@@ -260,14 +260,16 @@ def _api_init(app, config, path=None, related_paths=[]):
       '_orders',
       '_return',
       '_uniques',
+      '_globalsearch',
       '_verbose'
     ]
 
+    print(query_params)
     for key in query_params.keys():
       if key not in keys_allowed and key not in config_r['column_names']:
         logger.error(f"Unknown query parameter: {key}.")
-        emsg = "Unknown query parameter with first five character of "
-        emsg += f"{key[0:5]}. Allowed: {keys_allowed} and column names: "
+        emsg = "Unknown query parameter with first five characters '"
+        emsg += f"{key[0:5]}'. Allowed: {keys_allowed} and column names: "
         emsg += f"{config_r['column_names']}"
         content = {"error": emsg}
         return fastapi.responses.JSONResponse(content=content, status_code=400)

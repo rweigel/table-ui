@@ -48,12 +48,13 @@ async function init (firstLoad) {
         // stateLoadParams is not triggered. destroy() must delete
         // state because its column visibility will be used instead
         // of the new column visibility.
-        let msg = 'stateLoadParams() called. Deleting start, length, and '
-        msg += `columns from saved state data: ${data}`
+        let msg = 'stateLoadParams() called. Deleting start, length, '
+        msg += `columns, and search from saved state data: ${data}`
         console.log(msg)
         delete data.start
         delete data.length
         delete data.columns
+        delete data.search
       },
       headerCallback: function (thead, data, start, end, display) {
         // This is needed to prevent DataTables from removing the
@@ -67,6 +68,7 @@ async function init (firstLoad) {
   console.log('init() => Calling DataTable() with options:')
   // dataTableOptions copy is needed b/c DataTable() modifies it
   // and console.log() shows the modified version.
+  dataTableOptions.mark = true
   console.log(JSON.parse(JSON.stringify(dataTableOptions)))
   const table = $(tableID).DataTable(dataTableOptions)
   console.log('DataTable() returned:')
@@ -181,6 +183,11 @@ async function getConfig () {
 
   function updateConfig (config) {
     config.dataTablesAdditions = config.dataTablesAdditions || {}
+
+    const _globalsearch = getQueryValue('_globalsearch')
+    if (_globalsearch) {
+      config.dataTables.search = { search: decodeURIComponent(_globalsearch), smart: true }
+    }
 
     if (config.dataTables.fixedColumns !== undefined) {
       // fixedColumns does not work in DataTables 1.14, so remove from config.
@@ -885,6 +892,20 @@ function setEvents () {
     setQueryValue('_page', null)
     $(tableID).DataTable().page(0)
     setQueryStringFromSearch()
+    const globalSearch = $(tableID).DataTable().search()
+    if (globalSearch) {
+      setQueryValue('_globalsearch', encodeURIComponent(globalSearch))
+      $('#clearAllSearches').show()
+      const historyKey = 'globalSearchHistory:' + window.location.pathname
+      const history = JSON.parse(localStorage.getItem(historyKey) || '[]')
+      if (!history.includes(globalSearch)) {
+        history.unshift(globalSearch)
+        if (history.length > 20) history.pop()
+        localStorage.setItem(historyKey, JSON.stringify(history))
+      }
+    } else {
+      setQueryValue('_globalsearch', null)
+    }
   })
 
   $(tableID).on('stateSaveParams.dt', function (e, settings, data) {})
@@ -991,8 +1012,25 @@ function adjustDOM () {
   const tablePaginate = `${tableID}_paginate`
 
   console.log('adjustDOM() => Moving global search input.')
-  const input = $(`${tableFilter} input`).attr('placeholder', 'Global search')
+  const input = $(`${tableFilter} input`)
+    .attr('placeholder', 'Global search')
+    .attr('type', 'text')
   $(`${tableFilter} label`).replaceWith(input[0])
+  if (input.val()) {
+    input.css('background-color', 'yellow')
+  } else {
+    input.css('background-color', '')
+  }
+  // Attach localStorage-backed datalist for search history
+  const listId = 'globalSearchHistory'
+  if ($(`#${listId}`).length === 0) {
+    $('body').append(`<datalist id="${listId}"></datalist>`)
+  }
+  input.attr('list', listId)
+  const historyKey = 'globalSearchHistory:' + window.location.pathname
+  const history = JSON.parse(localStorage.getItem(historyKey) || '[]')
+  const datalist = $(`#${listId}`).empty()
+  history.forEach(v => datalist.append(`<option value="${v}">`))
   $(`${tableInfo}`).insertAfter(tableFilter)
 
   console.log("adjustDOM() => Creating 'Showing ...' string.")
@@ -1080,8 +1118,10 @@ function adjustDOM () {
     // (DataTables code sees this inserted span)
   }
   const qsSearch = parseQueryString('search')
-  if (Object.keys(qsSearch).length > 0) {
+  if (Object.keys(qsSearch).length > 0 || getQueryValue('_globalsearch')) {
     $('#clearAllSearches').show()
+  } else {
+    $('#clearAllSearches').hide()
   }
 
   console.log('adjustDOM() => Setting timeout to execute $(window).resize().')
@@ -1100,6 +1140,7 @@ function clearAllSearches () {
   // Used in onclick attribute of Clear All Searches button set in adjustDOM()
   const qs = parseQueryString('state')
   delete qs._page
+  delete qs._globalsearch
   // Could avoid reInit by looping though all inputs, setting value to ''
   // and triggering search.
   window.location.hash = decodeURIComponent($.param(qs))

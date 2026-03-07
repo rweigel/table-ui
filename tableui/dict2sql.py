@@ -21,7 +21,7 @@ def dict2sql(datasets, config, embed=False, logger=None):
   if config.get('use_all_attributes', False):
     # Modify attributes dict to include all unique attributes found in all
     # variables. If an attribute is misspelled, it is mapped to the correct
-    # spelling and placed in the attributes dict if there is a fixes for in
+    # spelling and placed in the attributes dict if there is a fixe for it
     # name config.json. The return value of attributes_all is a list 
     # of all uncorrected attribute names encountered.
     import collections
@@ -66,6 +66,7 @@ def dict2sql(datasets, config, embed=False, logger=None):
         info['counts_data'][count[0]] = count[1]
 
   return info
+
 
 def _table_header(attributes):
 
@@ -152,6 +153,7 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
   else:
     return table
 
+
 def _append_columns(data, attributes, row, fixes):
 
   for attribute in attributes:
@@ -189,7 +191,9 @@ def _add_attributes(data, attributes, attribute_names, fixes, path, omit_attribu
 
 
 def _write_files(name, config, out_dir, header, body, counts):
+
   import os
+  import tableui
 
   files = {
     'meta': f'{name}.meta.json',
@@ -224,9 +228,10 @@ def _write_files(name, config, out_dir, header, body, counts):
   utilrsw.write(files['csv'], [header, *body])
 
   logger.info(f"Writing: {files['sql']}")
-  _sql_write(name, header, body, f"{files['sql']}", metadata)
+  tableui.sql.write(name, header, body, f"{files['sql']}", types=None, metadata=metadata, logger=logger, logger_indent="   ")
 
   return files
+
 
 def _table_metadata(name, config, header, files):
   import datetime
@@ -246,117 +251,3 @@ def _table_metadata(name, config, header, files):
 
   return table_metadata
 
-def _sql_write(name, header, body, file, metadata):
-  import os
-
-  indent = "   "
-  import sqlite3
-
-  if os.path.exists(file):
-    logger.info(f"{indent}Removing existing SQLite database file '{file}'")
-    os.remove(file)
-
-  header, body = _sql_prep(header, body)
-
-  for hidx, colname in enumerate(header):
-    header[hidx] = f"`{colname}`"
-
-  column_names = f"({', '.join(header)})"
-  column_spec  = f"({', '.join(header)} TEXT)"
-  column_vals  = f"({', '.join(len(header)*['?'])})"
-
-  create  = f'CREATE TABLE `{name}` {column_spec}'
-  execute = f'INSERT INTO `{name}` {column_names} VALUES {column_vals}'
-
-  logger.debug(f"{indent}Creating and connecting to file '{file}'")
-  conn = sqlite3.connect(file)
-  logger.debug(f"{indent}Done")
-
-  logger.info(f"{indent}Getting cursor from connection to '{file}'")
-  cursor = conn.cursor()
-  logger.debug(f"{indent}Done")
-
-  logger.debug(f"{indent}Creating index using cursor.execute('{create}')")
-  cursor.execute(create)
-  logger.debug(f"{indent}Done")
-
-  logger.info(f"{indent}Inserting rows")
-  logger.debug(f"{indent}using cursor.executemany('{execute}', body)")
-  cursor.executemany(execute, body)
-  logger.debug(f"{indent}Done")
-
-  logger.debug(f"{indent}Executing: connection.commit()")
-  conn.commit()
-  logger.debug(f"{indent}Done")
-
-  if header is not None:
-    index = f"CREATE INDEX idx0 ON `{name}` ({header[0]})"
-    logger.debug(f"{indent}Creating index using cursor.execute('{index}')")
-    cursor.execute(index)
-    logger.debug(f"{indent}Done")
-
-    logger.debug(f"{indent}Executing: commit()")
-    conn.commit()
-    logger.debug(f"{indent}Done")
-
-  conn.close()
-
-  conn = sqlite3.connect(file)
-  cursor = conn.cursor()
-  name_desc = f'{name}.metadata'
-  logger.info(f"{indent}Creating table {name_desc} with table metadata stored as a JSON string")
-
-  spec = "(TableName TEXT NOT NULL, Metadata TEXT)"
-  execute = f"CREATE TABLE `{name_desc}` {spec}"
-  logger.debug(f"{indent}Executing: {execute}")
-  conn.execute(execute)
-  logger.debug(f"{indent}Done")
-
-  import json
-  metadata = json.dumps(metadata)
-  metadata = metadata.replace("'","''")
-  values = f"('{name_desc}', '{metadata}')"
-  insert = f'INSERT INTO `{name_desc}` ("TableName", "Metadata") VALUES {values}'
-  logger.debug(f"{indent}Executing: connection.execute('{insert})'")
-  conn.execute(insert)
-  logger.debug(f"{indent}Done.")
-  conn.commit()
-  conn.close()
-
-def _sql_prep(header, body):
-  import time
-
-  indent = "   "
-
-  def unique(header):
-
-    headerlc = [val.lower() for val in header]
-    headeru = header.copy()
-    for val in header:
-      indices = [i for i, x in enumerate(headerlc) if x == val.lower()]
-      if len(indices) > 1:
-        dups = [header[i] for i in indices]
-        logger.warning(f"{indent}Duplicate column names when cast to lower case: {str(dups)}.")
-        logger.warning(f"{indent}Renaming duplicates by appending _$DUPLICATE_NUMBER$ to the column name.")
-        for r, idx in enumerate(indices):
-          if r > 0:
-            newname = header[idx] + "_$" + str(r) + "$"
-            logger.info(f"{indent}Renaming {header[idx]} to {newname}")
-            headeru[idx] = newname
-    return headeru
-
-
-  logger.info(f"{indent}Renaming non-unique column names")
-  header = unique(header)
-  logger.info(f"{indent}Renamed non-unique column names")
-
-  logger.info(f"{indent}Casting table elements to str.")
-  start = time.time()
-  for i, row in enumerate(body):
-    for j, _ in enumerate(row):
-      body[i][j] = str(body[i][j])
-
-  dt = "{:.2f} [s]".format(time.time() - start)
-  logger.info(f"{indent}Casted table elements to str in {len(body)} rows and {len(header)} columns in {dt}")
-
-  return header, body
