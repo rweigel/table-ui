@@ -229,6 +229,30 @@ def _run_tests(configs, head_data, body_data):
     for col in data.keys():
       assert len(data[col]) <= 3
 
+    cols = f"{head_data[0]},{head_data[2]}"
+    url = f"{base}/data/?a=a01&_uniques=true&_return={cols}&_length=3"
+    _log_test_title(url)
+    response = requests.get(url)
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert list(data.keys()) == cols.split(",")
+    for col in data.keys():
+      assert len(data[col]) <= 3
+
+    cols = f"{head_data[0]},{head_data[2]}"
+    url = f"{base}/data/?a=a01&_uniques=true&_return={cols}&_length=3"
+    _log_test_title(url)
+    response = requests.get(url)
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert list(data.keys()) == cols.split(",")
+    assert data['a'][0][0] == body_data[0][0]
+    assert data['a'][0][1] == 1
+    assert data['c'][0][0] == body_data[0][2]
+    assert data['c'][0][1] == 1
+
   utilrsw.uvicorn.stop(process)
 
 

@@ -1,11 +1,10 @@
 import os
 import copy
 import json
-import time
 import urllib
 import logging
 
-import sqlite3
+import tableui
 
 logger = logging.getLogger(__name__)
 
@@ -35,18 +34,21 @@ def app(config):
         logger.setLevel(log_level.upper())
       logger.info(f"Debug: {debug}, log_level: {log_level}")
 
-  app = fastapi.FastAPI()
-  _api_init(app, config)
+  fastapi_app = fastapi.FastAPI()
+  _api_init(fastapi_app, config)
 
-  return app
+  return fastapi_app
 
 
-def _api_init(app, config, path=None, related_paths=[]):
+def _api_init(app, config, path=None, related_paths=None):
 
   import fastapi
   # Must import StaticFiles from fastapi.staticfiles
   # fastapi.staticfiles is not in dir(fastapi) (it is added dynamically)
   from fastapi.staticfiles import StaticFiles
+
+  if related_paths is None:
+    related_paths = []
 
   def parse_int(parameter, parameters, min=0, default=None):
     if parameter in parameters:
@@ -56,13 +58,15 @@ def _api_init(app, config, path=None, related_paths=[]):
       except Exception:
         emsg = f"Error: {parameter} must be an integer"
         content = {"error": emsg}
-        return fastapi.responses.JSONResponse(content=content, status_code=400)
+        return None, fastapi.responses.JSONResponse(content=content, status_code=400)
       if not val >= min:
         emsg = f"Error: {parameter} >= {min} required"
+        content = {"error": emsg}
+        return None, fastapi.responses.JSONResponse(content=content, status_code=400)
     else:
       val = default
 
-    parameters[parameter] = val
+    return val, None
 
   if path is None:
     path_list, _ = _paths(config)
@@ -70,11 +74,24 @@ def _api_init(app, config, path=None, related_paths=[]):
     if len(path_list) == 0:
       _api_init(app, config, path="")
     else:
+      rp_paths = [rp['path'] for rp in related_paths]
+      if len(related_paths) > 1 and "" not in rp_paths:
+        # Register root redirect once — before the per-path loop
+        first_path = rp_paths[0]
+        logger.info("Initializing endpoint /")
+        @app.route("/", methods=["GET", "HEAD"])
+        def rootredirect(request: fastapi.Request):
+          target = first_path
+          if not target.startswith('/'):
+            target = f"/{target}"
+          url = f"{target}/"
+          logger.info(f"Redirecting '/' to '{url}'")
+          return fastapi.responses.RedirectResponse(url, status_code=302)
       for path in path_list:
         _api_init(app, config, path=path, related_paths=related_paths)
     return
 
-  logger.info(f"Initalizing API with base path = '{path}'")
+  logger.info(f"Initializing API with base path = '{path}'")
 
   # Get config information. update=False => exit on error
   # _r => resolved (file paths, table names, column names, etc.)
@@ -92,19 +109,8 @@ def _api_init(app, config, path=None, related_paths=[]):
   if len(related_paths) > 1:
     for related_path in related_paths:
       path_list.append(related_path['path'])
-    if "" not in path_list:
-      # If more than one path and no root path, redirect root to first path
-      logger.info(f"Initalizing endpoint {path}/")
-      @app.route("/", methods=["GET", "HEAD"])
-      def rootredirect(request: fastapi.Request):
-        target = path_list[0]
-        if not target.startswith('/'):
-          target = f"/{target}"
-        url = f"{target}/"
-        logger.info(f"Redirecting '/' to '{url}'")
-        return fastapi.responses.RedirectResponse(url, status_code=302)
 
-  logger.info(f"Initalizing endpoint {path}/")
+  logger.info(f"Initializing endpoint {path}/")
   @app.route(f"{path}/", methods=["GET", "HEAD"])
   def indexhtml(request: fastapi.Request):
     # Silently ignores any query parameters
@@ -116,7 +122,7 @@ def _api_init(app, config, path=None, related_paths=[]):
 
   if "jsondb" in config_r:
     endpoint = f"{path}/jsondb"
-    logger.info(f"Initalizing endpoint '{endpoint}'")
+    logger.info(f"Initializing endpoint '{endpoint}'")
     @app.route(endpoint, methods=["GET", "HEAD"])
     def jsondb(request: fastapi.Request):
       # Silently ignores any query parameters other than _verbose
@@ -141,7 +147,7 @@ def _api_init(app, config, path=None, related_paths=[]):
 
   if "sqldb" in config_r and config_r["sqldb"] is not None:
     endpoint = f"{path}/sqldb"
-    logger.info(f"Initalizing endpoint '{endpoint}'")
+    logger.info(f"Initializing endpoint '{endpoint}'")
     @app.route(f"{path}/sqldb", methods=["GET", "HEAD"])
     def sqldb(request: fastapi.Request):
       # Silently ignores any query parameters
@@ -159,7 +165,7 @@ def _api_init(app, config, path=None, related_paths=[]):
       return fastapi.responses.FileResponse(config_r['sqldb'], **kwargs)
 
   endpoint = f"{path}/config"
-  logger.info(f"Initalizing endpoint '{endpoint}'")
+  logger.info(f"Initializing endpoint '{endpoint}'")
   @app.route(f"{path}/config", methods=["GET", "HEAD"])
   def configx(request: fastapi.Request):
     # Silently ignores any query parameters
@@ -185,7 +191,7 @@ def _api_init(app, config, path=None, related_paths=[]):
     return fastapi.responses.JSONResponse(content=content)
 
   endpoint = f"{path}/style.css"
-  logger.info(f"Initalizing endpoint '{endpoint}'")
+  logger.info(f"Initializing endpoint '{endpoint}'")
   @app.route(f"{path}/style.css", methods=["GET", "HEAD"])
   def style(request: fastapi.Request):
     # Silently ignores any query parameters
@@ -199,7 +205,7 @@ def _api_init(app, config, path=None, related_paths=[]):
     return fastapi.responses.Response(content=content, media_type="text/css")
 
   endpoint = f"{path}/render.js"
-  logger.info(f"Initalizing endpoint '{endpoint}'")
+  logger.info(f"Initializing endpoint '{endpoint}'")
   @app.route(f"{path}/render.js", methods=["GET", "HEAD"])
   def render(request: fastapi.Request):
     # Silently ignores any query parameters
@@ -213,7 +219,7 @@ def _api_init(app, config, path=None, related_paths=[]):
     return fastapi.responses.Response(content=content, media_type=media_type)
 
   endpoint = f"{path}/data/"
-  logger.info(f"Initalizing endpoint '{endpoint}'")
+  logger.info(f"Initializing endpoint '{endpoint}'")
   @app.route(f"{path}/data/", methods=["POST", "GET", "HEAD"])
   def data(request: fastapi.Request):
 
@@ -263,10 +269,11 @@ def _api_init(app, config, path=None, related_paths=[]):
       '_globalsearch',
       '_verbose'
     ]
+    # We ignore the DataTables jQuery cache-buster "_"
 
-    print(query_params)
     for key in query_params.keys():
       if key not in keys_allowed and key not in config_r['column_names']:
+        # We truncate the error message to the first five characters for security reasons
         logger.error(f"Unknown query parameter: {key}.")
         emsg = "Unknown query parameter with first five characters '"
         emsg += f"{key[0:5]}'. Allowed: {keys_allowed} and column names: "
@@ -286,8 +293,12 @@ def _api_init(app, config, path=None, related_paths=[]):
     else:
       query_params["_uniques"] = False
 
-    parse_int("_start", query_params, min=0, default=0)
-    parse_int("_length", query_params, min=1, default=None)
+    query_params["_start"], err = parse_int("_start", query_params, min=0, default=0)
+    if err is not None:
+      return err
+    query_params["_length"], err = parse_int("_length", query_params, min=1, default=None)
+    if err is not None:
+      return err
 
     if "_orders" in query_params:
       orders = query_params["_orders"].split(",")
@@ -304,17 +315,23 @@ def _api_init(app, config, path=None, related_paths=[]):
     else:
       query_params["_orders"] = None
 
-    searches = {}
-    if query_params is not None:
-      logger.info(f"Query params: {query_params}")
-      for key, _ in query_params.items():
-        if key in config_r['column_names']:
-          kwargs = {'encoding': 'utf-8', 'errors': 'replace'}
-          searches[key] = urllib.parse.unquote(query_params[key], **kwargs)
-      query_params['searches'] = searches
-      logger.info(f"Search params: {searches}")
+    if "_globalsearch" in query_params:
+      kwargs = {'encoding': 'utf-8', 'errors': 'replace'}
+      query_params["_globalsearch"] = urllib.parse.unquote(query_params["_globalsearch"], **kwargs)
+      if not query_params["_globalsearch"]:
+        query_params["_globalsearch"] = None
     else:
-      query_params['searches'] = None
+      query_params["_globalsearch"] = None
+
+    searches = {}
+    logger.info(f"Query params: {query_params}")
+    for key, _ in query_params.items():
+      if key in config_r['column_names']:
+        kwargs = {'encoding': 'utf-8', 'errors': 'replace'}
+        searches[key] = urllib.parse.unquote(query_params[key], **kwargs)
+    query_params['searches'] = searches
+    logger.info(f"Search params: {searches}")
+    logger.info(f"Global search: {query_params['_globalsearch']}")
 
     return_cols = config_r['column_names']
     if "_return" in query_params:
@@ -347,8 +364,12 @@ def _api_init(app, config, path=None, related_paths=[]):
 
     data = _data_transform(result['data'], return_cols, query_params["_verbose"])
 
+    draw, err = parse_int("_draw", query_params, min=1, default=1)
+    if err is not None:
+      return err
+
     content = {
-                "draw": int(query_params.get("_draw", 1)),
+                "draw": draw,
                 "recordsTotal": result['recordsTotal'],
                 "recordsFiltered": result['recordsFiltered'],
                 "data": data
@@ -461,9 +482,9 @@ def _config_resolve(config, path=None, update=False):
     return None, eobj
 
   # Add (or updates) and checks 'dataTables' in config
-  emsg = _dataTables(config, update=update)
-  if emsg is not None:
-    return None, emsg
+  eobj = _dataTables(config, update=update)
+  if eobj is not None:
+    return None, eobj
 
   if 'jsondb' in config:
 
@@ -509,7 +530,7 @@ def _config_resolve(config, path=None, update=False):
     table_name = ".".join(os.path.basename(config['sqldb']).split(".")[0:-1])
     if table_name in config['sqldb_tables']:
       msg = "No table_name given; Found table with name based on sqldb "
-      msg += "file name: '{table_name}'"
+      msg += f"file name: '{table_name}'"
       logger.info(msg)
       config['table_name'] = table_name
     else:
@@ -523,9 +544,9 @@ def _config_resolve(config, path=None, update=False):
       return None, _error(emsg, "", update)
 
   # Adds 'column_names' to config and 'columns' to config['dataTables']
-  emsg = _column_names(config, update=update)
-  if emsg is not None:
-    return None, emsg
+  eobj = _column_names(config, update=update)
+  if eobj is not None:
+    return None, eobj
 
   # Adds or updates 'dataTablesAdditions' in config
   eobj = _dataTablesAdditions(config, update=update)
@@ -606,8 +627,11 @@ def _dir_resolve(config, update=False):
       if eobj is not None:
         return eobj
 
+  return None
+
 
 def _dataTablesAdditions(config, update=False):
+  import datetime
 
   dataTablesAdditions = config.get("dataTablesAdditions", {})
 
@@ -631,6 +655,7 @@ def _dataTablesAdditions(config, update=False):
   if dataTablesAdditions['tableMetadata'].get('tableTitle', None) is None:
     dataTablesAdditions['tableMetadata']['tableTitle'] = config['table_name']
 
+  dbfile = None
   if "sqldb" in config:
     dbfile = config["sqldb"]
     #dataTablesAdditions['sqldb'] = os.path.basename(dbfile)
@@ -643,9 +668,8 @@ def _dataTablesAdditions(config, update=False):
     dataTablesAdditions['tableMetadata']['tableType'] = "json"
     dataTablesAdditions['tableMetadata']['tableFile'] = os.path.basename(dbfile)
 
-  if dataTablesAdditions['tableMetadata'].get('creationDate', None) is None:
+  if dbfile is not None and dataTablesAdditions['tableMetadata'].get('creationDate', None) is None:
     try:
-      import datetime
       mtime = os.path.getmtime(dbfile)
       creationDate = datetime.datetime.fromtimestamp(mtime).isoformat()
       dataTablesAdditions['tableMetadata']['creationDate'] = creationDate[0:-7] + "Z"
@@ -653,6 +677,8 @@ def _dataTablesAdditions(config, update=False):
       logger.warning(f"Could not get file modification time for {dbfile}: {e}")
 
   config['dataTablesAdditions'] = dataTablesAdditions
+
+  return None
 
 
 def _dataTables(config, update=False):
@@ -690,15 +716,17 @@ def _dataTables(config, update=False):
         logger.warning("Warning: Config file specifies serverSide=true but jsondb was given. Overriding to serverSide=false")
       config['dataTables']['serverSide'] = False
 
+  return None
+
 
 def _error(emsg, err, update):
+  emsg = emsg.strip().rstrip('.')
+  if err:
+    err = str(err).strip().rstrip('.')
+    emsg = f"{emsg}: {err}."
   if update:
     logger.error(f"{emsg}.")
     return emsg
-  if err:
-    err = f"{emsg}: {err}"
-  if emsg.endswith('.'):
-    emsg = emsg[0:-1]
   logger.error(f"{emsg}. Exiting.")
   exit(1)
 
@@ -722,12 +750,9 @@ def _column_names(config, update=False):
       config['dataTables']['columns'].append({"name": column_name})
 
   if 'sqldb' in config:
-    query = f"PRAGMA table_info('{config['table_name']}');"
     try:
       logger.info("Getting column names")
-      data = _sql_execute(query, sqldb=config['sqldb'])
-      logger.info(f"Got {len(data)} column names\n")
-      config['column_names'] = [row[1] for row in data]
+      config['column_names'] = tableui.sql.column_names(config['sqldb'], config['table_name'])
     except Exception as e:
       emsg = "Error getting column names"
       return _error(emsg, e, update)
@@ -736,8 +761,8 @@ def _column_names(config, update=False):
 
     return None
 
-  n_rows = len(config['jsondb']['data'][0])
-  column_names = [str(c) for c in range(0, n_rows)]
+  n_cols = len(config['jsondb']['data'][0])
+  column_names = [str(c) for c in range(0, n_cols)]
   if config['jsondb'].get('head', None) is None:
     if not update:
       logger.warning("No json_head file given. Using indices for column names.")
@@ -747,7 +772,7 @@ def _column_names(config, update=False):
 
   if not os.path.exists(config['jsondb']['head']):
     emsg = f"File not found: {config['jsondb']['head']}"
-    _error(emsg, "", update)
+    return _error(emsg, "", update)
 
   with open(config['jsondb']['head']) as f:
     try:
@@ -764,9 +789,11 @@ def _read_default(which, config_r):
   if which == 'renderFunctions':
     default_file = RENDER_DEFAULT
     content_type = "javascript"
-  if which == 'style':
+  elif which == 'style':
     default_file = STYLE_DEFAULT
     content_type = "css"
+  else:
+    raise ValueError(f"Unknown 'which' value: '{which}'. Expected 'renderFunctions' or 'style'.")
 
   default = ""
   with open(default_file) as f:
@@ -812,115 +839,6 @@ def _table_meta(config, update=False):
   return None
 
 
-def _sql_cursor(sqldb, memory=False):
-  import threading
-  # memory = True not well tested.
-  #  Seems much slower for small and fast queries and
-  #  ~3x faster for large and complex queries.
-  if not memory:
-    connection = sqlite3.connect(sqldb)
-    cursor = connection.cursor()
-  else:
-    try:
-      # Open the file-based DB and a fresh in-memory DB
-      file_conn = sqlite3.connect(sqldb)
-      mem_conn = sqlite3.connect(":memory:")
-      # Copy the whole file DB into memory
-      # Simple module-level cache to avoid re-copying unchanged DB files into memory
-      if '_MEMORY_DB_CACHE' not in globals():
-        _MEMORY_DB_CACHE = {}
-        _MEMORY_DB_LOCK = threading.Lock()
-      else:
-        _MEMORY_DB_CACHE = globals()['_MEMORY_DB_CACHE']
-        _MEMORY_DB_LOCK = globals()['_MEMORY_DB_LOCK']
-
-      file_path = os.path.abspath(sqldb)
-      try:
-        mtime = os.path.getmtime(file_path)
-      except Exception:
-        mtime = None
-
-      # If we've already copied this exact file (same mtime), reuse the in-memory connection
-      with _MEMORY_DB_LOCK:
-        cache_entry = _MEMORY_DB_CACHE.get(file_path)
-        if cache_entry is not None and cache_entry[0] == mtime:
-          connection = cache_entry[1]
-          cursor = connection.cursor()
-          return cursor, connection
-
-      # Otherwise create a fresh in-memory DB (closing any stale cached connection)
-      if cache_entry is not None:
-        try:
-          cache_entry[1].close()
-        except Exception:
-          pass
-        with _MEMORY_DB_LOCK:
-          _MEMORY_DB_CACHE.pop(file_path, None)
-
-      try:
-        # Open the file-based DB and a fresh in-memory DB, then copy
-        logger.info(f"Copying database '{sqldb}' into memory")
-        file_conn = sqlite3.connect(sqldb)
-        mem_conn = sqlite3.connect(":memory:")
-        file_conn.backup(mem_conn)
-        file_conn.close()
-        connection = mem_conn
-        cursor = mem_conn.cursor()
-        # Cache the new in-memory DB keyed by absolute path and current mtime
-        with _MEMORY_DB_LOCK:
-          _MEMORY_DB_CACHE[file_path] = (mtime, mem_conn)
-      except Exception:
-        # Ensure any opened connections are closed on error
-        try:
-          file_conn.close()
-        except Exception:
-          pass
-        try:
-          mem_conn.close()
-        except Exception:
-          pass
-        raise
-    except Exception:
-      # Ensure any opened connections are closed on error
-      try:
-        file_conn.close()
-      except Exception:
-        pass
-      try:
-        mem_conn.close()
-      except Exception:
-        pass
-      raise
-
-  return cursor, connection
-
-
-def _sql_execute(query, sqldb=None, params=None):
-
-  start = time.time()
-  cursor, connection = _sql_cursor(sqldb, memory=False)
-
-  logger.info("  Executing")
-  logger.info(f"  {query}")
-  if params:
-      logger.info("  with parameters:")
-      logger.info(f"  {params}")
-  logger.info("  and fetching all results from")
-  logger.info(f"  {sqldb if sqldb is not None else 'existing connection'}")
-  if params:
-      result = cursor.execute(query, params)
-  else:
-      result = cursor.execute(query)
-  data = result.fetchall()
-  connection.close()
-  dt = "{:.4f} [s]".format(time.time() - start)
-  n_rows = len(data)
-  n_cols = len(data[0]) if n_rows > 0 else 0
-  logger.info(f"  {dt} to execute query and fetch {n_rows}x{n_cols} table.")
-
-  return data
-
-
 def _sql_query(dbinfo, query_params):
 
   def orderby(orders):
@@ -935,57 +853,65 @@ def _sql_query(dbinfo, query_params):
     orderstr = orderstr[:-2]
     return orderstr
 
-  def clause(searches):
+  def where(searches, globalsearch=None, all_columns=None):
     if searches is None:
         return "", []
     keys = list(searches.keys())
-    where = []
+    clauses = []
     params = []
     escape = "\\"
     for key in keys:
-        val = searches[key]
-        if val == "''" or val == '""':
-            where.append(f"`{key}` = ?")
-            params.append('')
-        elif val.startswith('>'):
-            where.append(f"`{key}` > ?")
-            params.append(val[1:])
-        elif val.startswith('≥'):
-            where.append(f"`{key}` >= ?")
-            params.append(val[1:])
-        elif val.startswith('<'):
-            where.append(f"`{key}` < ?")
-            params.append(val[1:])
-        elif val.startswith('≤'):
-            where.append(f"`{key}` <= ?")
-            params.append(val[1:])
-        elif val.startswith("'") and val.endswith("'"):
-            where.append(f"`{key}` = ?")
-            params.append(val.strip("'"))
-        elif val.startswith('%') and not val.endswith('%'):
-            where.append(f"`{key}` LIKE ? ESCAPE '{escape}'")
-            params.append(val)
-        elif not val.startswith('%') and val.endswith('%'):
-            where.append(f"`{key}` LIKE ? ESCAPE '{escape}'")
-            params.append(val)
-        else:
-            where.append(f"`{key}` LIKE ? ESCAPE '{escape}'")
-            params.append(f"%{val}%")
-    if len(where) == 0:
-        return "", []
-    return "WHERE " + " AND ".join(where), params
+      val = searches[key]
+      if val == "''" or val == '""':
+        clauses.append(f"`{key}` = ?")
+        params.append('')
+      elif val.startswith('>'):
+        clauses.append(f"`{key}` > ?")
+        params.append(val[1:])
+      elif val.startswith('≥'):
+        clauses.append(f"`{key}` >= ?")
+        params.append(val[1:])
+      elif val.startswith('<'):
+        clauses.append(f"`{key}` < ?")
+        params.append(val[1:])
+      elif val.startswith('≤'):
+        clauses.append(f"`{key}` <= ?")
+        params.append(val[1:])
+      elif val.startswith("'") and val.endswith("'"):
+        clauses.append(f"`{key}` = ?")
+        params.append(val.strip("'"))
+      elif val.startswith('%') and not val.endswith('%'):
+        clauses.append(f"`{key}` LIKE ? ESCAPE '{escape}'")
+        params.append(val)
+      elif not val.startswith('%') and val.endswith('%'):
+        clauses.append(f"`{key}` LIKE ? ESCAPE '{escape}'")
+        params.append(val)
+      else:
+        clauses.append(f"`{key}` LIKE ? ESCAPE '{escape}'")
+        params.append(f"%{val}%")
+    if globalsearch and all_columns:
+      or_parts = [f"`{col}` LIKE ? ESCAPE '{escape}'" for col in all_columns]
+      clauses.append("(" + " OR ".join(or_parts) + ")")
+      params.extend([f"%{globalsearch}%"] * len(all_columns))
+    if len(clauses) == 0:
+      return "", []
+    return "WHERE " + " AND ".join(clauses), params
 
   offset = query_params['_start']
   limit = query_params['_length']
   orders = query_params['_orders']
   searches = query_params['searches']
+  globalsearch = query_params.get('_globalsearch', None)
   _return = query_params['_return']
   uniques = query_params['_uniques']
 
   recordsTotal = dbinfo['n_rows']
   recordsFiltered = recordsTotal
 
-  clause_str, clause_params = clause(searches)
+  sqldb = dbinfo['sqldb']
+  table = dbinfo['table_name']
+
+  clause, params = where(searches, globalsearch=globalsearch, all_columns=dbinfo['column_names'])
 
   if uniques:
     uniques = {}
@@ -994,12 +920,9 @@ def _sql_query(dbinfo, query_params):
       columns = dbinfo['column_names']
     for col in columns:
       logger.info(f"Getting unique values for column '{col}'")
-      query = f"SELECT `{col}`, COUNT(*) as count FROM `{dbinfo['table_name']}` "
-      query += f"{clause_str} GROUP BY `{col}`"
-      rows = _sql_execute(query, sqldb=dbinfo['sqldb'], params=clause_params)
-      logger.info(f"Got {len(rows)} unique values\n")
+      uniques[col] = tableui.sql.uniques(sqldb, table, col, clause=clause, params=params)
+      logger.info(f"Got {len(uniques[col])} unique values\n")
       # Each value is a list of (value, count) tuples
-      uniques[col] = rows.copy()
     return {"data": uniques}
 
   if _return is None:
@@ -1007,11 +930,10 @@ def _sql_query(dbinfo, query_params):
   else:
     columns_str = ", ".join([f"`{col}`" for col in _return])
 
-  query = f"SELECT {columns_str} FROM `{dbinfo['table_name']}` "
-  query += f"{clause_str} {orderby(orders)}"
+  query = f"SELECT {columns_str} FROM `{table}` {clause} {orderby(orders)}"
   if offset == 0 and limit is None:
     logger.info("No _start or _length given. Extracting all records.")
-    data = _sql_execute(query, sqldb=dbinfo['sqldb'], params=clause_params)
+    data = tableui.sql.execute(sqldb, query, params=params)
     if searches is not None:
       recordsFiltered = len(data)
     return {
@@ -1021,32 +943,35 @@ def _sql_query(dbinfo, query_params):
             }
 
   if searches is not None:
-    query_count = f"SELECT COUNT(*) FROM `{dbinfo['table_name']}` {clause_str}"
     logger.info("Getting number of filtered records")
-    recordsFiltered = _sql_execute(query_count,
-                                   sqldb=dbinfo['sqldb'],
-                                   params=clause_params)[0][0]
+    recordsFiltered = tableui.sql.nrows(sqldb, table, clause=clause, params=params)
     logger.info(f"Got number of filtered records = {recordsFiltered}\n")
 
   if limit is None:
     limit = recordsTotal
 
-  warning = None
+  warnings = []
   if offset >= recordsFiltered:
-    warning = f"_start={offset} is larger than the number of filtered records "
-    warning += f" ({recordsFiltered}). Setting _start to "
-    warning += f"{max(0, recordsFiltered - limit)}"
-    offset = max(0, recordsFiltered - limit)
+    new_offset = max(0, recordsFiltered - limit)
+    warnings.append(
+      f"_start={offset} is larger than the number of filtered records "
+      f"({recordsFiltered}). Setting _start to {new_offset}."
+    )
+    offset = new_offset
 
   if offset + limit > recordsFiltered:
-    warning = f"_start + _length = {offset + limit} is larger than the "
-    warning += f"number of filtered records ({recordsFiltered})."
-    warning += f" Setting _length to {recordsFiltered - offset}"
-    limit = recordsFiltered - offset
+    new_limit = recordsFiltered - offset
+    warnings.append(
+      f"_start + _length = {offset + limit} is larger than the number of "
+      f"filtered records ({recordsFiltered}). Setting _length to {new_limit}."
+    )
+    limit = new_limit
+
+  warning = " ".join(warnings) if warnings else None
 
   query = f"{query} LIMIT {limit} OFFSET {offset}"
   logger.info(f"Getting records with offset={offset} and limit={limit}")
-  data = _sql_execute(query, sqldb=dbinfo['sqldb'], params=clause_params)
+  data = tableui.sql.execute(sqldb, query, params=params)
   logger.info(f"Got {len(data)} records\n")
 
   result = {
@@ -1054,6 +979,7 @@ def _sql_query(dbinfo, query_params):
               'recordsFiltered': recordsFiltered,
               'data': data
             }
+
   if warning is not None:
     result['warning'] = warning
 
@@ -1072,7 +998,8 @@ def _sql_table_meta(config, update=False):
     try:
       query = f"SELECT * FROM `{table_metadata}`"
       logger.info("Getting table metadata")
-      row = _sql_execute(query, sqldb=config['sqldb'])[0]
+      rows = tableui.sql.execute(config['sqldb'], query)
+      row = rows[0] if rows else None
       if row is not None:
         config['table_meta'] = json.loads(row[1])
         keys = list(config['table_meta'].keys())
@@ -1084,12 +1011,13 @@ def _sql_table_meta(config, update=False):
       emsg = "Error getting table metadata"
       return _error(emsg, e, update)
 
+  return None
+
 
 def _sql_n_rows(config, update=False):
   try:
-    query = f"SELECT COUNT(*) FROM `{config['table_name']}`"
     logger.info("Getting number of rows")
-    config["n_rows"] = _sql_execute(query, sqldb=config['sqldb'])[0][0]
+    config["n_rows"] = tableui.sql.nrows(config['sqldb'], config['table_name'])
     logger.info(f"Got number of rows = {config['n_rows']}\n")
   except Exception as e:
     emsg = f"Error getting number of rows in {config['table_name']}"
@@ -1099,14 +1027,9 @@ def _sql_n_rows(config, update=False):
 
 
 def _sql_table_names(config, update=False):
-
-  query = "SELECT name FROM sqlite_master WHERE type='table';"
   try:
-    table_names = []
     logger.info("Getting table names")
-    data = _sql_execute(query, sqldb=config['sqldb'])
-    for row in data:
-      table_names.append(row[0])
+    table_names = tableui.sql.table_names(config['sqldb'])
     logger.info("Got tables names")
     logger.info(f"  {table_names}\n")
   except Exception as e:
