@@ -19,6 +19,58 @@ body {
 h1 {
   font-size: 1em;
 }
+
+button {
+  background-color: white;
+  border: 1px solid black;
+}
+summary {
+  cursor: pointer;
+  width: fit-content;
+}
+details {
+  background-color: white;
+}
+input[type="checkbox"] {
+  accent-color: black;
+}
+a {
+  color: black;
+  text-decoration-color: black;
+}
+details code {
+  font-size: small;
+  background-color: rgb(244, 244, 244);
+  border: 1px solid black;
+  border-radius: 4px;
+  padding: 0.1em;
+}
+select.columnUniques {
+  visibility: hidden;
+  overflow: auto;
+  margin-top: 0.25em;
+}
+span.clearOneSearch {
+  white-space: nowrap;
+  visibility: hidden;
+  cursor: pointer;
+}
+div.options {
+  margin-left: 1em;
+  border: 1px solid black;
+  padding: 0.5em;
+}
+div.cell {
+  position: relative;
+  height: 100%;
+}
+.icon-in-cell {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+}
+
+
 th, td {
   white-space: nowrap;
 }
@@ -40,6 +92,7 @@ tr th:first-child {
 table.dataTable tbody th, table.dataTable tbody tr:first-child td {
   padding-top: 18px;
 }
+
 .dtfh-floatingparenthead table.dataTable thead th,
 .dataTables_scrollHead table thead th {
   /* border-bottom: var(--border) solid yellow !important; */
@@ -84,53 +137,10 @@ div.dataTables_scrollBody table.dataTable {
   */
   margin-bottom: var(--scroll-height-fix);
 }
-div.cell {
-  position: relative;
-  height: 100%;
-}
-.icon-in-cell {
-  position: absolute;
-  top: 1px;
-  left: 1px;
-}
+
 
 .dataTables_wrapper.no-footer div.dataTables_scrollBody>table {
   border: 1px solid #ddd;
-}
-button {
-  background-color: white;
-  border: 1px solid black;
-}
-summary {
-  cursor: pointer;
-  width: fit-content;
-}
-details {
-  background-color: white;
-}
-input[type="checkbox"] {
-  accent-color: black;
-}
-a {
-  color: black;
-  text-decoration-color: black;
-}
-details code {
-  font-size: small;
-  background-color: rgb(244, 244, 244);
-  border: 1px solid black;
-  border-radius: 4px;
-  padding: 0.1em;
-}
-select.columnUniques {
-  visibility: hidden;
-  overflow: auto;
-  margin-top: 0.25em;
-}
-span.clearOneSearch {
-  white-space: nowrap;
-  visibility: hidden;
-  cursor: pointer;
 }
 
 /*
@@ -147,13 +157,21 @@ input:-webkit-autofill:focus {
 
 #relatedTables {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 2px;
+  right: 0px;
   z-index: 1000;
   background-color: white;
-  padding: 5px;
+  padding: 0px;
+  /*
   border-radius: 4px;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  */
+}
+#relatedTables {
+  display: none;
+}
+#relatedTablesSelect {
+  margin-right: 1em;
 }
 
 #table1 {
@@ -176,12 +194,6 @@ input:-webkit-autofill:focus {
 #clearAllSearches button {
   margin-right: 1em;
   background-color: yellow;
-}
-#relatedTables {
-  display: none;
-}
-#relatedTablesSelect {
-  margin-right: 1em;
 }
 
 table.dataTable thead th {
@@ -212,7 +224,7 @@ table.dataTable tbody {
 .dataTables_wrapper .dataTables_info {
   clear: none;
   text-align: left;
-  padding-top: 0.45em;
+  padding-top: 0.25em;
 }
 .dataTables_wrapper .dataTables_paginate {
   float: left;

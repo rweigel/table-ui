@@ -1038,7 +1038,8 @@ function adjustDOM () {
   const numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length
   let colInfo = ` and all ${numCols} columns`
   if (numCols !== numColsVisible) {
-    colInfo = ` and ${numColsVisible}<sup><span style="cursor: help;font-size: 0.40em" title="Unselect 'Hide empty columns' in options to see all columns">&#9432;</sup></span> of ${numCols} columns`
+    const sup = `<sup><span style="cursor: help;font-size: 0.40em" title="Unselect 'Hide empty columns' in options to see all columns">&#9432;</sup></span>`
+    colInfo = ` and ${numColsVisible}${sup} of ${numCols} columns`
   }
 
   const info = $(tableID).DataTable().page.info()

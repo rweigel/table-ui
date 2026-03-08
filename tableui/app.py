@@ -970,6 +970,8 @@ def _sql_query(dbinfo, query_params):
   warning = " ".join(warnings) if warnings else None
 
   query = f"{query} LIMIT {limit} OFFSET {offset}"
+  logger.info(query)
+  print(params)
   logger.info(f"Getting records with offset={offset} and limit={limit}")
   data = tableui.sql.execute(sqldb, query, params=params)
   logger.info(f"Got {len(data)} records\n")
