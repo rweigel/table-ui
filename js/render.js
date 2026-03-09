@@ -12,6 +12,7 @@ renderFunctions.ellipsis = function (columnName, config, n) {
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;');
   };
+
   return (columnString, type, row, meta) => {
     if (type !== 'display' || typeof columnString !== 'string') {
       return columnString
@@ -22,8 +23,9 @@ renderFunctions.ellipsis = function (columnName, config, n) {
     }
     shortened = columnString.substring(0, n)
     const ellipsisClick = '<span class="ellipsis-click">&#8230;</span>'
+    const ellipsisFull = `<span style="display:none;" class="ellipsis-full">${columnString}</span>`
     shortened += ellipsisClick
-    return `<span class="ellipsis" title="${columnString}">${shortened}</span>`
+    return `<span class="ellipsis" title="${columnString}">${shortened}</span>${ellipsisFull}`
   }
 }
 

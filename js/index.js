@@ -68,7 +68,19 @@ async function init (firstLoad) {
   console.log('init() => Calling DataTable() with options:')
   // dataTableOptions copy is needed b/c DataTable() modifies it
   // and console.log() shows the modified version.
-  dataTableOptions.mark = true
+  dataTableOptions.mark = {
+    each: function (element) {
+      console.log('mark.js highlighted element:')
+      console.log($(element).parent()[0])
+      const fullSpan = $(element).closest('.ellipsis-full')
+      if (fullSpan.length > 0) {
+        console.log('mark.js each: element is inside .ellipsis-full; removing display:none')
+        fullSpan.css('display', '')
+        const td = fullSpan.closest('td')
+        td.find('.ellipsis, .ellipsis-click').css('display', 'none')
+      }
+    }
+  }
   console.log(JSON.parse(JSON.stringify(dataTableOptions)))
   const table = $(tableID).DataTable(dataTableOptions)
   console.log('DataTable() returned:')
@@ -889,23 +901,12 @@ function setEvents () {
   $(tableID).off('search.dt').off('search.dt')
   $(tableID).on('search.dt', function (event) {
     console.log('setEvents() => search.dt triggered')
+    const tbody = $(`${tableID} tbody`)[0]
+    console.log('setEvents() => search.dt => table body element:')
+    console.log(tbody)
     setQueryValue('_page', null)
     $(tableID).DataTable().page(0)
     setQueryStringFromSearch()
-    const globalSearch = $(tableID).DataTable().search()
-    if (globalSearch) {
-      setQueryValue('_globalsearch', encodeURIComponent(globalSearch))
-      $('#clearAllSearches').show()
-      const historyKey = 'globalSearchHistory:' + window.location.pathname
-      const history = JSON.parse(localStorage.getItem(historyKey) || '[]')
-      if (!history.includes(globalSearch)) {
-        history.unshift(globalSearch)
-        if (history.length > 20) history.pop()
-        localStorage.setItem(historyKey, JSON.stringify(history))
-      }
-    } else {
-      setQueryValue('_globalsearch', null)
-    }
   })
 
   $(tableID).on('stateSaveParams.dt', function (e, settings, data) {})
@@ -1527,6 +1528,22 @@ function setQueryStringFromSearch () {
       $('#clearAllSearches').hide()
     }
   }
+
+  const globalSearch = $(tableID).DataTable().search()
+  if (globalSearch) {
+    setQueryValue('_globalsearch', encodeURIComponent(globalSearch))
+    $('#clearAllSearches').show()
+    const historyKey = 'globalSearchHistory:' + window.location.pathname
+    const history = JSON.parse(localStorage.getItem(historyKey) || '[]')
+    if (!history.includes(globalSearch)) {
+      history.unshift(globalSearch)
+      if (history.length > 20) history.pop()
+      localStorage.setItem(historyKey, JSON.stringify(history))
+    }
+  } else {
+    setQueryValue('_globalsearch', null)
+  }
+
 }
 
 function array2object (arr, key) {
