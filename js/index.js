@@ -1019,69 +1019,70 @@ function searchHightlight (tableID) {
       fullSpan.closest('td').find('.ellipsis, .ellipsis-click').css('display', 'none')
     }
   }
-}
 
-// Convert a search term using SQL LIKE syntax to a RegExp for mark.js.
-// Rules:
-//  - 'abc'        exact match (single-quoted)
-//  - abc          auto-wrapped to %abc%  (substring match)
-//  - abc%         starts-with abc
-//  - %abc         ends-with abc
-//  - a%b          a then anything then b
-//  - a_b          a then one char then b
-//  - \%, \_, \\   literal %, _, \
-function sqlLikeToRegex (term) {
-  // Single-quoted exact match: 'abc' -> /^abc$/gi
-  // '' inside quotes is an escaped single quote.
-  // Must start and end with a single quote but not be just ''
-  if (/^'.*'$/.test(term) && !/^''$/.test(term)) {
-    const inner = term.slice(1, -1).replace(/''/g, "'")
-    return new RegExp('^' + _reEscape(inner) + '$', 'gi')
-  }
+  function sqlLikeToRegex (term) {
+    // Convert a search term using SQL LIKE syntax to a RegExp for mark.js.
+    // Rules:
+    //  - 'abc'        exact match (single-quoted)
+    //  - abc          auto-wrapped to %abc%  (substring match)
+    //  - abc%         starts-with abc
+    //  - %abc         ends-with abc
+    //  - a%b          a then anything then b
+    //  - a_b          a then one char then b
+    //  - \%, \_, \\   literal %, _, \
 
-  // SQL LIKE: auto-add % wildcards unless term already has unescaped % at start/end
-  let pattern = term
-  if (!_hasUnescapedPercentAt(pattern, 'start')) pattern = '%' + pattern
-  if (!_hasUnescapedPercentAt(pattern, 'end')) pattern = pattern + '%'
+    // Single-quoted exact match: 'abc' -> /^abc$/gi
+    // '' inside quotes is an escaped single quote.
+    // Must start and end with a single quote but not be just ''
+    if (/^'.*'$/.test(term) && !/^''$/.test(term)) {
+      const inner = term.slice(1, -1).replace(/''/g, "'")
+      return new RegExp('^' + _reEscape(inner) + '$', 'gi')
+    }
 
-  // Convert LIKE pattern characters to regex string
-  let regexStr = ''
-  let i = 0
-  while (i < pattern.length) {
-    const ch = pattern[i]
-    if (ch === '\\' && i + 1 < pattern.length) {
-      const next = pattern[i + 1]
-      if (next === '%' || next === '_' || next === '\\') {
-        regexStr += _reEscape(next)
-        i += 2
-        continue
+    // SQL LIKE: auto-add % wildcards unless term already has unescaped % at start/end
+    let pattern = term
+    if (!_hasUnescapedPercentAt(pattern, 'start')) pattern = '%' + pattern
+    if (!_hasUnescapedPercentAt(pattern, 'end')) pattern = pattern + '%'
+
+    // Convert LIKE pattern characters to regex string
+    let regexStr = ''
+    let i = 0
+    while (i < pattern.length) {
+      const ch = pattern[i]
+      if (ch === '\\' && i + 1 < pattern.length) {
+        const next = pattern[i + 1]
+        if (next === '%' || next === '_' || next === '\\') {
+          regexStr += _reEscape(next)
+          i += 2
+          continue
+        }
       }
+      if (ch === '%') {
+        regexStr += '.*'
+      } else if (ch === '_') {
+        regexStr += '.'
+      } else {
+        regexStr += _reEscape(ch)
+      }
+      i++
     }
-    if (ch === '%') {
-      regexStr += '.*'
-    } else if (ch === '_') {
-      regexStr += '.'
-    } else {
-      regexStr += _reEscape(ch)
-    }
-    i++
+
+    return new RegExp(regexStr, 'gi')
   }
 
-  return new RegExp(regexStr, 'gi')
-}
-
-function _hasUnescapedPercentAt (s, position) {
-  if (position === 'start') {
-    return s.charAt(0) === '%'
+  function _hasUnescapedPercentAt (s, position) {
+    if (position === 'start') {
+      return s.charAt(0) === '%'
+    }
+    // End: an odd number of trailing backslashes means the % is escaped
+    const m = s.match(/(\\*)%$/)
+    if (!m) return false
+    return m[1].length % 2 === 0
   }
-  // End: an odd number of trailing backslashes means the % is escaped
-  const m = s.match(/(\\*)%$/)
-  if (!m) return false
-  return m[1].length % 2 === 0
-}
 
-function _reEscape (s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  function _reEscape (s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
 }
 
 function setQueryLink (url) {
