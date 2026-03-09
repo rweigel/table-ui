@@ -68,19 +68,7 @@ async function init (firstLoad) {
   console.log('init() => Calling DataTable() with options:')
   // dataTableOptions copy is needed b/c DataTable() modifies it
   // and console.log() shows the modified version.
-  dataTableOptions.mark = {
-    each: function (element) {
-      console.log('mark.js highlighted element:')
-      console.log($(element).parent()[0])
-      const fullSpan = $(element).closest('.ellipsis-full')
-      if (fullSpan.length > 0) {
-        console.log('mark.js each: element is inside .ellipsis-full; removing display:none')
-        fullSpan.css('display', '')
-        const td = fullSpan.closest('td')
-        td.find('.ellipsis, .ellipsis-click').css('display', 'none')
-      }
-    }
-  }
+
   console.log(JSON.parse(JSON.stringify(dataTableOptions)))
   const table = $(tableID).DataTable(dataTableOptions)
   console.log('DataTable() returned:')
@@ -165,6 +153,8 @@ function dtInitComplete () {
   adjustDOM()
 
   setEvents()
+
+  searchHightlight(tableID)
 
   watchForFloatingHeader()
 
@@ -901,9 +891,6 @@ function setEvents () {
   $(tableID).off('search.dt').off('search.dt')
   $(tableID).on('search.dt', function (event) {
     console.log('setEvents() => search.dt triggered')
-    const tbody = $(`${tableID} tbody`)[0]
-    console.log('setEvents() => search.dt => table body element:')
-    console.log(tbody)
     setQueryValue('_page', null)
     $(tableID).DataTable().page(0)
     setQueryStringFromSearch()
@@ -942,6 +929,9 @@ function setEvents () {
     .off('draw.dt')
     .on('draw.dt', function () {
       console.log('setEvents() => draw.dt triggered.')
+
+      console.log('setEvents() => draw.dt => Calling searchHightlight().')
+      searchHightlight(tableID)
 
       console.log('setEvents() => draw.dt => Calling adjustDOM()')
       adjustDOM()
@@ -994,6 +984,106 @@ function setEvents () {
   })
 }
 
+function searchHightlight (tableID) {
+  const dt = $(tableID).DataTable()
+  const bodyElement = dt.table().body()
+  const markInstance = new Mark(bodyElement)
+  markInstance.unmark({ done })
+
+  function done () {
+    // Global search: highlight across all visible cells
+    const globalSearch = dt.search()
+    console.log('searchHightlight() => global search term:', globalSearch)
+    if (globalSearch) {
+      markInstance.markRegExp(sqlLikeToRegex(globalSearch), { each })
+    }
+
+    // Column search: highlight only within that column's cells
+    dt.columns().every(function () {
+      const rawColSearch = this.search()
+      if (!rawColSearch) return
+      const regex = sqlLikeToRegex(rawColSearch)
+      console.log(`searchHightlight() => column ${this.index()} search '${rawColSearch}' => regex ${regex}`)
+      // Only include nodes actually rendered in the DOM
+      const colNodes = Array.from(dt.column(this.index()).nodes()).filter(n => document.contains(n))
+      if (colNodes.length === 0) return
+      const colMark = new Mark(colNodes)
+      colMark.markRegExp(regex, { each })
+    })
+  }
+
+  function each (element) {
+    const fullSpan = $(element).closest('.ellipsis-full')
+    if (fullSpan.length > 0) {
+      fullSpan.css('display', '')
+      fullSpan.closest('td').find('.ellipsis, .ellipsis-click').css('display', 'none')
+    }
+  }
+}
+
+// Convert a search term using SQL LIKE syntax to a RegExp for mark.js.
+// Rules:
+//  - 'abc'        exact match (single-quoted)
+//  - abc          auto-wrapped to %abc%  (substring match)
+//  - abc%         starts-with abc
+//  - %abc         ends-with abc
+//  - a%b          a then anything then b
+//  - a_b          a then one char then b
+//  - \%, \_, \\   literal %, _, \
+function sqlLikeToRegex (term) {
+  // Single-quoted exact match: 'abc' -> /^abc$/gi
+  // '' inside quotes is an escaped single quote.
+  // Must start and end with a single quote but not be just ''
+  if (/^'.*'$/.test(term) && !/^''$/.test(term)) {
+    const inner = term.slice(1, -1).replace(/''/g, "'")
+    return new RegExp('^' + _reEscape(inner) + '$', 'gi')
+  }
+
+  // SQL LIKE: auto-add % wildcards unless term already has unescaped % at start/end
+  let pattern = term
+  if (!_hasUnescapedPercentAt(pattern, 'start')) pattern = '%' + pattern
+  if (!_hasUnescapedPercentAt(pattern, 'end')) pattern = pattern + '%'
+
+  // Convert LIKE pattern characters to regex string
+  let regexStr = ''
+  let i = 0
+  while (i < pattern.length) {
+    const ch = pattern[i]
+    if (ch === '\\' && i + 1 < pattern.length) {
+      const next = pattern[i + 1]
+      if (next === '%' || next === '_' || next === '\\') {
+        regexStr += _reEscape(next)
+        i += 2
+        continue
+      }
+    }
+    if (ch === '%') {
+      regexStr += '.*'
+    } else if (ch === '_') {
+      regexStr += '.'
+    } else {
+      regexStr += _reEscape(ch)
+    }
+    i++
+  }
+
+  return new RegExp(regexStr, 'gi')
+}
+
+function _hasUnescapedPercentAt (s, position) {
+  if (position === 'start') {
+    return s.charAt(0) === '%'
+  }
+  // End: an odd number of trailing backslashes means the % is escaped
+  const m = s.match(/(\\*)%$/)
+  if (!m) return false
+  return m[1].length % 2 === 0
+}
+
+function _reEscape (s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function setQueryLink (url) {
   // Store URL for use in adjustDOM() after table draw.
   setQueryLink.url = url
@@ -1032,6 +1122,27 @@ function adjustDOM () {
   const history = JSON.parse(localStorage.getItem(historyKey) || '[]')
   const datalist = $(`#${listId}`).empty()
   history.forEach(v => datalist.append(`<option value="${v}">`))
+
+  // Add clear (✘) button next to global search input if not already present
+  if (input.parent().find('.clearGlobalSearch').length === 0) {
+    input.wrap('<span style="white-space:nowrap;"></span>')
+    const clearGlobal = $('<span class="clearGlobalSearch clearOneSearch">✘</span>')
+    clearGlobal.insertAfter(input)
+    clearGlobal.on('mousedown', function (e) {
+      e.preventDefault()
+      input.val('')
+      clearGlobal.css('visibility', 'hidden')
+      input.focus()
+      $(tableID).DataTable().search('').draw()
+    })
+  }
+  const clearGlobal = input.parent().find('.clearGlobalSearch')
+  if (input.val()) {
+    clearGlobal.css('visibility', 'visible')
+  } else {
+    clearGlobal.css('visibility', 'hidden')
+  }
+
   $(`${tableInfo}`).insertAfter(tableFilter)
 
   console.log("adjustDOM() => Creating 'Showing ...' string.")
@@ -1135,7 +1246,7 @@ function adjustDOM () {
     scrollBar()
   }, 0)
 
-  console.log('adjustDOM() finished.')
+  console.log('adjustDOM() => finished.')
 }
 
 function clearAllSearches () {
