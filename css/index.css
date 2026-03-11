@@ -167,6 +167,14 @@ input:-webkit-autofill:focus {
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   */
 }
+
+.help {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewport="0 0 100 100" style="fill:black;font-size:16px;"><text y="70%">?</text></svg>'), auto;
+  position: relative; bottom: 0.6em;
+  z-index: 1;
+  font-size: 0.3em;
+}
+
 #relatedTables {
   display: none;
 }

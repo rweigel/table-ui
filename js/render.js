@@ -42,6 +42,7 @@ renderFunctions.underline = function (columnName, config) {
     return columnString
   }
 }
+
 renderFunctions.splitArray = function (columnName, config, symbol) {
   return (columnString, type, row, meta) => {
     if (type !== 'display') {

@@ -1,5 +1,5 @@
 {
-  "sqldb": "../demo/demo.body.sqlite",
+  "sqldb": "../demo/demo.sqlite",
   "dataTables": "default.json",
   "table_name": "demo",
   "dataTablesAdditions": {
@@ -14,15 +14,17 @@
     },
     "columnOptions": [
       {
-        "name": "0",
+        "name": "a",
         "render": {
           "function": "annotate",
           "args": ["⇨"]
         },
-        "width": "3em"
+        "width": "3em",
+        "visible": false
       },
       {
-        "name": "1",
+        "name": "b",
+        "description": "Description for column b",
         "render": {
           "function": "bold"
         }

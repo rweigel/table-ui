@@ -28,7 +28,6 @@
 </head>
 
 <body>
-
   <div id="relatedTables">
     Related Tables: 
     <select id="relatedTablesSelect">
@@ -41,12 +40,18 @@
 
       <h1>Options</h1>
         <div id="options" style="margin-left:1em">
-          <div id="showHideColumns" title="show/hide columns with no content">
+          <div title="show/hide columns with no content">
             <label style="margin-left:2.8em; cursor:pointer">
-              <input type="checkbox" id="hideEmptyColumns"/>
-              <span>Hide Empty Columns</span>
+              <input type="checkbox" id="showEmptyColumns" checked/>
+              <span>Show empty columns</span>
             </label>
           </div>
+          <!--div title="show/hide columns with visibility disabled by configuration">
+            <label style="margin-left:2.8em; cursor:pointer">
+              <input type="checkbox" id="showHiddenColumns"/>
+              <span>Show columns hidden by configuration</span>
+            </label>
+          </div-->
           <div id="lengthControl" title="set number of rows per page">
             <span style="margin-left: 0.4em">Rows per page</span>
           </div>

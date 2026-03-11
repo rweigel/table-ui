@@ -21,7 +21,7 @@ def dict2sql(datasets, config, embed=False, logger=None):
   if config.get('use_all_attributes', False):
     # Modify attributes dict to include all unique attributes found in all
     # variables. If an attribute is misspelled, it is mapped to the correct
-    # spelling and placed in the attributes dict if there is a fixe for it
+    # spelling and placed in the attributes dict if there is a fix for it
     # name config.json. The return value of attributes_all is a list 
     # of all uncorrected attribute names encountered.
     import collections
@@ -112,7 +112,6 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
     table = []
     row = []
 
-  n_cols_last = None
   datasets = copy.deepcopy(datasets)
 
   paths = attributes.keys()
@@ -205,7 +204,7 @@ def _write_files(name, config, out_dir, header, body, counts):
   }
 
   metadata = _table_metadata(name, config, header, files)
-
+  import pdb; pdb.set_trace()
   for key in files:
     files[key] = os.path.join(out_dir, files[key])
 

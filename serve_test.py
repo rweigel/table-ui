@@ -15,7 +15,7 @@ def _log_test_title(url):
   logger.info(line)
 
 
-def _run_tests(configs, head_data, body_data):
+def _run_tests(configs, head_data, body_data, debug=False):
 
   import utilrsw.uvicorn
 
@@ -39,6 +39,9 @@ def _run_tests(configs, head_data, body_data):
   _log_test_title(url)
   response = requests.get(url)
   assert response.status_code == 200
+  if debug:
+    print(f"body:\n  {body_data}")
+    print(f"response['data']:\n  {response.json()['data']}")
   assert 'data' in response.json()
   assert response.json()['data'] == body_data
 
@@ -259,6 +262,9 @@ def _run_tests(configs, head_data, body_data):
 if __name__ == "__main__":
 
   import tableui
+
+  debug = False
+
   configs = tableui.cli()
   configs['server']['--port'] = 4777
 
@@ -276,13 +282,18 @@ if __name__ == "__main__":
   # Test 1
   config = {"jsondb": {"head": head_file, "body": body_file}}
   configs['app']['config'] = config
-  #_run_tests(configs, head_data, body_data)
+  _run_tests(configs, head_data, body_data, debug=debug)
 
   # Test 2
   table_name = "demo"
   config = {"table_name": table_name}
   # Convert json to sqlite3 database
-  sqldb_path = tableui.list2sql(table_name, body_file, head_file)
-  config["sqldb"] = sqldb_path
+  types = {'d': 'INTEGER'}
+  kwargs = {
+    'types': {'d': 'INTEGER'},
+    'out': 'demo/demo.sqlite'
+  }
+  sqldb_path = tableui.list2sql(table_name, body_file, head_file, **kwargs)
+  config["sqldb"] = sqldb_path # Should match kwargs['out']
   configs['app']['config'] = config
-  _run_tests(configs, head_data, body_data)
+  _run_tests(configs, head_data, body_data, debug=debug)

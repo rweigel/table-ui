@@ -3,6 +3,10 @@ let nonemptyMode = false
 console.log('Document ready. Calling init()')
 $(document).ready(() => init(true))
 
+function infoSpan (title) {
+  return `<span title="${title}"><sup class="help">&#9432;</sup></span>`
+}
+
 async function init (firstLoad) {
   const config = await getConfig()
 
@@ -19,8 +23,9 @@ async function init (firstLoad) {
 
   $('title').text(config.dataTablesAdditions.tableMetadata.tableTitle)
 
-  // Add header names to table. Two rows are added. The first row is for
-  // name and sorting, second row is for filtering. Need to add before
+  // Add header names to table. Two rows are added. The first row is for search
+  // and a drop-down. The second row is for name and sorting. DataTables will
+  // create header automatically if not found, but we need to manually add before
   // table is created so it is included in DataTables column width
   // calculations.
   $(tableID).append('<thead><tr></tr><tr></tr></thead>')
@@ -28,10 +33,13 @@ async function init (firstLoad) {
   const tr1 = $(`${tableID} > thead > tr:eq(1)`)
   for (let i = 0; i < config.dataTables.columns.length; i++) {
     const name = config.dataTables.columns[i].name
+    let title = ''
+    if (config.dataTables.columns[i].title) {
+      title = `title="${config.dataTables.columns[i].title}"`
+    }
     tr0.append(`<th name="${name}"></th>`)
-    tr1.append(`<th name="${name}">${name}</th>`)
+    tr1.append(`<th name="${name}" ${title}>${name}</th>`)
   }
-
   // https://datatables.net/reference/option/
   const dataTableOptions =
     {
@@ -130,10 +138,10 @@ function dtInitComplete () {
   const table = $(tableID).dataTable()
   if (getQueryValue('_cols_show') === 'nonempty') {
     nonemptyMode = true
-    let msg = 'dtInitComplete() => Setting hideEmptyColumns '
+    let msg = 'dtInitComplete() => Setting showEmptyColumns '
     msg += 'checkbox to checked because _cols_show=nonempty in query string.'
     console.log(msg)
-    $('#hideEmptyColumns').prop('checked', true)
+    $('#showEmptyColumns').prop('checked', false)
     console.log('dtInitComplete() => Hiding empty columns.')
     const columnEmpty = emptyColumns(true)
     table.api().columns(columnEmpty).visible(false, false)
@@ -144,6 +152,8 @@ function dtInitComplete () {
   } else {
     console.log('dtInitComplete() => Showing all columns.')
   }
+
+  createColumnHelp(getConfig.config)
 
   // Must be before adjustDOM() b/c adjustDOM() calls $(window).resize(), which
   // triggers widths of columns to be recalculated based on content added in call
@@ -617,6 +627,18 @@ function createRelatedTablesDropdown (config) {
   }
 }
 
+function createColumnHelp (config) {
+  const columnOptionsMap = array2object(config.dataTablesAdditions.columnOptions || [], 'name')
+  $(`${tableID}_wrapper thead tr:eq(1) > th`).each(function () {
+    const name = $(this).attr('name')
+    if (!name) return
+    const description = columnOptionsMap[name]?.description
+    if (description) {
+      $(this).append(infoSpan(description))
+    }
+  })
+}
+
 function createColumnConstraints (which) {
   const msg = 'createColumnConstraints() => Setting dropdowns and search inputs'
   console.log(msg)
@@ -970,18 +992,40 @@ function setEvents () {
     )
   })
 
-  console.log('setEvents() => Setting click event for hideEmptyColumns checkbox.')
-  $('#hideEmptyColumns').unbind('click')
-  $('#hideEmptyColumns').click(function () {
+  console.log('setEvents() => Setting click event for showEmptyColumns checkbox.')
+  $('#showEmptyColumns').unbind('click')
+  $('#showEmptyColumns').click(function () {
     if ($(this).is(':checked')) {
-      console.log('setEvents() => #hideEmptyColumns clicked to checked.')
-      setQueryValue('_cols_show', 'nonempty')
+      console.log('setEvents() => #showEmptyColumns clicked to checked.')
+      setQueryValue('_cols_show', 'all')
     } else {
-      console.log('setEvents() => #hideEmptyColumns clicked to unchecked.')
-      setQueryValue('_cols_show', null)
+      console.log('setEvents() => #showEmptyColumns clicked to unchecked.')
+      setQueryValue('_cols_show', 'nonempty')
     }
     reInit()
   })
+
+  // The following is not finished.
+  console.log('setEvents() => Setting click event for showHiddenColumns checkbox.')
+  $('#showHiddenColumns').unbind('click')
+  $('#showHiddenColumns').click(function () {
+    if ($(this).is(':checked')) {
+      console.log('setEvents() => #showHiddenColumns clicked to checked.')
+      $(tableID).DataTable().columns().visible(true, true)
+      // Modify _cols_show so it can be
+      //   'all', 'nonempty', 'hidden', or 'nonempty,hidden'
+      // Or have
+      // _showhidden=<true|false>
+      // _showempty=<true|false>
+
+      //setQueryValue('_cols_show', 'all')
+    } else {
+      console.log('setEvents() => #showEmptyColumns clicked to unchecked.')
+      //setQueryValue('_cols_show', 'nonempty')
+    }
+    //reInit()
+  })
+
 }
 
 function searchHightlight (tableID) {
@@ -1085,9 +1129,15 @@ function searchHightlight (tableID) {
   }
 }
 
-function setQueryLink (url) {
-  // Store URL for use in adjustDOM() after table draw.
-  setQueryLink.url = url
+function clearAllSearches () {
+  // Used in onclick attribute of Clear All Searches button set in adjustDOM()
+  const qs = parseQueryString('state')
+  delete qs._page
+  delete qs._globalsearch
+  // Could avoid reInit by looping though all inputs, setting value to ''
+  // and triggering search.
+  window.location.hash = decodeURIComponent($.param(qs))
+  reInit()
 }
 
 function adjustDOM () {
@@ -1148,10 +1198,24 @@ function adjustDOM () {
 
   console.log("adjustDOM() => Creating 'Showing ...' string.")
   const numCols = $(tableID).DataTable().columns().nodes().length
+
+  const numColsEmpty = emptyColumns(true).length
   const numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length
+  const numColsHidden = numCols - numColsVisible
+
   let colInfo = ` and all ${numCols} columns`
-  if (numCols !== numColsVisible) {
-    const sup = `<sup><span style="cursor: help;font-size: 0.40em" title="Unselect 'Hide empty columns' in options to see all columns">&#9432;</sup></span>`
+  if (numColsHidden !== 0) {
+    let msg = ""
+    if (numColsEmpty !== 0 && getQueryValue('_cols_show') !== undefined) {
+      let s = numColsEmpty === 1 ? '' : 's'
+      msg = `Select 'Show empty columns' in options to see the ${numColsEmpty} empty column${s}. `
+    }
+    if (numColsHidden > 0) {
+      let s = numColsHidden === 1 ? '' : 's'
+      msg += `${numColsHidden} column${s} hidden due to configuration setting.`
+      //msg += `Select 'Show columns hidden by configuration setting' to see the ${numColsHidden} hidden column${s}.`
+    }
+    const sup = infoSpan(msg)
     colInfo = ` and ${numColsVisible}${sup} of ${numCols} columns`
   }
 
@@ -1250,18 +1314,8 @@ function adjustDOM () {
   console.log('adjustDOM() => finished.')
 }
 
-function clearAllSearches () {
-  // Used in onclick attribute of Clear All Searches button set in adjustDOM()
-  const qs = parseQueryString('state')
-  delete qs._page
-  delete qs._globalsearch
-  // Could avoid reInit by looping though all inputs, setting value to ''
-  // and triggering search.
-  window.location.hash = decodeURIComponent($.param(qs))
-  reInit()
-}
-
 function emptyColumns (indices) {
+
   const data = $(tableID).DataTable().rows({ page: 'current' }).data().toArray()
   console.log('emptyColumns() => Data for current page:')
   console.log(data)
@@ -1445,6 +1499,11 @@ function scrollBar (floatingHeader) {
     container1.scrollLeft(container2.scrollLeft())
     scrolling = false
   })
+}
+
+function setQueryLink (url) {
+  // Store URL for use in adjustDOM() after table draw.
+  setQueryLink.url = url
 }
 
 function parseQueryString (component, hash) {

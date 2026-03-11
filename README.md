@@ -21,18 +21,7 @@ For a SQLite database, processing for search and query is server-side.
 Create and serve SQLite database.
 
 ```python
-import tableui
-table_name = "demo"
-# Convert json to sqlite3 database
-json_body = 'demo/demo.body.json'
-kwargs = {
-  'json_head': 'demo/demo.head.json',
-  'out': 'demo/demo.sqlite'
-}
-tableui.list2sql(table_name, json_body, **kwargs)
-tableui.serve(config='conf/demo-sqlite.json')
-# Or from shell
-#  python serve.py --config conf/demo-sqlite.json
+python serve.py --config conf/demo-sqlite.json
 ```
 
 ## More than one worker
