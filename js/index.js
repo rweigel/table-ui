@@ -1432,12 +1432,17 @@ function watchForFloatingHeader () {
 
 function scrollBar (floatingHeader) {
   let container2 = $('.dataTables_scrollBody');
+  if (!container2.length) {
+    $('#scroll-container').hide()
+    return
+  }
   if (floatingHeader) {
     floatingHeader = true
     $('#scroll-container').hide()
     container2 = $('.dtfh-floatingparent');
   } else {
     floatingHeader = false
+    $('#scroll-container').show()
   }
   // Method II.
   // Fixes (1) - (3) in Method I.
@@ -1663,7 +1668,7 @@ function setQueryStringFromSearch () {
   } else {
     msg = 'setQueryStringFromSearch() => No .dtfh-floatingparent found. '
     console.log(`${msg}Using inputs under .dataTables_scrollHead`)
-    inputs = $('.dataTables_scrollHead input.columnSearch')
+    inputs = $(`${tableID} input.columnSearch`)
   }
   msg = 'setQueryStringFromSearch() => Reading '
   console.log(`${msg}${inputs.length} column search inputs.`)
