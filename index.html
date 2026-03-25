@@ -21,15 +21,18 @@
     <script
       src="//cdn.datatables.net/v/dt/jq-3.6.0/dt-1.13.4/af-2.5.3/cr-1.6.2/fc-4.2.2/fh-3.3.2/r-2.4.1/datatables.min.js">
     </script>
-    <script src="//cdn.datatables.net/plug-ins/1.13.4/dataRender/ellipsis.js"></script>
+
     <script src="//cdn.jsdelivr.net/npm/mark.js/dist/mark.min.js"></script>
+
     <script src="render.js"></script><!-- server endpoint provides this-->
+
+    <script src="js/query.js"></script>
     <script src="js/index.js"></script>
 </head>
 
 <body>
   <div id="relatedTables">
-    Related Tables: 
+    Related Tables:
     <select id="relatedTablesSelect">
     </select>
   </div>
@@ -46,12 +49,12 @@
               <span>Show empty columns</span>
             </label>
           </div>
-          <!--div title="show/hide columns with visibility disabled by configuration">
+          <div title="show/hide columns with visibility disabled by configuration">
             <label style="margin-left:2.8em; cursor:pointer">
               <input type="checkbox" id="showHiddenColumns"/>
               <span>Show columns hidden by configuration</span>
             </label>
-          </div-->
+          </div>
           <div id="lengthControl" title="set number of rows per page">
             <span style="margin-left: 0.4em">Rows per page</span>
           </div>

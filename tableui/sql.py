@@ -1,4 +1,3 @@
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -12,15 +11,17 @@ def write(name, header, body, file, types=None, metadata=None, logger=None, logg
     logger.info(f"{indent}Removing existing SQLite database file '{file}'")
     os.remove(file)
 
+  header = _rename_duplicates(header, logger, logger_indent=logger_indent)
+
   column_types = _types(header, types)
 
-  header, body = _prep(header, body, column_types, logger, logger_indent="   ")
+  header, body = _cast(header, body, column_types, logger, logger_indent="   ")
 
   for hidx, colname in enumerate(header):
     header[hidx] = f"`{colname}`"
 
   column_names = f"({', '.join(header)})"
-  column_spec  = "(" + ", ".join(f"{col} {t}" for col, t in zip(header, column_types.values())) + ")"
+  column_spec  = "(" + ", ".join(f"{col} {t}" for col, t in zip(header, column_types)) + ")"
   column_vals  = f"({', '.join(len(header)*['?'])})"
 
   execute = f'INSERT INTO `{name}` {column_names} VALUES {column_vals}'
@@ -85,6 +86,62 @@ def write(name, header, body, file, types=None, metadata=None, logger=None, logg
   conn.close()
 
 
+def execute(sqldb, query, params=None):
+
+  import time
+
+  start = time.time()
+  cursor, connection = _cursor(sqldb, memory=False)
+
+  logger.info("  Executing")
+  logger.info(f"  {query}")
+  if params:
+      logger.info("  with parameters:")
+      logger.info(f"  {params}")
+  logger.info("  and fetching all results from")
+  logger.info(f"  {sqldb if sqldb is not None else 'existing connection'}")
+  if params:
+      result = cursor.execute(query, params)
+  else:
+      result = cursor.execute(query)
+  data = result.fetchall()
+  connection.close()
+  dt = "{:.4f} [s]".format(time.time() - start)
+  n_rows = len(data)
+  n_cols = len(data[0]) if n_rows > 0 else 0
+  logger.info(f"  {dt} to execute query and fetch {n_rows}x{n_cols} table.")
+
+  return data
+
+
+def table_names(sqldb):
+
+  query = "SELECT name FROM sqlite_master WHERE type='table';"
+  data = execute(sqldb, query)
+  return [row[0] for row in data]
+
+
+def column_names(sqldb, table_name):
+  query = f"PRAGMA table_info(`{table_name}`);"
+  data = execute(sqldb, query)
+  return [row[1] for row in data] if data else []
+
+
+def uniques(sqldb, table_name, column_name, clause=None, params=None):
+  clause = clause if clause else ""
+  query = f"SELECT `{column_name}`, COUNT(*) as count FROM `{table_name}` "
+  query += f"{clause} GROUP BY `{column_name}`"
+  data = execute(sqldb, query, params=params)
+  return [(row[0], row[1]) for row in data] if data else []
+
+
+def nrows(sqldb, table_name, clause=None, params=None):
+  clause_str = clause if clause else ""
+  query = f"SELECT COUNT(*) FROM `{table_name}` {clause_str}"
+  data = execute(sqldb, query, params=params)
+  return data[0][0] if data else 0
+
+
 def _types(columns, types):
   # Build column type map: TEXT by default
   valid_types = {'TEXT', 'INTEGER', 'REAL', 'NUMERIC', 'BLOB'}
@@ -111,13 +168,10 @@ def _types(columns, types):
   return type_map
 
 
-def _prep(header, body, types, logger, logger_indent="   "):
-  import time
-
+def _rename_duplicates(header, logger, logger_indent="   "):
   indent = logger_indent
 
   def unique(header):
-
     headerlc = [val.lower() for val in header]
     headeru = header.copy()
     for val in header:
@@ -133,10 +187,16 @@ def _prep(header, body, types, logger, logger_indent="   "):
             headeru[idx] = newname
     return headeru
 
-
   logger.info(f"{indent}Renaming non-unique column names")
   header = unique(header)
   logger.info(f"{indent}Renamed non-unique column names")
+  return header
+
+
+def _cast(header, body, types, logger, logger_indent="   "):
+  import time
+
+  indent = logger_indent
 
   type_cast = {
     'TEXT':    str,
@@ -145,7 +205,7 @@ def _prep(header, body, types, logger, logger_indent="   "):
     'NUMERIC': float,
     'BLOB':    lambda x: x,
   }
-  col_types_list = list(types.values()) if types else []
+  col_types_list = types if isinstance(types, list) else []
 
   logger.info(f"{indent}Casting table elements using column types.")
   start = time.time()
@@ -248,58 +308,3 @@ def _cursor(sqldb, memory=False):
 
   return cursor, connection
 
-
-def execute(sqldb, query, params=None):
-
-  import time
-
-  start = time.time()
-  cursor, connection = _cursor(sqldb, memory=False)
-
-  logger.info("  Executing")
-  logger.info(f"  {query}")
-  if params:
-      logger.info("  with parameters:")
-      logger.info(f"  {params}")
-  logger.info("  and fetching all results from")
-  logger.info(f"  {sqldb if sqldb is not None else 'existing connection'}")
-  if params:
-      result = cursor.execute(query, params)
-  else:
-      result = cursor.execute(query)
-  data = result.fetchall()
-  connection.close()
-  dt = "{:.4f} [s]".format(time.time() - start)
-  n_rows = len(data)
-  n_cols = len(data[0]) if n_rows > 0 else 0
-  logger.info(f"  {dt} to execute query and fetch {n_rows}x{n_cols} table.")
-
-  return data
-
-
-def table_names(sqldb):
-
-  query = "SELECT name FROM sqlite_master WHERE type='table';"
-  data = execute(sqldb, query)
-  return [row[0] for row in data]
-
-
-def column_names(sqldb, table_name):
-  query = f"PRAGMA table_info(`{table_name}`);"
-  data = execute(sqldb, query)
-  return [row[1] for row in data] if data else []
-
-
-def uniques(sqldb, table_name, column_name, clause=None, params=None):
-  clause = clause if clause else ""
-  query = f"SELECT `{column_name}`, COUNT(*) as count FROM `{table_name}` "
-  query += f"{clause} GROUP BY `{column_name}`"
-  data = execute(sqldb, query, params=params)
-  return [(row[0], row[1]) for row in data] if data else []
-
-
-def nrows(sqldb, table_name, clause=None, params=None):
-  clause_str = clause if clause else ""
-  query = f"SELECT COUNT(*) FROM `{table_name}` {clause_str}"
-  data = execute(sqldb, query, params=params)
-  return data[0][0] if data else 0

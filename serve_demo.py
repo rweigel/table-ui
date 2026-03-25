@@ -13,4 +13,5 @@ tableui.list2sql(table_name, body, head, **kwargs)
 
 # Run server
 configs = tableui.cli()
+configs['app']['config'] = 'conf/demo-sqlite.json'
 utilrsw.uvicorn.run("tableui.app", configs)

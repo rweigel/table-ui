@@ -1,5 +1,61 @@
 const renderFunctions = {}
 
+renderFunctions._constrainedSearchLinks = function (columnName, columnString) {
+  const links = []
+  links.push(renderFunctions._searchLink(columnName, columnString, '='))
+  links.push('&hairsp;' + renderFunctions._searchLink(columnName, columnString, '>'))
+  links.push('&hairsp;' + renderFunctions._searchLink(columnName, columnString, '≥'))
+  links.push('&hairsp;' + renderFunctions._searchLink(columnName, columnString, '<'))
+  links.push('&hairsp;' + renderFunctions._searchLink(columnName, columnString, '≤'))
+  return links
+}
+
+renderFunctions._searchLink = function (columnName, columnString, constraint) {
+  const constraintIcon = constraint || '🔍'
+  if (!constraint || constraint === '=') {
+    constraint = ''
+  }
+  let attrs = 'title="Search column for this exact value"'
+  if (constraint !== '') {
+    attrs = `title="Search columns for datetimes ${constraint} ${columnString}"`
+  }
+  attrs += ' style="text-decoration:none;"'
+  attrs += ` onclick="triggerSearch('${columnName}', '${constraint}${columnString}')"`
+  const url = `#${columnName}=${constraint}${columnString}`
+  return `<a href="${url}" ${attrs}>${constraintIcon}</a>`
+}
+
+renderFunctions._combineLinks = function (columnString, links, split, wrapperClass) {
+  if (columnString === '') {
+    return ''
+  }
+  if (!links) {
+    return columnString
+  }
+  if (typeof links === 'string') {
+    links = [links]
+  }
+  if (!split) {
+    split = ''
+  }
+  if (!wrapperClass) {
+    wrapperClass = ''
+  }
+  return `${columnString}${split}<span class="${wrapperClass}"><nobr>${links.join('')}</nobr></span>`
+}
+
+renderFunctions.constrainedSearch = function (columnName, config) {
+  return (columnString, type, row, meta) => {
+    if (type !== 'display') {
+      return columnString
+    }
+    wrapperClass = 'timeSearchConstraints'
+    split = '<br>'
+    let links = renderFunctions._constrainedSearchLinks(columnName, columnString)
+    return renderFunctions._combineLinks(columnString, links, split, wrapperClass)
+  }
+}
+
 renderFunctions.ellipsis = function (columnName, config, n) {
   // https://github.com/DataTables/Plugins/blob/master/dataRender/ellipsis.js
   // Previous version used only this line
@@ -63,6 +119,7 @@ renderFunctions.splitArray = function (columnName, config, symbol) {
     return columnString
   }
 }
+
 renderFunctions.annotate = function (columnName, config, symbol) {
   return (columnString, type, row, meta) => {
     if (type !== 'display') {
@@ -87,7 +144,7 @@ renderFunctions.bold = function (columnName, config) {
   }
 }
 
-function trimURL (url, trim) {
+renderFunctions._trimURL = function (url, trim) {
   const attrs = `href="${url}" title="${url}"`
   let urlTrimmed = url
   if (trim !== undefined) {
@@ -109,7 +166,7 @@ renderFunctions.trimURL = function (columnName, config, trim) {
     if (type !== 'display') {
       return columnString
     }
-    return trimURL(columnString, trim)
+    return renderFunctions._trimURL(columnString, trim)
   }
 }
 
@@ -135,7 +192,7 @@ renderFunctions.renderLink = function (columnName, config, options) {
     }
     let urlTrimmed = url
     if (options.trim) {
-      urlTrimmed = trimURL(url, options.trim)
+      urlTrimmed = renderFunctions._trimURL(url, options.trim)
     }
     const attrs = `href="${url}" title="${url}"`
     columnString = `<a ${attrs} target="_blank">${urlTrimmed}</a>`

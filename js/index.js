@@ -1,7 +1,7 @@
 const tableID = '#table1'
-let nonemptyMode = false
 console.log('Document ready. Calling init()')
 $(document).ready(() => init(true))
+
 
 function infoSpan (title) {
   return `<span title="${title}"><sup class="help">&#9432;</sup></span>`
@@ -136,21 +136,37 @@ function reInit () {
 function dtInitComplete () {
   console.log('dtInitComplete() => DOM is ready.')
   const table = $(tableID).dataTable()
-  if (getQueryValue('_cols_show') === 'nonempty') {
-    nonemptyMode = true
+  if (colsShowHas('nonempty')) {
     let msg = 'dtInitComplete() => Setting showEmptyColumns '
-    msg += 'checkbox to checked because _cols_show=nonempty in query string.'
+    msg += 'checkbox to checked because _cols_show contains nonempty.'
     console.log(msg)
     $('#showEmptyColumns').prop('checked', false)
     console.log('dtInitComplete() => Hiding empty columns.')
     const columnEmpty = emptyColumns(true)
     table.api().columns(columnEmpty).visible(false, false)
     if (columnEmpty.length === 0) {
-      console.log('dtInitComplete() => No empty columns. Removing _cols_show from query string.')
-      setQueryValue('_cols_show', null)
+      console.log('dtInitComplete() => No empty columns. Removing nonempty flag from _cols_show.')
+      colsShowRemove('nonempty')
     }
   } else {
     console.log('dtInitComplete() => Showing all columns.')
+  }
+
+  if (colsShowHas('hidden')) {
+    let msg = 'dtInitComplete() => Showing config-hidden columns '
+    msg += 'because _cols_show contains hidden.'
+    console.log(msg)
+    $('#showHiddenColumns').prop('checked', true)
+    const columnOptionsMap = array2object(getConfig.config.dataTablesAdditions.columnOptions || [], 'name')
+    table.api().columns().every(function () {
+      const index = this.index()
+      const name = getConfig.config.dataTables.columns[index].name
+      if (columnOptionsMap[name] && columnOptionsMap[name].visible === false) {
+        this.visible(true, false)
+      }
+    })
+  } else {
+    console.log('dtInitComplete() => Not showing config-hidden columns.')
   }
 
   createColumnHelp(getConfig.config)
@@ -656,6 +672,14 @@ function createColumnConstraints (which) {
 
   const table = $(tableID).dataTable()
   const config = getConfig.config
+
+  // Determine default showSearches: true unless columnSearches is explicitly false
+  let showSearches = true
+  if (config.dataTablesAdditions.columnSearches === false) {
+    // Disable search inputs for all columns by default
+    showSearches = false
+  }
+
   let showDropdowns = false
   if (config.dataTablesAdditions.columnDropdowns === true) {
     // Set default to showing dropdowns for all columns
@@ -694,27 +718,37 @@ function createColumnConstraints (which) {
     }
     if (which === 'all' || which === 'input') {
       const searchOnKeypress = config.dataTables.columns[index].return === false
-      createColumnInput(parent, visibleIndex, name, column, width, searchOnKeypress)
+      let showSearch = showSearches
+      if (columnOptions[name] && 'search' in columnOptions[name]) {
+        // Per-column override
+        showSearch = columnOptions[name].search
+      }
+      createColumnInput(parent, visibleIndex, name, column, width, searchOnKeypress, showSearch)
     }
     if (which === 'all' || which === 'select') {
       let showDropdown = showDropdowns
       if (columnOptions[name] && 'dropdown' in columnOptions[name]) {
-        // Override default with column-specific setting
+        // If dropdown is set, suppress the auto-generated dropdown for this column
         showDropdown = columnOptions[name].dropdown
       }
       if (config.dataTables.serverSide && showDropdowns !== null) {
-        createColumnDropdown(parent, visibleIndex, name, column, width, showDropdown)
+        createColumnDropdown(parent, visibleIndex, name, column, showDropdown)
       }
     }
     visibleIndex++
-    return true
+    return
   })
 }
 
-function createColumnInput (parent, visibleIndex, name, column, width, searchOnKeypress) {
+function createColumnInput (parent, visibleIndex, name, column, width, searchOnKeypress, show) {
   // Create `input` element
   const element = 'thead tr:eq(0) > th'
   const th = $(`${parent} ${element}`).eq(visibleIndex).empty()
+
+  if (show === false) {
+    // Search input disabled for this column
+    return
+  }
   const attrs = `class="columnSearch" name="${name}"`
   const input = $(`<input ${attrs} type="text" ${width} placeholder="Search col."/>`)
   const qsName = getQueryValue(name)
@@ -896,6 +930,15 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
   }
 }
 
+function triggerSearch (columnName, searchValue) {
+  const e = $.Event('keydown')
+  e.which = 13
+  e.keyCode = 13
+  const el = `.dataTables_scrollHead input.columnSearch[name=${columnName}]`
+  $(el).trigger('input')
+  $(el).val(searchValue).trigger(e)
+}
+
 function setEvents () {
   window.removeEventListener('input', (event) => {
     console.log('Removing input event:', event)
@@ -958,7 +1001,7 @@ function setEvents () {
       console.log('setEvents() => draw.dt => Calling adjustDOM()')
       adjustDOM()
 
-      if (pageChanged && nonemptyMode) {
+      if (pageChanged && !$('#showEmptyColumns').is(':checked')) {
         const msgo = 'setEvents() => draw.dt => '
         const msg = `${msgo}Page was changed and nonempty mode is active. `
         console.log(`${msg}Checking for change in number of empty columns.`)
@@ -971,7 +1014,7 @@ function setEvents () {
         }
         console.log(`${msgo} # of empty columns has changed. Calling init().`)
         if (_emptyColumnsNow.length > 0) {
-          setQueryValue('_cols_show', 'nonempty')
+          colsShowAdd('nonempty')
         }
         reInit()
       }
@@ -997,10 +1040,10 @@ function setEvents () {
   $('#showEmptyColumns').click(function () {
     if ($(this).is(':checked')) {
       console.log('setEvents() => #showEmptyColumns clicked to checked.')
-      setQueryValue('_cols_show', 'all')
+      colsShowRemove('nonempty')
     } else {
       console.log('setEvents() => #showEmptyColumns clicked to unchecked.')
-      setQueryValue('_cols_show', 'nonempty')
+      colsShowAdd('nonempty')
     }
     reInit()
   })
@@ -1011,19 +1054,12 @@ function setEvents () {
   $('#showHiddenColumns').click(function () {
     if ($(this).is(':checked')) {
       console.log('setEvents() => #showHiddenColumns clicked to checked.')
-      $(tableID).DataTable().columns().visible(true, true)
-      // Modify _cols_show so it can be
-      //   'all', 'nonempty', 'hidden', or 'nonempty,hidden'
-      // Or have
-      // _showhidden=<true|false>
-      // _showempty=<true|false>
-
-      //setQueryValue('_cols_show', 'all')
+      colsShowAdd('hidden')
     } else {
-      console.log('setEvents() => #showEmptyColumns clicked to unchecked.')
-      //setQueryValue('_cols_show', 'nonempty')
+      console.log('setEvents() => #showHiddenColumns clicked to unchecked.')
+      colsShowRemove('hidden')
     }
-    //reInit()
+    reInit()
   })
 
 }
@@ -1085,8 +1121,10 @@ function searchHightlight (tableID) {
 
     // SQL LIKE: auto-add % wildcards unless term already has unescaped % at start/end
     let pattern = term
-    if (!_hasUnescapedPercentAt(pattern, 'start')) pattern = '%' + pattern
-    if (!_hasUnescapedPercentAt(pattern, 'end')) pattern = pattern + '%'
+    let autoStart = false
+    let autoEnd = false
+    if (!_hasUnescapedPercentAt(pattern, 'start')) { pattern = '%' + pattern; autoStart = true }
+    if (!_hasUnescapedPercentAt(pattern, 'end')) { pattern = pattern + '%'; autoEnd = true }
 
     // Convert LIKE pattern characters to regex string
     let regexStr = ''
@@ -1110,6 +1148,11 @@ function searchHightlight (tableID) {
       }
       i++
     }
+
+    // Strip auto-added leading/trailing .* so mark.js only highlights the
+    // matched portion (e.g. "data" in "dataset1"), not the full wildcard match.
+    if (autoStart && regexStr.startsWith('.*')) regexStr = regexStr.slice(2)
+    if (autoEnd && regexStr.endsWith('.*')) regexStr = regexStr.slice(0, -2)
 
     return new RegExp(regexStr, 'gi')
   }
@@ -1201,7 +1244,14 @@ function adjustDOM () {
 
   const numColsEmpty = emptyColumns(true).length
   const numColsVisible = $(tableID).DataTable().columns(':visible').nodes().length
-  const numColsHidden = numCols - numColsVisible
+  // Count only columns hidden due to configuration setting (not empty-hidden columns)
+  const columnOptionsMap = array2object(getConfig.config.dataTablesAdditions.columnOptions || [], 'name')
+  let numColsHidden = 0
+  if (!$('#showHiddenColumns').is(':checked')) {
+    for (const name of Object.keys(columnOptionsMap)) {
+      if (columnOptionsMap[name].visible === false) numColsHidden++
+    }
+  }
 
   let colInfo = ` and all ${numCols} columns`
   if (numColsHidden !== 0) {
@@ -1212,8 +1262,7 @@ function adjustDOM () {
     }
     if (numColsHidden > 0) {
       let s = numColsHidden === 1 ? '' : 's'
-      msg += `${numColsHidden} column${s} hidden due to configuration setting.`
-      //msg += `Select 'Show columns hidden by configuration setting' to see the ${numColsHidden} hidden column${s}.`
+      msg += `Select 'Show columns hidden by configuration' to see the ${numColsHidden} column${s} hidden due to configuration setting.`
     }
     const sup = infoSpan(msg)
     colInfo = ` and ${numColsVisible}${sup} of ${numCols} columns`
@@ -1310,6 +1359,8 @@ function adjustDOM () {
     $(window).resize()
     scrollBar()
   }, 0)
+
+  updateCheckboxLabels(numColsEmpty)
 
   console.log('adjustDOM() => finished.')
 }
@@ -1504,222 +1555,6 @@ function scrollBar (floatingHeader) {
     container1.scrollLeft(container2.scrollLeft())
     scrolling = false
   })
-}
-
-function setQueryLink (url) {
-  // Store URL for use in adjustDOM() after table draw.
-  setQueryLink.url = url
-}
-
-function parseQueryString (component, hash) {
-  // http://paulgueller.com/2011/04/26/parse-the-querystring-with-jquery/
-  const nvpair = {}
-  let qs = window.location.hash.replace('#', '')
-  if (hash) {
-    qs = hash.replace('#', '')
-  }
-  if (qs.length === 0) {
-    return {}
-  }
-  const pairs = qs.split('&')
-  $.each(pairs, function (i, v) {
-    const pair = v.split('=')
-    if (component === 'search' && pair[0].startsWith('_')) {
-      return // Skip state parameters
-    }
-    if (component === 'state' && !pair[0].startsWith('_')) {
-      return // Keep state parameters
-    }
-    nvpair[pair[0]] = pair[1]
-  })
-
-  return nvpair
-}
-
-function setDefaultQueryString (hash) {
-  const currentHash = window.location.hash.replace('#', '')
-  if (hash && !currentHash) {
-    const qs = parseQueryString()
-    const qsDefault = parseQueryString(null, hash)
-    for (const [key, val] of Object.entries(qsDefault)) {
-      if (!(key in qs)) {
-        let msg = 'init() => Setting query string parameter '
-        msg += `${key} = ${val} from defaultHash: `
-        console.log(msg)
-        setQueryValue(key, val)
-      }
-    }
-  }
-}
-
-function getQueryValue (name, defaultValue) {
-  const qs = parseQueryString()
-  if (!qs[name]) {
-    return defaultValue
-  }
-  return qs[name]
-}
-
-function setQueryValue (name, val) {
-  console.log(`setQueryValue() called with name='${name}' and val='${val}'`)
-  const qs = parseQueryString()
-  if (val === null) {
-    console.log(`setQueryValue() => Removing ${name} from query string.`)
-    delete qs[name]
-  } else {
-    qs[name] = val
-  }
-
-  // Put _ parameters at end of query string
-  const sortedKeys = Object.keys(qs).sort((a, b) => {
-    if (a.startsWith('_')) return 1
-    return -1
-  })
-
-  const sortedQs = {}
-  for (const key of sortedKeys) {
-    sortedQs[key] = qs[key]
-  }
-  window.location.hash = decodeURIComponent($.param(sortedQs))
-}
-
-function checkQueryString (config) {
-  console.log('checkQueryString() => Checking query string for invalid column names.')
-
-  const _colsShow = getQueryValue('_cols_show')
-  if (_colsShow && _colsShow === 'all') {
-    setQueryValue('_cols_show', null)
-  }
-
-  const qs = parseQueryString()
-  console.log('checkQueryString() => Query string:')
-  console.log(qs)
-  const columnObject = array2object(config.dataTables.columns, 'name')
-
-  const msg = "checkQueryString() => what = 'keys'. Checking keys but not "
-  console.log(`${msg}values in query string.`)
-  let alerted = false
-  for (const key of Object.keys(qs)) {
-    if (key.startsWith('_')) {
-      const msg = `checkQueryString() => found state parameter '${key}' in `
-      console.log(`${msg}query string. Leaving it.`)
-      continue
-    }
-    if (key in columnObject) {
-      console.log(`checkQueryString() => Found valid key = '${key}' in query string.`)
-    } else {
-      console.log(`checkQueryString() => Found invalid key = '${key}' in query string. Removing it.`)
-      if (alerted === false) {
-        alerted = true
-        let amsg = `Invalid column name in query string: "${key}". `
-        amsg += 'Removing it from query string and any other invalid column names.'
-        window.alert(amsg)
-      }
-      setQueryValue(key, null)
-    }
-  }
-
-  console.log("checkQueryString() => what = 'cols'. Checking only _cols parameter in query string.")
-  let _cols = getQueryValue('_cols')
-  if (!_cols) {
-    console.log('checkQueryString() => No _cols in query string. Leaving it.')
-    return
-  }
-
-  _cols = _cols.split(',')
-  let updateHash = false
-  for (let i = 0; i < _cols.length; i++) {
-    const columnName = _cols[i]
-    if (columnName in columnObject) {
-      continue
-    } else {
-      const msg = `checkQueryString() => Column name '${columnName}' not `
-      console.log(`${msg}found in column names. Removing it from _cols.`)
-      if (!updateHash) {
-        let amsg = 'checkQueryString() => Column name in query string not '
-        amsg += `found: "${columnName}". Removing it and any other invalid `
-        window.alert(`${amsg}column names from query string.`)
-      }
-      updateHash = true
-      delete _cols[i]
-    }
-  }
-  const columnNames = config.dataTables.columns.map(col => col.name)
-  if (updateHash) {
-    console.log('checkQueryString() => Updating query string to remove invalid column names.')
-    _cols = columnNames.filter(Boolean) // Remove any null/undefined values
-    console.log(_cols)
-    setQueryValue('_cols', _cols.join(','))
-  }
-}
-
-function setQueryStringFromSearch () {
-  let msg = 'setQueryStringFromSearch() => Getting query string from search inputs.'
-  console.log(`${msg}search inputs.`)
-  // Step through column search inputs and update query string
-  // Highlight inputs with search values and remove highlight for
-  // inputs with no search value.
-  let searchValue
-  let inputs
-  if ($('.dtfh-floatingparent').length > 0) {
-    msg = 'setQueryStringFromSearch() => .dtfh-floatingparent found. '
-    console.log(`${msg}Using inputs under it.`)
-    inputs = $('.dtfh-floatingparent input.columnSearch')
-  } else {
-    msg = 'setQueryStringFromSearch() => No .dtfh-floatingparent found. '
-    console.log(`${msg}Using inputs under .dataTables_scrollHead`)
-    inputs = $(`${tableID} input.columnSearch`)
-  }
-  msg = 'setQueryStringFromSearch() => Reading '
-  console.log(`${msg}${inputs.length} column search inputs.`)
-  const qsSearch = parseQueryString('search')
-  for (const input of inputs) {
-    const name = $(input).attr('name')
-    searchValue = $(input).val()
-    if (searchValue) {
-      let msg = 'setQueryStringFromSearch() => Found search value for column'
-      msg += ` '${name}'. Updating query string and highlighting input.`
-      $(input).css('background-color', 'yellow')
-      msg = 'setQueryStringFromSearch() => Updating query string with '
-      msg += `search value for column '${name}' = '${searchValue}'.`
-      console.log(msg)
-      setQueryValue(name, searchValue)
-    } else {
-      // console.log(`No search value for column '${name}'.`);
-      $(input).css('background-color', '')
-      if (qsSearch[name]) {
-        const msg = `setQueryStringFromSearch() => Found ${name} in `
-        console.log(`${msg}query string. Removing it from query string.`)
-        setQueryValue(name, null)
-      }
-    }
-    const qs = parseQueryString('search')
-    const numSearchKeys = Object.keys(qs).length
-    const msg = 'setQueryStringFromSearch() => There are '
-    if (numSearchKeys > 0) {
-      console.log(`${msg}${numSearchKeys} search keys in the query string. Showing Clear button.`)
-      $('#clearAllSearches').show()
-    } else {
-      console.log(`${msg}no search terms in the query string. Hiding Clear button.`)
-      $('#clearAllSearches').hide()
-    }
-  }
-
-  const globalSearch = $(tableID).DataTable().search()
-  if (globalSearch) {
-    setQueryValue('_globalsearch', encodeURIComponent(globalSearch))
-    $('#clearAllSearches').show()
-    const historyKey = 'globalSearchHistory:' + window.location.pathname
-    const history = JSON.parse(localStorage.getItem(historyKey) || '[]')
-    if (!history.includes(globalSearch)) {
-      history.unshift(globalSearch)
-      if (history.length > 20) history.pop()
-      localStorage.setItem(historyKey, JSON.stringify(history))
-    }
-  } else {
-    setQueryValue('_globalsearch', null)
-  }
-
 }
 
 function array2object (arr, key) {

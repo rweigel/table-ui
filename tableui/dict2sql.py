@@ -130,11 +130,11 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
 
       if data is None:
         if mode == 'rows':
-          msg = f"    No path '{path}'. Using '?' for all attrib. vals."
+          msg = f"    No path '{path}' in {dataset}. Using '' for all attrib. vals."
           logger.warning(msg)
-          # Insert "?" for all attributes
+          # Insert "" for all attributes
           n_attribs = len(attributes[path])
-          fill = n_attribs*"?".split()
+          fill = n_attribs*"".split()
           row = [*row, *fill]
         continue
 
@@ -204,7 +204,7 @@ def _write_files(name, config, out_dir, header, body, counts):
   }
 
   metadata = _table_metadata(name, config, header, files)
-  import pdb; pdb.set_trace()
+  #import pdb; pdb.set_trace()
   for key in files:
     files[key] = os.path.join(out_dir, files[key])
 
