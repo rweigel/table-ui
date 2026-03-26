@@ -6,12 +6,6 @@
 ::placeholder {
    text-align: center;
 }
-input[type="text"] {
-  text-align: center;
-}
-#table1_filter input::-webkit-calendar-picker-indicator {
-  display: none !important;
-}
 body {
   margin: 1em;
   margin-top: 0.5em;
@@ -19,7 +13,10 @@ body {
 h1 {
   font-size: 1em;
 }
-
+a {
+  color: black;
+  text-decoration-color: black;
+}
 button {
   background-color: white;
   border: 1px solid black;
@@ -30,13 +27,7 @@ summary {
 }
 details {
   background-color: white;
-}
-input[type="checkbox"] {
-  accent-color: black;
-}
-a {
-  color: black;
-  text-decoration-color: black;
+  padding-bottom: 0.5em;
 }
 details code {
   font-size: small;
@@ -64,12 +55,21 @@ div.cell {
   position: relative;
   height: 100%;
 }
+input[type="text"] {
+  text-align: center;
+}
+input[type="checkbox"] {
+  accent-color: black;
+}
 .icon-in-cell {
   position: absolute;
   top: 1px;
   left: 1px;
 }
 
+#table1_filter input::-webkit-calendar-picker-indicator {
+  display: none !important;
+}
 
 th, td {
   white-space: nowrap;
@@ -92,6 +92,7 @@ tr th:first-child {
 table.dataTable tbody th, table.dataTable tbody tr:first-child td {
   padding-top: 18px;
 }
+
 
 .dtfh-floatingparenthead table.dataTable thead th,
 .dataTables_scrollHead table thead th {
@@ -137,7 +138,6 @@ div.dataTables_scrollBody table.dataTable {
   */
   margin-bottom: var(--scroll-height-fix);
 }
-
 
 .dataTables_wrapper.no-footer div.dataTables_scrollBody>table {
   border: 1px solid #ddd;
@@ -233,10 +233,16 @@ table.dataTable tbody {
   clear: none;
   text-align: left;
   padding-top: 0.25em;
+  margin-left: 0.5em;
+}
+.dataTables_wrapper .dataTables_filter {
+  float: left;
+  padding-top: 0.15em;
 }
 .dataTables_wrapper .dataTables_paginate {
   float: left;
   text-align: right;
+  padding: 0em;
 }
 .dataTables_wrapper .dataTables_paginate .paginate_button {
   padding: 0em;
@@ -250,3 +256,4 @@ div.dataTables_processing {
   z-index: 101;
   top: 0px;
 }
+
