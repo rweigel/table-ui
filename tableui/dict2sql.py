@@ -204,7 +204,6 @@ def _write_files(name, config, out_dir, header, body, counts):
   }
 
   metadata = _table_metadata(name, config, header, files)
-  #import pdb; pdb.set_trace()
   for key in files:
     files[key] = os.path.join(out_dir, files[key])
 
@@ -227,7 +226,13 @@ def _write_files(name, config, out_dir, header, body, counts):
   utilrsw.write(files['csv'], [header, *body])
 
   logger.info(f"Writing: {files['sql']}")
-  tableui.sql.write(name, header, body, f"{files['sql']}", types=None, metadata=metadata, logger=logger, logger_indent="   ")
+  kwargs = {
+    "types": None,
+    "metadata": metadata,
+    "logger": logger,
+    "logger_indent": "   "
+  }
+  tableui.sql.write(name, header, body, files['sql'], **kwargs)
 
   return files
 
@@ -249,4 +254,3 @@ def _table_metadata(name, config, header, files):
       table_metadata["columnDefinitions"][column_name] = None
 
   return table_metadata
-

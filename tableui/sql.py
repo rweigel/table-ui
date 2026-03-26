@@ -15,13 +15,16 @@ def write(name, header, body, file, types=None, metadata=None, logger=None, logg
 
   column_types = _types(header, types)
 
+  # Extract ordered type list from dict BEFORE header is modified
+  column_types_list = [column_types[col] for col in header]
+
   header, body = _cast(header, body, column_types, logger, logger_indent="   ")
 
   for hidx, colname in enumerate(header):
     header[hidx] = f"`{colname}`"
 
   column_names = f"({', '.join(header)})"
-  column_spec  = "(" + ", ".join(f"{col} {t}" for col, t in zip(header, column_types)) + ")"
+  column_spec  = "(" + ", ".join(f"{col} {t}" for col, t in zip(header, column_types_list)) + ")"
   column_vals  = f"({', '.join(len(header)*['?'])})"
 
   execute = f'INSERT INTO `{name}` {column_names} VALUES {column_vals}'
@@ -66,7 +69,8 @@ def write(name, header, body, file, types=None, metadata=None, logger=None, logg
   conn = sqlite3.connect(file)
   cursor = conn.cursor()
   name_desc = f'{name}.metadata'
-  logger.info(f"{indent}Creating table {name_desc} with table metadata stored as a JSON string")
+  msg = f"{indent}Creating table {name_desc} with table metadata stored as a JSON string"
+  logger.info(msg)
 
   spec = "(TableName TEXT NOT NULL, Metadata TEXT)"
   execute = f"CREATE TABLE `{name_desc}` {spec}"
@@ -307,4 +311,3 @@ def _cursor(sqldb, memory=False):
       raise
 
   return cursor, connection
-
