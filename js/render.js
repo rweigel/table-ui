@@ -109,7 +109,7 @@ renderFunctions.splitArray = function (columnName, config, symbol) {
         const parsed = JSON.parse(columnString.replace(/'/g, '"'))
         if (Array.isArray(parsed)) {
           columnString = JSON.stringify(parsed, null, 2).replace(/\n/g, '<br>')
-          columnString = `<div style="text-align: left;">${columnString}</div>`
+          columnString = `<pre style="text-align: left;">${columnString}</pre>`
         }
         return columnString
       } catch (e) {

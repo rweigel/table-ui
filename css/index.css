@@ -6,6 +6,7 @@
 ::placeholder {
    text-align: center;
 }
+
 body {
   margin: 1em;
   margin-top: 0.5em;
@@ -61,22 +62,79 @@ input[type="text"] {
 input[type="checkbox"] {
   accent-color: black;
 }
+
 .icon-in-cell {
   position: absolute;
   top: 1px;
   left: 1px;
 }
-
-#table1_filter input::-webkit-calendar-picker-indicator {
-  display: none !important;
+.ellipsis {
+  cursor: pointer;
+}
+.help {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewport="0 0 100 100" style="fill:black;font-size:16px;"><text y="70%">?</text></svg>'), auto;
+  position: relative; bottom: 0.6em;
+  z-index: 1;
+  font-size: 0.3em;
 }
 
+#relatedTables {
+  position: absolute;
+  top: 2px;
+  right: 0px;
+  z-index: 1000;
+  background-color: white;
+  padding: 0px;
+  /*
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  */
+}
+#relatedTables {
+  display: none;
+}
+#relatedTablesSelect {
+  margin-right: 1em;
+}
+
+#error {
+  color: red;
+  font-weight: bold;
+  padding: 0.5em;
+  display: none;
+  padding-bottom: 3px;
+}
+#showHideColumns {
+  margin-right: 1em;
+  padding-bottom: 0.5em;
+}
+#clearAllSearches {
+  display: none;
+}
+#clearAllSearches button {
+  margin-right: 1em;
+  background-color: yellow;
+}
+
+
+#table1 {
+  width: 100% !important;
+}
 th, td {
   white-space: nowrap;
 }
 table {
   border-radius: 0px !important;
   border-left: 0px !important;
+}
+table.dataTable thead th {
+  font-size: 0.8em;
+  text-align: center;
+}
+table.dataTable tbody {
+  font-family: monospace;
+  text-align: center;
+  font-size: 9pt;
 }
 th, td {
   /* border-right: var(--border) solid green; */
@@ -88,7 +146,6 @@ tr td:first-child {
 tr th:first-child {
   border-left: var(--border);
 }
-
 table.dataTable tbody th, table.dataTable tbody tr:first-child td {
   padding-top: 18px;
 }
@@ -139,10 +196,6 @@ div.dataTables_scrollBody table.dataTable {
   margin-bottom: var(--scroll-height-fix);
 }
 
-.dataTables_wrapper.no-footer div.dataTables_scrollBody>table {
-  border: 1px solid #ddd;
-}
-
 /*
   Fix for Chrome autofill, which has its own background color.
   When an autofill value is selected, the input gets a class of
@@ -155,78 +208,24 @@ input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0px 40rem yellow inset;
 }
 
-#relatedTables {
-  position: absolute;
-  top: 2px;
-  right: 0px;
-  z-index: 1000;
-  background-color: white;
-  padding: 0px;
-  /*
-  border-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  */
+#table1_filter input::-webkit-calendar-picker-indicator {
+  display: none !important;
 }
 
-.help {
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewport="0 0 100 100" style="fill:black;font-size:16px;"><text y="70%">?</text></svg>'), auto;
-  position: relative; bottom: 0.6em;
-  z-index: 1;
-  font-size: 0.3em;
+.dataTables_wrapper.no-footer div.dataTables_scrollBody>table {
+  border: 1px solid #ddd;
 }
 
-#relatedTables {
-  display: none;
-}
-#relatedTablesSelect {
-  margin-right: 1em;
-}
-
-#table1 {
-  width: 100% !important;
-}
-#error {
-  color: red;
-  font-weight: bold;
-  padding: 0.5em;
-  display: none;
-  padding-bottom: 3px;
-}
-#showHideColumns {
-  margin-right: 1em;
-  padding-bottom: 0.5em;
-}
-#clearAllSearches {
-  display: none;
-}
-#clearAllSearches button {
-  margin-right: 1em;
-  background-color: yellow;
-}
-
-table.dataTable thead th {
-  font-size: 0.8em;
-  text-align: center;
-}
-
-table.dataTable tbody {
-  font-family: monospace;
-  text-align: center;
-  font-size: 9pt;
-}
-
-.ellipsis {
-  cursor: pointer;
-}
-.dataTables_filter {
+.dataTables_wrapper .dataTables_filter {
   float: left;
+  padding-top: 0.15em;
 }
-.dataTables_filter input {
+.dataTables_wrapper .dataTables_filter input {
   height: 1.4em;
   box-sizing: border-box;
   padding: 0;
 }
-.dataTables_length {
+.dataTables_wrapper .dataTables_length {
   display: inline-block;
 }
 .dataTables_wrapper .dataTables_info {
@@ -234,10 +233,6 @@ table.dataTable tbody {
   text-align: left;
   padding-top: 0.25em;
   margin-left: 0.5em;
-}
-.dataTables_wrapper .dataTables_filter {
-  float: left;
-  padding-top: 0.15em;
 }
 .dataTables_wrapper .dataTables_paginate {
   float: left;

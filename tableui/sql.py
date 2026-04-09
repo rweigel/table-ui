@@ -192,8 +192,10 @@ def _rename_duplicates(header, logger, logger_indent="   "):
     return headeru
 
   logger.info(f"{indent}Renaming non-unique column names")
+  n_original = len(header)
   header = unique(header)
-  logger.info(f"{indent}Renamed non-unique column names")
+  n_unique = len(header)
+  logger.info(f"{indent}Renamed {n_original-n_unique} non-unique column names")
   return header
 
 
