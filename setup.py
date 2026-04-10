@@ -12,5 +12,10 @@ setup(
     description='Serve a SQL database as a web page using DataTables.',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    install_requires=install_requires
+    install_requires=install_requires,
+    entry_points={
+        'console_scripts': [
+            'tableui-serve=tableui.cli:main',
+        ],
+    },
 )

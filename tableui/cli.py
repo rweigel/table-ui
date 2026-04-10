@@ -55,3 +55,9 @@ def cli():
   configs = utilrsw.uvicorn.cli(parser=parser)
 
   return configs
+
+
+def main():
+  import utilrsw.uvicorn
+  configs = cli()
+  utilrsw.uvicorn.run("tableui.app", configs)
