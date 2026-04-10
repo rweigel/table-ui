@@ -4,6 +4,8 @@ logger = None
 
 def dict2sql(datasets, config, embed=False, logger=None):
 
+  import copy
+
   if logger is None:
     import logging
     logger = logging.getLogger('dict2sql')
@@ -12,18 +14,24 @@ def dict2sql(datasets, config, embed=False, logger=None):
   name = config.get('name', 'table')
   out_dir = config.get('out_dir', '.')
 
+  omit_attributes = config.get('omit_attributes', None)
   attributes = {}
-  paths = config['paths']
+  paths = copy.deepcopy(config['paths'])
   for path in paths:
-    attributes[path] = config['paths'][path]
+    attributes[path] = copy.deepcopy(config['paths'][path])
+    if omit_attributes is not None:
+      for attribute in omit_attributes:
+        if attribute in attributes[path]:
+          logger.warning(f"Omitting attribute '{attribute}' from path '{path}' b/c in omit_attributes")
+          del attributes[path][attribute]
 
   attribute_counts = None
   if config.get('use_all_attributes', False):
-    # Modify attributes dict to include all unique attributes found in all
-    # variables. If an attribute is misspelled, it is mapped to the correct
-    # spelling and placed in the attributes dict if there is a fix for it
-    # name config.json. The return value of attributes_all is a list 
-    # of all uncorrected attribute names encountered.
+    # Modify attributes dict to include all unique attributes found. If an
+    # attribute is misspelled, it is mapped to the correct spelling and placed
+    # in the attributes dict if there is a fix for it name in config.json. The
+    # return value of attributes_all is a list of all uncorrected attribute
+    # names encountered.
     import collections
     logger.info("Finding all unique attributes")
     attributes_all = _table_walk(datasets, attributes, config, mode='attributes')
@@ -117,7 +125,7 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
   paths = attributes.keys()
 
   for idx, dataset in enumerate(datasets):
-    logger.debug(f"  Computing {mode} for element {idx}")
+    logger.debug(f"  Computing columns for element {idx}; mode = '{mode}'")
 
     if mode == 'rows':
       row = []
@@ -127,6 +135,7 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
       logger.debug(f"    Reading path = '{path}'")
 
       data = utilrsw.get_path(dataset, path.split('/'))
+      logger.debug(f"      path has {len(data)} attribute(s)")
 
       if data is None:
         if mode == 'rows':
@@ -175,7 +184,6 @@ def _append_columns(data, attributes, row, fixes):
 def _add_attributes(data, attributes, attribute_names, fixes, path, omit_attributes):
 
   for attribute_name in data:
-
     if omit_attributes is not None and attribute_name in omit_attributes:
       logger.debug(f"  Skipping {path}{attribute_name} b/c in omit_attributes")
       continue
@@ -194,18 +202,31 @@ def _write_files(name, config, out_dir, header, body, counts):
   import os
   import tableui
 
+  if len(header) == 0:
+    raise Exception("Table has no columns. Cannot write table files.")
+
   files = {
-    'meta': f'{name}.meta.json',
-    'header': f'{name}.head.json',
-    'body': f'{name}.body.json',
-    'csv': f'{name}.csv',
-    'sql': f'{name}.sql',
-    'counts': f'{name}.attribute_counts.csv'
+    'json-split': {
+      'meta': os.path.join(out_dir, 'json-split', f'{name}.meta.json'),
+      'header': os.path.join(out_dir, 'json-split', f'{name}.head.json'),
+      'body': os.path.join(out_dir, 'json-split', f'{name}.body.json')
+    },
+    'json': os.path.join(out_dir, f'{name}.json'),
+    'csv': os.path.join(out_dir, f'{name}.csv'),
+    'sql': os.path.join(out_dir, f'{name}.sql'),
+    'counts': os.path.join(out_dir, f'{name}.attribute_counts.csv')
   }
 
+  all = True
+  if 'formats' in config:
+    all = False
+    for format in config['formats']:
+      formats_known = ['json', 'json-split', 'csv', 'sql']
+      if format not in formats_known:
+        msg = f"Ignoring unknown format '{format}' in config. Allowed: {formats_known}."
+        logger.error(msg)
+
   metadata = _table_metadata(name, config, header, files)
-  for key in files:
-    files[key] = os.path.join(out_dir, files[key])
 
   if counts is None:
     del files['counts']
@@ -213,26 +234,38 @@ def _write_files(name, config, out_dir, header, body, counts):
     logger.info(f"Writing: {files['counts']}")
     utilrsw.write(files['counts'], [["attribute", "count"], *counts])
 
-  logger.info(f"Writing: {files['meta']}")
-  utilrsw.write(files['meta'], metadata)
+  if all or 'json' in config['formats']:
+    combined = {
+      "metadata": metadata,
+      "header": header,
+      "body": body
+    }
+    logger.info(f"Writing: {files['json']}")
+    utilrsw.write(files['json'], combined)
 
-  logger.info(f"Writing: {files['header']}")
-  utilrsw.write(files['header'], header)
+  if all or 'json-split' in config['formats']:
+    logger.info(f"Writing: {files['json-split']['meta']}")
+    utilrsw.write(files['json-split']['meta'], metadata)
 
-  logger.info(f"Writing: {files['body']}")
-  utilrsw.write(files['body'], body)
+    logger.info(f"Writing: {files['json-split']['header']}")
+    utilrsw.write(files['json-split']['header'], header)
 
-  logger.info(f"Writing: {files['csv']}")
-  utilrsw.write(files['csv'], [header, *body])
+    logger.info(f"Writing: {files['json-split']['body']}")
+    utilrsw.write(files['json-split']['body'], body)
 
-  logger.info(f"Writing: {files['sql']}")
-  kwargs = {
-    "types": None,
-    "metadata": metadata,
-    "logger": logger,
-    "logger_indent": "   "
-  }
-  tableui.sql.write(name, header, body, files['sql'], **kwargs)
+  if all or 'csv' in config['formats']:
+    logger.info(f"Writing: {files['csv']}")
+    utilrsw.write(files['csv'], [header, *body])
+
+  if all or 'sql' in config['formats']:
+    logger.info(f"Writing: {files['sql']}")
+    kwargs = {
+      "types": None,
+      "metadata": metadata,
+      "logger": logger,
+      "logger_indent": "   "
+    }
+    tableui.sql.write(name, header, body, files['sql'], **kwargs)
 
   return files
 
@@ -247,6 +280,10 @@ def _table_metadata(name, config, header, files):
     "creationDate": creationDate,
     "columnDefinitions": columnDefinitions
   }
+
+  for column_name in columnDefinitions:
+    if column_name not in header:
+      logger.warning(f"Column name '{column_name}' in column_definitions but not in table header")
 
   for column_name in header:
     if column_name not in columnDefinitions:

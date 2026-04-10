@@ -146,6 +146,19 @@ def nrows(sqldb, table_name, clause=None, params=None):
   return data[0][0] if data else 0
 
 
+def print_table(sqldb, table_name, indent=0, clause=None, params=None, max_rows=10):
+  clause_str = clause if clause else ""
+  query = f"SELECT * FROM `{table_name}` {clause_str} LIMIT {max_rows}"
+  data = execute(sqldb, query, params=params)
+  column_names_list = column_names(sqldb, table_name)
+  indent = " " * indent
+  print(f"{indent}Table name: {table_name}")
+  print(f"{indent}  Columns")
+  print(f"{indent}    {column_names_list}")
+  print(f"{indent}  Rows")
+  for idx, row in enumerate(data):
+    print(f"{indent}    {idx} {row}")
+
 def _types(columns, types):
   # Build column type map: TEXT by default
   valid_types = {'TEXT', 'INTEGER', 'REAL', 'NUMERIC', 'BLOB'}
