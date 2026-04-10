@@ -293,7 +293,7 @@ if __name__ == "__main__":
     'types': {'d': 'INTEGER'},
     'out': 'demo/demo.sqlite'
   }
-  sqldb_path = tableui.list2sql(table_name, body_file, head_file, **kwargs)
+  sqldb_path = tableui.lists2table(table_name, body_file, head_file, **kwargs)
   config["sqldb"] = sqldb_path # Should match kwargs['out']
   configs['app']['config'] = config
   _run_tests(configs, head_data, body_data, debug=debug)

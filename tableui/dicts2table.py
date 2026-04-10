@@ -2,13 +2,13 @@ import utilrsw
 
 logger = None
 
-def dict2sql(datasets, config, embed=False, logger=None):
-
+def dicts2table(datasets, config, embed=False, logger=None):
+  "Docstring TODO"
   import copy
 
   if logger is None:
     import logging
-    logger = logging.getLogger('dict2sql')
+    logger = logging.getLogger('dicts2table')
   globals()['logger'] = logger
 
   name = config.get('name', 'table')
@@ -22,7 +22,7 @@ def dict2sql(datasets, config, embed=False, logger=None):
     if omit_attributes is not None:
       for attribute in omit_attributes:
         if attribute in attributes[path]:
-          logger.warning(f"Omitting attribute '{attribute}' from path '{path}' b/c in omit_attributes")
+          logger.warning(f"Ignoring attribute '{attribute}' in path '{path}' b/c in omit_attributes")
           del attributes[path][attribute]
 
   attribute_counts = None

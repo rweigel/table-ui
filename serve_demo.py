@@ -9,7 +9,7 @@ kwargs = {
   'types': {'d': 'INTEGER'},
   'out': 'demo/demo.sqlite'
 }
-tableui.list2sql(table_name, body, head, **kwargs)
+tableui.lists2table(table_name, body, head, **kwargs)
 
 # Run server
 configs = tableui.cli()

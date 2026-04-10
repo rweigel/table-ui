@@ -1,4 +1,4 @@
-def list2sql(table_name, body, head=None, types=None, out=None):
+def lists2table(table_name, body, head=None, types=None, out=None):
   import json
   import logging
 

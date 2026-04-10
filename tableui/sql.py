@@ -159,6 +159,7 @@ def print_table(sqldb, table_name, indent=0, clause=None, params=None, max_rows=
   for idx, row in enumerate(data):
     print(f"{indent}    {idx} {row}")
 
+
 def _types(columns, types):
   # Build column type map: TEXT by default
   valid_types = {'TEXT', 'INTEGER', 'REAL', 'NUMERIC', 'BLOB'}

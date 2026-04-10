@@ -1,24 +1,30 @@
 {
   "metadata": {
     "description": "",
-    "creationDate": "2026-04-10T10:56:14Z",
+    "creationDate": "2026-04-10T22:48:58Z",
     "columnDefinitions": {
       "attribute1": "Attribute 1 definition",
       "attribute3": "Attribute 3 definition",
       "id": null,
-      "attribute2": null
+      "attribute2": null,
+      "attribute2typo": null,
+      "attribute3typo": null
     }
   },
   "header": [
     "id",
     "attribute1",
     "attribute2",
-    "attribute3"
+    "attribute3",
+    "attribute2typo",
+    "attribute3typo"
   ],
   "body": [
     [
       "id_11",
       "id_11/attribute1",
+      "",
+      "",
       "id_11/attribute2",
       11
     ],
@@ -26,19 +32,25 @@
       "id_12",
       "id_12/attribute1",
       "id_12/attribute2",
-      12
+      12,
+      "",
+      ""
     ],
     [
       "id_21",
       "id_21/attribute1",
       "id_21/attribute2",
-      21
+      21,
+      "",
+      ""
     ],
     [
       "id_22",
       "id_22/attribute1",
       "id_22/attribute2",
-      22
+      22,
+      "",
+      ""
     ]
   ]
 }

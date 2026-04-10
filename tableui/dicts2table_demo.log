@@ -1,0 +1,324 @@
+2026-04-10T18:48:58.303456Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.303589Z INFO  dicts2table_demo Reference config and data.
+2026-04-10T18:48:58.303659Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.476127Z INFO  dicts2table_demo config:
+2026-04-10T18:48:58.476329Z INFO  dicts2table_demo {
+  "use_all_attributes": true,
+  "out_dir": "dicts2table_demo",
+  "name": "demo",
+  "paths": {
+    "/": {
+      "id": "id",
+      "attribute1": null,
+      "attribute2": null,
+      "attribute3": {
+        "type": "integer"
+      }
+    }
+  },
+  "column_definitions": {
+    "attribute1": "Attribute 1 definition",
+    "attribute3": "Attribute 3 definition",
+    "id": null,
+    "attribute2": null
+  }
+}
+2026-04-10T18:48:58.476474Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.476545Z INFO  dicts2table_demo dicts2table input:
+2026-04-10T18:48:58.476661Z INFO  dicts2table_demo [
+  {
+    "id": "id_11",
+    "attribute1": "id_11/attribute1",
+    "attribute2": "id_11/attribute2",
+    "attribute3": 11
+  },
+  {
+    "id": "id_12",
+    "attribute1": "id_12/attribute1",
+    "attribute2": "id_12/attribute2",
+    "attribute3": 12
+  },
+  {
+    "id": "id_21",
+    "attribute1": "id_21/attribute1",
+    "attribute2": "id_21/attribute2",
+    "attribute3": 21
+  },
+  {
+    "id": "id_22",
+    "attribute1": "id_22/attribute1",
+    "attribute2": "id_22/attribute2",
+    "attribute3": 22
+  }
+]
+2026-04-10T18:48:58.476739Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.476808Z INFO  dicts2table_demo dicts2table output:
+2026-04-10T18:48:58.477139Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.479332Z INFO  dicts2table_demo Table Names:
+  ['demo', 'demo.metadata']
+
+2026-04-10T18:48:58.480130Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.481124Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.481259Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.481336Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.481441Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.481511Z INFO  dicts2table_demo use_all_attributes=False, only id and attribute1 in path '/'.
+2026-04-10T18:48:58.481585Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.511881Z INFO  dicts2table_demo config:
+2026-04-10T18:48:58.512092Z INFO  dicts2table_demo {
+  "use_all_attributes": false,
+  "out_dir": "dicts2table_demo",
+  "name": "demo",
+  "paths": {
+    "/": {
+      "id": "id",
+      "attribute1": null
+    }
+  },
+  "column_definitions": {
+    "attribute1": "Attribute 1 definition",
+    "attribute3": "Attribute 3 definition",
+    "id": null,
+    "attribute2": null
+  }
+}
+2026-04-10T18:48:58.512178Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.512249Z INFO  dicts2table_demo dicts2table input:
+2026-04-10T18:48:58.512354Z INFO  dicts2table_demo [
+  {
+    "id": "id_11",
+    "attribute1": "id_11/attribute1",
+    "attribute2": "id_11/attribute2",
+    "attribute3": 11
+  },
+  {
+    "id": "id_12",
+    "attribute1": "id_12/attribute1",
+    "attribute2": "id_12/attribute2",
+    "attribute3": 12
+  },
+  {
+    "id": "id_21",
+    "attribute1": "id_21/attribute1",
+    "attribute2": "id_21/attribute2",
+    "attribute3": 21
+  },
+  {
+    "id": "id_22",
+    "attribute1": "id_22/attribute1",
+    "attribute2": "id_22/attribute2",
+    "attribute3": 22
+  }
+]
+2026-04-10T18:48:58.512424Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.512497Z INFO  dicts2table_demo dicts2table output:
+2026-04-10T18:48:58.512812Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.514936Z INFO  dicts2table_demo Table Names:
+  ['demo', 'demo.metadata']
+
+2026-04-10T18:48:58.515731Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.516394Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.516504Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.516595Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.516713Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.516779Z INFO  dicts2table_demo use_all_attributes=True and omit_attributes=['attribute2'].
+2026-04-10T18:48:58.516857Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.552266Z INFO  dicts2table_demo config:
+2026-04-10T18:48:58.552489Z INFO  dicts2table_demo {
+  "use_all_attributes": true,
+  "out_dir": "dicts2table_demo",
+  "name": "demo",
+  "paths": {
+    "/": {
+      "id": "id",
+      "attribute1": null,
+      "attribute2": null,
+      "attribute3": {
+        "type": "integer"
+      }
+    }
+  },
+  "column_definitions": {
+    "attribute1": "Attribute 1 definition",
+    "attribute3": "Attribute 3 definition",
+    "id": null,
+    "attribute2": null
+  },
+  "omit_attributes": [
+    "attribute2"
+  ]
+}
+2026-04-10T18:48:58.552576Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.552646Z INFO  dicts2table_demo dicts2table input:
+2026-04-10T18:48:58.552746Z INFO  dicts2table_demo [
+  {
+    "id": "id_11",
+    "attribute1": "id_11/attribute1",
+    "attribute2": "id_11/attribute2",
+    "attribute3": 11
+  },
+  {
+    "id": "id_12",
+    "attribute1": "id_12/attribute1",
+    "attribute2": "id_12/attribute2",
+    "attribute3": 12
+  },
+  {
+    "id": "id_21",
+    "attribute1": "id_21/attribute1",
+    "attribute2": "id_21/attribute2",
+    "attribute3": 21
+  },
+  {
+    "id": "id_22",
+    "attribute1": "id_22/attribute1",
+    "attribute2": "id_22/attribute2",
+    "attribute3": 22
+  }
+]
+2026-04-10T18:48:58.552923Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.552988Z INFO  dicts2table_demo dicts2table output:
+2026-04-10T18:48:58.553149Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.559177Z INFO  dicts2table_demo Table Names:
+  ['demo', 'demo.metadata']
+
+2026-04-10T18:48:58.559755Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.560160Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.560223Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.560270Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.560332Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.560383Z INFO  dicts2table_demo Example of using fix_attributes to fix misspelled attribute names.
+2026-04-10T18:48:58.560438Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.585336Z INFO  dicts2table_demo config:
+2026-04-10T18:48:58.585532Z INFO  dicts2table_demo {
+  "use_all_attributes": true,
+  "out_dir": "dicts2table_demo",
+  "name": "demo",
+  "paths": {
+    "/": {
+      "id": "id",
+      "attribute1": null,
+      "attribute2": null,
+      "attribute3": {
+        "type": "integer"
+      }
+    }
+  },
+  "column_definitions": {
+    "attribute1": "Attribute 1 definition",
+    "attribute3": "Attribute 3 definition",
+    "id": null,
+    "attribute2": null
+  },
+  "fix_attributes": true,
+  "fixes": {
+    "attribute2typo": "attribute2",
+    "attribute3typo": "attribute3"
+  }
+}
+2026-04-10T18:48:58.585613Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.585684Z INFO  dicts2table_demo dicts2table input:
+2026-04-10T18:48:58.585782Z INFO  dicts2table_demo [
+  {
+    "id": "id_11",
+    "attribute1": "id_11/attribute1",
+    "attribute2typo": "id_11/attribute2",
+    "attribute3typo": 11
+  },
+  {
+    "id": "id_12",
+    "attribute1": "id_12/attribute1",
+    "attribute2": "id_12/attribute2",
+    "attribute3": 12
+  },
+  {
+    "id": "id_21",
+    "attribute1": "id_21/attribute1",
+    "attribute2": "id_21/attribute2",
+    "attribute3": 21
+  },
+  {
+    "id": "id_22",
+    "attribute1": "id_22/attribute1",
+    "attribute2": "id_22/attribute2",
+    "attribute3": 22
+  }
+]
+2026-04-10T18:48:58.585950Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.586022Z INFO  dicts2table_demo dicts2table output:
+2026-04-10T18:48:58.586187Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.588321Z INFO  dicts2table_demo Table Names:
+  ['demo', 'demo.metadata']
+
+2026-04-10T18:48:58.588724Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.589026Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.589068Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.589102Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.589150Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.589181Z INFO  dicts2table_demo Example using formats
+2026-04-10T18:48:58.589213Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.589965Z INFO  dicts2table_demo config:
+2026-04-10T18:48:58.590034Z INFO  dicts2table_demo {
+  "use_all_attributes": true,
+  "out_dir": "dicts2table_demo",
+  "name": "demo",
+  "paths": {
+    "/": {
+      "id": "id",
+      "attribute1": null,
+      "attribute2": null,
+      "attribute3": {
+        "type": "integer"
+      }
+    }
+  },
+  "column_definitions": {
+    "attribute1": "Attribute 1 definition",
+    "attribute3": "Attribute 3 definition",
+    "id": null,
+    "attribute2": null,
+    "attribute2typo": null,
+    "attribute3typo": null
+  },
+  "formats": [
+    "json"
+  ]
+}
+2026-04-10T18:48:58.590063Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.590084Z INFO  dicts2table_demo dicts2table input:
+2026-04-10T18:48:58.590164Z INFO  dicts2table_demo [
+  {
+    "id": "id_11",
+    "attribute1": "id_11/attribute1",
+    "attribute2typo": "id_11/attribute2",
+    "attribute3typo": 11
+  },
+  {
+    "id": "id_12",
+    "attribute1": "id_12/attribute1",
+    "attribute2": "id_12/attribute2",
+    "attribute3": 12
+  },
+  {
+    "id": "id_21",
+    "attribute1": "id_21/attribute1",
+    "attribute2": "id_21/attribute2",
+    "attribute3": 21
+  },
+  {
+    "id": "id_22",
+    "attribute1": "id_22/attribute1",
+    "attribute2": "id_22/attribute2",
+    "attribute3": 22
+  }
+]
+2026-04-10T18:48:58.590187Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.590204Z INFO  dicts2table_demo dicts2table output:
+2026-04-10T18:48:58.590264Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.590440Z INFO  dicts2table_demo Table Names:
+  ['demo', 'demo.metadata']
+
+2026-04-10T18:48:58.590694Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.590910Z INFO  dicts2table_demo 
+2026-04-10T18:48:58.590936Z INFO  dicts2table_demo -----------------------------------------------------------------------------------------------------
+2026-04-10T18:48:58.590956Z INFO  dicts2table_demo 

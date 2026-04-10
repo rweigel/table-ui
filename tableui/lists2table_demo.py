@@ -1,10 +1,10 @@
 import tableui
 
-table_name = "list2sql_demo"
+table_name = "lists2table_demo"
 body = [["a01", "b01", 1], ["a02", "b02", 2]]
 head = ["a", "b", "c"]
 types = ["TEXT", "TEXT", "INTEGER"]
-sqldb_path = tableui.list2sql(table_name, body, head, types=types)
+sqldb_path = tableui.lists2table(table_name, body, head, types=types)
 
 import sqlite3
 conn = sqlite3.connect(sqldb_path)

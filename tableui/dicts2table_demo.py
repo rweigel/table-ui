@@ -4,43 +4,43 @@ import copy
 import utilrsw
 import tableui
 
-if True:
-  import logging
-  logger = logging.getLogger('dict2sql')
-  logger.setLevel(logging.DEBUG)
+logger = utilrsw.logger('dicts2table_demo', console_format='%(message)s', log_level='DEBUG')
 
-def print_summary(config, data, info, title):
+def print_summary(config, data, title):
 
-  utilrsw.hline()
-  print(title)
-  utilrsw.hline()
+  logger.info(utilrsw.hline(display=False))
+  logger.info(title)
+  logger.info(utilrsw.hline(display=False))
 
-  print("config:")
-  print(json.dumps(config, indent=2))
-  print("")
+  info = tableui.dicts2table(data, config, embed=True)
 
-  print("dict2sql input:")
-  print(json.dumps(data, indent=2))
-  print("")
+  logger.info("config:")
+  logger.info(json.dumps(config, indent=2))
+  logger.info("")
 
-  print("dict2sql output:")
+  logger.info("dicts2table input:")
+  logger.info(json.dumps(data, indent=2))
+  logger.info("")
+
+  logger.info("dicts2table output:")
   utilrsw.print_dict(info, indent=2)
-  print("")
+  logger.info("")
 
   table_names = tableui.sql.table_names(info['sql'])
-  print(f"Table Names:\n  {table_names}\n")
+  logger.info(f"Table Names:\n  {table_names}\n")
 
   for table_name in table_names:
     tableui.sql.print_table(info['sql'], table_name)
-    print("")
+    logger.info("")
 
-  utilrsw.hline()
+  logger.info(utilrsw.hline(display=False))
+  logger.info("")
 
 
 config0 = {
   "use_all_attributes": True,
-  "out_dir": 'dict2sql_demo/demo1',
-  "name": "demo1",
+  "out_dir": 'dicts2table_demo',
+  "name": "demo",
   "paths": {
     "/": {
       "id": "id",
@@ -83,8 +83,7 @@ data1 = [
 ]
 
 title = "Reference config and data."
-info = tableui.dict2sql(data1, config0, embed=True)
-print_summary(config0, data1, info, title)
+print_summary(config0, data1, title)
 
 
 title = "use_all_attributes=False, only id and attribute1 in path '/'."
@@ -92,15 +91,13 @@ config = copy.deepcopy(config0)
 config['use_all_attributes'] = False
 del config['paths']['/']['attribute2']
 del config['paths']['/']['attribute3']
-info = tableui.dict2sql(data1, config, embed=True)
-print_summary(config, data1, info, title)
+print_summary(config, data1, title)
 
 
 title = "use_all_attributes=True and omit_attributes=['attribute2']."
 config = copy.deepcopy(config0)
 config['omit_attributes'] = ['attribute2']
-info = tableui.dict2sql(data1, config, embed=True)
-print_summary(config, data1, info, title)
+print_summary(config, data1, title)
 
 
 title = "Example of using fix_attributes to fix misspelled attribute names."
@@ -114,12 +111,10 @@ data1[0]['attribute2typo'] = data1[0]['attribute2']
 data1[0]['attribute3typo'] = data1[0]['attribute3']
 del data1[0]['attribute2']
 del data1[0]['attribute3']
-info = tableui.dict2sql(data1, config, embed=True)
-print_summary(config, data1, info, title)
+print_summary(config, data1, title)
 
 
 title = "Example using formats"
 config = copy.deepcopy(config0)
 config['formats'] = ['json'] # Allowed: 'json', 'json-split', 'csv', 'sql'
-info = tableui.dict2sql(data1, config, embed=True)
-print_summary(config, data1, info, title)
+print_summary(config, data1, title)
