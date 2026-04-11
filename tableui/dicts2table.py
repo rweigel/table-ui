@@ -135,7 +135,6 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
       logger.debug(f"    Reading path = '{path}'")
 
       data = utilrsw.get_path(dataset, path.split('/'))
-      logger.debug(f"      path has {len(data)} attribute(s)")
 
       if data is None:
         if mode == 'rows':
@@ -146,6 +145,8 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
           fill = n_attribs*"".split()
           row = [*row, *fill]
         continue
+
+      logger.debug(f"      path has {len(data)} attribute(s)")
 
       if mode == 'attributes':
         _add_attributes(data, attributes[path], attribute_names, fixes, path, omit_attributes)
