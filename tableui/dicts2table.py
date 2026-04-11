@@ -142,7 +142,7 @@ def _table_walk(datasets, attributes, config, mode='attributes'):
           logger.warning(msg)
           # Insert "" for all attributes
           n_attribs = len(attributes[path])
-          fill = n_attribs*"".split()
+          fill = [""] * n_attribs
           row = [*row, *fill]
         continue
 
