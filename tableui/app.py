@@ -8,7 +8,7 @@ import tableui
 
 logger = logging.getLogger(__name__)
 
-ROOT_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+ROOT_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "ui"))
 CONFIG_DEFAULT = os.path.join(ROOT_DIR, "conf", "default.json")
 RENDER_DEFAULT = os.path.join(ROOT_DIR, "js", "render.js")
 STYLE_DEFAULT = os.path.join(ROOT_DIR, "css", "index.css")
@@ -79,7 +79,7 @@ def _api_init(app, config, path=None, related_paths=None):
         # Register root redirect once — before the per-path loop
         first_path = rp_paths[0]
         logger.info("Initializing endpoint /")
-        @app.route("/", methods=["GET", "HEAD"])
+        @app.api_route("/", methods=["GET", "HEAD"])
         def rootredirect(request: fastapi.Request):
           target = first_path
           if not target.startswith('/'):
@@ -101,7 +101,7 @@ def _api_init(app, config, path=None, related_paths=None):
   if path != "":
     path = f"/{path.strip('/')}"
 
-  for dir in ['js', 'css', 'demo', 'misc']:
+  for dir in ['js', 'css', 'conf', 'demo']:
     directory = os.path.join(ROOT_DIR, dir)
     app.mount(f"{path}/{dir}/", StaticFiles(directory=directory))
 
@@ -111,7 +111,7 @@ def _api_init(app, config, path=None, related_paths=None):
       path_list.append(related_path['path'])
 
   logger.info(f"Initializing endpoint {path}/")
-  @app.route(f"{path}/", methods=["GET", "HEAD"])
+  @app.api_route(f"{path}/", methods=["GET", "HEAD"])
   def indexhtml(request: fastapi.Request):
     # Silently ignores any query parameters
     fname = os.path.join(ROOT_DIR, 'index.html')
@@ -123,7 +123,7 @@ def _api_init(app, config, path=None, related_paths=None):
   if "jsondb" in config_r:
     endpoint = f"{path}/jsondb"
     logger.info(f"Initializing endpoint '{endpoint}'")
-    @app.route(endpoint, methods=["GET", "HEAD"])
+    @app.api_route(endpoint, methods=["GET", "HEAD"])
     def jsondb(request: fastapi.Request):
       # Silently ignores any query parameters other than _verbose
       query_params = dict(request.query_params)
@@ -148,7 +148,7 @@ def _api_init(app, config, path=None, related_paths=None):
   if "sqldb" in config_r and config_r["sqldb"] is not None:
     endpoint = f"{path}/sqldb"
     logger.info(f"Initializing endpoint '{endpoint}'")
-    @app.route(f"{path}/sqldb", methods=["GET", "HEAD"])
+    @app.api_route(f"{path}/sqldb", methods=["GET", "HEAD"])
     def sqldb(request: fastapi.Request):
       # Silently ignores any query parameters
 
@@ -166,7 +166,7 @@ def _api_init(app, config, path=None, related_paths=None):
 
   endpoint = f"{path}/config"
   logger.info(f"Initializing endpoint '{endpoint}'")
-  @app.route(f"{path}/config", methods=["GET", "HEAD"])
+  @app.api_route(f"{path}/config", methods=["GET", "HEAD"])
   def configx(request: fastapi.Request):
     # Silently ignores any query parameters
 
@@ -192,7 +192,7 @@ def _api_init(app, config, path=None, related_paths=None):
 
   endpoint = f"{path}/style.css"
   logger.info(f"Initializing endpoint '{endpoint}'")
-  @app.route(f"{path}/style.css", methods=["GET", "HEAD"])
+  @app.api_route(f"{path}/style.css", methods=["GET", "HEAD"])
   def style(request: fastapi.Request):
     # Silently ignores any query parameters
     config_r, err = _config_resolve(config, path=path_o, update=True)
@@ -206,7 +206,7 @@ def _api_init(app, config, path=None, related_paths=None):
 
   endpoint = f"{path}/render.js"
   logger.info(f"Initializing endpoint '{endpoint}'")
-  @app.route(f"{path}/render.js", methods=["GET", "HEAD"])
+  @app.api_route(f"{path}/render.js", methods=["GET", "HEAD"])
   def render(request: fastapi.Request):
     # Silently ignores any query parameters
     config_r, err = _config_resolve(config, path=path_o, update=True)
@@ -220,7 +220,7 @@ def _api_init(app, config, path=None, related_paths=None):
 
   endpoint = f"{path}/data/"
   logger.info(f"Initializing endpoint '{endpoint}'")
-  @app.route(f"{path}/data/", methods=["POST", "GET", "HEAD"])
+  @app.api_route(f"{path}/data/", methods=["POST", "GET", "HEAD"])
   def data(request: fastapi.Request):
 
     logger.info(f"Data request with query params: {request.query_params}")
