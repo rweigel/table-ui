@@ -4,7 +4,10 @@ install_requires = ["uvicorn", "fastapi"]
 
 setup(
     name='tableui',
-    version='0.0.2',
+    use_scm_version={
+        "version_scheme": "post-release",
+    },
+    setup_requires=['setuptools_scm'],
     author='Bob Weigel',
     author_email='rweigel@gmu.edu',
     packages=find_packages(),
