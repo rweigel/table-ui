@@ -1485,6 +1485,7 @@ function scrollBar (floatingHeader) {
   let container2 = $('.dataTables_scrollBody');
   if (!container2.length) {
     $('#scroll-container').hide()
+    $('#scroll-container-bottom').hide()
     return
   }
   if (floatingHeader) {
@@ -1522,6 +1523,16 @@ function scrollBar (floatingHeader) {
   $('#scroll-container div').width($('#table1').width() - shift)
   $('#scroll-container').css('margin-left', shift)
 
+  // Create bottom scroll container if it doesn't exist
+  if ($('#scroll-container-bottom').length === 0) {
+    $('<div id="scroll-container-bottom"><div style="height:1px;"></div></div>')
+      .insertAfter('.dataTables_scrollBody')
+  }
+  const containerBottom = $('#scroll-container-bottom')
+  containerBottom.find('div').width($('#table1').width() - shift)
+  containerBottom.css('margin-left', shift)
+  containerBottom.show()
+
   if (floatingHeader) {
     console.log('triggered')
     const top = $('.dtfh-floatingparent').outerHeight() + 'px';
@@ -1537,22 +1548,28 @@ function scrollBar (floatingHeader) {
 
   let scrolling = false
   container1.off('scroll').on('scroll', () => {
-    if (scrolling) {
-      return
-    }
+    if (scrolling) return
     scrolling = true
     $('.dataTables_scrollBody').scrollLeft(container1.scrollLeft())
     $('.dataTables_scrollHead').scrollLeft(container1.scrollLeft())
     container2.scrollLeft(container1.scrollLeft())
+    containerBottom.scrollLeft(container1.scrollLeft())
     scrolling = false
   })
   container2.off('scroll').on('scroll', () => {
-    if (scrolling) {
-      return
-    }
     if (scrolling) return
     scrolling = true
     container1.scrollLeft(container2.scrollLeft())
+    containerBottom.scrollLeft(container2.scrollLeft())
+    scrolling = false
+  })
+  containerBottom.off('scroll').on('scroll', () => {
+    if (scrolling) return
+    scrolling = true
+    $('.dataTables_scrollBody').scrollLeft(containerBottom.scrollLeft())
+    $('.dataTables_scrollHead').scrollLeft(containerBottom.scrollLeft())
+    container1.scrollLeft(containerBottom.scrollLeft())
+    container2.scrollLeft(containerBottom.scrollLeft())
     scrolling = false
   })
 }
