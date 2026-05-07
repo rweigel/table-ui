@@ -136,6 +136,7 @@ function reInit () {
 function dtInitComplete () {
   console.log('dtInitComplete() => DOM is ready.')
   const table = $(tableID).dataTable()
+  const columnSelectionWarning = getConfig.config.dataTablesAdditions.columnSelectionWarning
   if (colsShowHas('nonempty')) {
     let msg = 'dtInitComplete() => Setting showEmptyColumns '
     msg += 'checkbox to checked because _cols_show contains nonempty.'
@@ -167,6 +168,10 @@ function dtInitComplete () {
     })
   } else {
     console.log('dtInitComplete() => Not showing config-hidden columns.')
+  }
+
+  if (columnSelectionWarning) {
+    $('#error').html(columnSelectionWarning).show()
   }
 
   createColumnHelp(getConfig.config)
@@ -341,13 +346,35 @@ async function getConfig () {
     console.log("_columns() => Creating config['columns']")
 
     let _cols = getQueryValue('_cols')
+    let _colsRegex = getQueryValue('_cols_regex')
     console.log('_columns() => _cols from query string:', _cols)
+    console.log('_columns() => _cols_regex from query string:', _colsRegex)
     let allVisible = true
-    if (_cols) {
-      _cols = _cols.trim().split(',')
+    if (_cols || _colsRegex) {
+      if (_cols) {
+        _cols = _cols.trim().split(',')
+      } else {
+        _cols = []
+      }
+      if (_colsRegex) {
+        _colsRegex = _colsRegex.trim().split(',')
+      } else {
+        _colsRegex = []
+      }
       allVisible = false
     } else {
       _cols = []
+      _colsRegex = []
+    }
+
+    const exactCols = _cols
+    const regexCols = []
+    for (const col of _colsRegex) {
+      try {
+        regexCols.push(new RegExp(col))
+      } catch (e) {
+        console.log(`_columns() => Invalid _cols_regex regex '${col}'. Ignoring it.`)
+      }
     }
 
     let columnOptions = config.dataTablesAdditions.columnOptions || {}
@@ -355,13 +382,19 @@ async function getConfig () {
     const qs = parseQueryString()
     config.dataTables.searchCols = []
     const columns = config.dataTables.columns
+    let matchedColumnCount = 0
     for (let i = 0; i < columns.length; i++) {
       columns[i].title = columns[i].title || columns[i].name
       // Needed for _verbose server response?
       // columns[i]['data'] = columns[i]['data'] || columns[i]['name'];
       columns[i].target = columns[i].target || i
 
-      const visible = allVisible || _cols.includes(columns[i].name)
+      const visible = allVisible ||
+        exactCols.includes(columns[i].name) ||
+        regexCols.some(regex => regex.test(columns[i].name))
+      if (visible) {
+        matchedColumnCount++
+      }
       if ([null, undefined].includes(columns[i].visible)) {
         // Override visibility if not set in dataTables.columns
         columns[i].visible = visible
@@ -391,6 +424,19 @@ async function getConfig () {
           columns[i].render = render
         }
       }
+    }
+
+    if (!allVisible && matchedColumnCount === 0) {
+      let message = 'No columns match the current column selection.'
+      if (_colsRegex.length > 0) {
+        message += ` _cols_regex=${_colsRegex.join(',')}.`
+      }
+      if (exactCols.length > 0) {
+        message += ` _cols=${exactCols.join(',')}.`
+      }
+      config.dataTablesAdditions.columnSelectionWarning = message
+    } else {
+      delete config.dataTablesAdditions.columnSelectionWarning
     }
   }
 
@@ -836,6 +882,10 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
 
   const input = th.find('input.columnSearch')
 
+  const _return = encodeURIComponent(name)
+  const dlTitle = `Download list of unique values and (count) for column ${name}`
+  const dlLink = `<a href="data/?_return=${_return}&_uniques=true" title="${dlTitle}" target="blank">⤓</a>`
+
   const maxLen = 100
   const width = input.outerWidth()
   const title = `List of most frequent unique values and (count); max of ${maxLen} shown`
@@ -843,11 +893,16 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
   // For spacing to be correct, need to place select in DOM even if not shown.
   let select = $(`
     <div style="white-space: nowrap;">
-      <select ${attrs} style="width: ${width}px;margin-left:3px"></select>
-      <span style="visibility:hidden">✘</span>
+      <select ${attrs} style="width: ${width}px;"></select>
+      <span class="columnDropDownDownload">${dlLink}</span>
     </div>
   `)
   select.appendTo(th)
+
+  const whyNeeded = 1
+  const selectEl = select.find('select')
+  const dx = whyNeeded + input.offset().left - selectEl.offset().left
+  selectEl.css('margin-left', `${dx}px`)
 
   if (show === false) {
     // Place the dropdown in the DOM but do not show so spacing correct.
@@ -858,7 +913,7 @@ function createColumnDropdown (parent, visibleIndex, name, column, show) {
   const searches = new URLSearchParams(qsSearch).toString()
 
   let url = `data/?${searches}&_return=${encodeURIComponent(name)}`
-  url += '&_uniques=true&_length=100'
+  url += `&_uniques=true&_length=${maxLen}`
   getOptionHTML(url, setOptionHTML)
 
   function setOptionHTML (html) {

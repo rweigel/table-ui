@@ -77,9 +77,9 @@ renderFunctions.ellipsis = function (columnName, config, n) {
     if (n > columnString.length) {
       return columnString
     }
-    shortened = columnString.substring(0, n)
+    shortened = esc(columnString.substring(0, n))
     const ellipsisClick = '<span class="ellipsis-click">&#8230;</span>'
-    const ellipsisFull = `<span style="display:none;" class="ellipsis-full">${columnString}</span>`
+    const ellipsisFull = `<span style="display:none;" class="ellipsis-full">${esc(columnString)}</span>`
     shortened += ellipsisClick
     return `<span class="ellipsis" title="${columnString}">${shortened}</span>${ellipsisFull}`
   }

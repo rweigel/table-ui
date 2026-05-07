@@ -42,11 +42,27 @@ select.columnUniques {
   overflow: auto;
   margin-top: 0.25em;
 }
+
 span.clearOneSearch {
   white-space: nowrap;
   visibility: hidden;
   cursor: pointer;
+  display: inline-block;
+  width: 1em;
+  text-align: center;
+  vertical-align: middle;
+  line-height: 1;
 }
+.columnDropDownDownload {
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-block;
+  width: 1em;
+  text-align: left;
+  vertical-align: middle;
+  line-height: 1;
+}
+
 div.options {
   margin-left: 1em;
   border: 1px solid black;

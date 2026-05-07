@@ -153,37 +153,71 @@ function checkQueryString (config) {
     }
   }
 
-  console.log("checkQueryString() => what = 'cols'. Checking only _cols parameter in query string.")
+  console.log("checkQueryString() => what = 'cols'. Checking _cols and _cols_regex parameters in query string.")
   let _cols = getQueryValue('_cols')
-  if (!_cols) {
-    console.log('checkQueryString() => No _cols in query string. Leaving it.')
+  let _colsRegex = getQueryValue('_cols_regex')
+  if (!_cols && !_colsRegex) {
+    console.log('checkQueryString() => No _cols or _cols_regex in query string. Leaving them.')
     return
   }
 
-  _cols = _cols.split(',')
-  let updateHash = false
-  for (let i = 0; i < _cols.length; i++) {
-    const columnName = _cols[i]
-    if (columnName in columnObject) {
-      continue
-    } else {
+  if (_cols) {
+    _cols = _cols.split(',')
+    const validCols = []
+    let updateCols = false
+    for (let i = 0; i < _cols.length; i++) {
+      const columnName = _cols[i]
+      if (columnName in columnObject) {
+        validCols.push(columnName)
+        continue
+      }
+
       const msg = `checkQueryString() => Column name '${columnName}' not `
       console.log(`${msg}found in column names. Removing it from _cols.`)
-      if (!updateHash) {
+      if (!updateCols) {
         let amsg = 'checkQueryString() => Column name in query string not '
         amsg += `found: "${columnName}". Removing it and any other invalid `
         window.alert(`${amsg}column names from query string.`)
       }
-      updateHash = true
-      delete _cols[i]
+      updateCols = true
+    }
+
+    if (updateCols) {
+      console.log('checkQueryString() => Updating query string to remove invalid _cols values.')
+      _cols = validCols.filter(Boolean)
+      console.log(_cols)
+      setQueryValue('_cols', _cols.length ? _cols.join(',') : null)
     }
   }
-  const columnNames = config.dataTables.columns.map(col => col.name)
-  if (updateHash) {
-    console.log('checkQueryString() => Updating query string to remove invalid column names.')
-    _cols = columnNames.filter(Boolean) // Remove any null/undefined values
-    console.log(_cols)
-    setQueryValue('_cols', _cols.join(','))
+
+  if (_colsRegex) {
+    _colsRegex = _colsRegex.split(',')
+    const validRegexes = []
+    let updateColsRegex = false
+    for (let i = 0; i < _colsRegex.length; i++) {
+      const columnRegex = _colsRegex[i]
+      try {
+        new RegExp(columnRegex)
+        validRegexes.push(columnRegex)
+        continue
+      } catch (e) {
+        console.log(`checkQueryString() => Invalid _cols_regex regex '${columnRegex}'. Removing it.`)
+      }
+
+      if (!updateColsRegex) {
+        let amsg = 'checkQueryString() => Invalid regex in _cols_regex: '
+        amsg += `"${columnRegex}". Removing it and any other invalid regexes.`
+        window.alert(amsg)
+      }
+      updateColsRegex = true
+    }
+
+    if (updateColsRegex) {
+      console.log('checkQueryString() => Updating query string to remove invalid _cols_regex values.')
+      _colsRegex = validRegexes.filter(Boolean)
+      console.log(_colsRegex)
+      setQueryValue('_cols_regex', _colsRegex.length ? _colsRegex.join(',') : null)
+    }
   }
 }
 
