@@ -1307,13 +1307,14 @@ function adjustDOM () {
       if (columnOptionsMap[name].visible === false) numColsHidden++
     }
   }
+  const numColsEmptyHidden = colsShowHas('nonempty') ? numColsEmpty : 0
 
   let colInfo = ` and all ${numCols} columns`
-  if (numColsHidden !== 0) {
+  if (numColsHidden !== 0 || numColsEmptyHidden !== 0) {
     let msg = ""
-    if (numColsEmpty !== 0 && getQueryValue('_cols_show') !== undefined) {
-      let s = numColsEmpty === 1 ? '' : 's'
-      msg = `Select 'Show empty columns' in options to see the ${numColsEmpty} empty column${s}. `
+    if (numColsEmptyHidden !== 0) {
+      let s = numColsEmptyHidden === 1 ? '' : 's'
+      msg = `Select 'Show empty columns' in options to see the ${numColsEmptyHidden} empty column${s}. `
     }
     if (numColsHidden > 0) {
       let s = numColsHidden === 1 ? '' : 's'
